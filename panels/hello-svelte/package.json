@@ -1,0 +1,69 @@
+{
+  "name": "@workspace-panels/hello-svelte",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "vibestudio": {
+    "title": "Hello Svelte",
+    "entry": "index.ts",
+    "template": "svelte",
+    "authority": {
+      "provides": [],
+      "requests": [
+        {
+          "capability": "context.boundary",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "critical",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "context.materialize",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "subagents.create",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:channel",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:models",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@workspace/runtime": "workspace:*",
+    "@workspace/svelte": "workspace:*"
+  },
+  "devDependencies": {
+    "svelte": "^5.55.0",
+    "vitest": "^3.2.2"
+  }
+}
