@@ -1,4 +1,8 @@
-import { DurableObjectBase, rpc, type DurableObjectContext } from "@workspace/runtime/worker";
+import {
+  DurableObjectBase,
+  rpc,
+  type DurableObjectContext,
+} from "@workspace/runtime/worker";
 
 /**
  * Sample Durable Object showing the canonical userland storage primitive.
@@ -14,10 +18,6 @@ import { DurableObjectBase, rpc, type DurableObjectContext } from "@workspace/ru
  */
 export class SampleDO extends DurableObjectBase {
   static override schemaVersion = 1;
-
-  protected override schemaProductionBaseline() {
-    return { version: 1, name: "sample-do-v1" } as const;
-  }
 
   protected override requiredTables(): readonly string[] {
     return ["visits"];
@@ -40,7 +40,10 @@ export class SampleDO extends DurableObjectBase {
   })
   recordVisit(): { count: number } {
     this.ensureReady();
-    this.sql.exec(`INSERT INTO visits (ts) VALUES (?)`, new Date().toISOString());
+    this.sql.exec(
+      `INSERT INTO visits (ts) VALUES (?)`,
+      new Date().toISOString(),
+    );
     return this.visitCount();
   }
 
@@ -52,7 +55,9 @@ export class SampleDO extends DurableObjectBase {
   })
   visitCount(): { count: number } {
     this.ensureReady();
-    const row = this.sql.exec(`SELECT COUNT(*) as count FROM visits`).one() as { count: number };
+    const row = this.sql.exec(`SELECT COUNT(*) as count FROM visits`).one() as {
+      count: number;
+    };
     return { count: row.count };
   }
 }
@@ -61,7 +66,7 @@ export default {
   async fetch(_request: Request) {
     return new Response(
       "Sample Durable Object worker.\nMethods: SampleDO.recordVisit, SampleDO.visitCount.\nCall via unified RPC target IDs; see sampleDo.test.ts for an end-to-end example using createTestDO.",
-      { headers: { "Content-Type": "text/plain" } }
+      { headers: { "Content-Type": "text/plain" } },
     );
   },
 };

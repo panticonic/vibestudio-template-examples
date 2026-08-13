@@ -1,4 +1,13 @@
-systemEpoch: 57
+systemEpoch: 58
+template:
+  name: Examples
+  description: Sample panels and workers for learning and experimentation.
+  repositories:
+    - panels/hello-svelte
+    - panels/hello-vanilla
+    - workers/hello
+    - workers/sample-do
+  files: []
 templates:
   use:
     - url: git+https://github.com/panticonic/vibestudio-workspace-base.git
