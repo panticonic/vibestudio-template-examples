@@ -61,10 +61,10 @@
   },
   "dependencies": {
     "@workspace/runtime": "workspace:*",
-    "@workspace/svelte": "workspace:*"
+    "@workspace/svelte": "workspace:*",
+    "svelte": "5.56.9"
   },
   "devDependencies": {
-    "svelte": "5.56.9",
     "vitest": "3.2.7"
   }
 }
