@@ -1,0 +1,32 @@
+{
+  "name": "@workspace-workers/regency-realm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "State service for the Regency example: the world, the season clock, the council's order book, and briefings to the agents who play in it.",
+  "dependencies": {
+    "@workspace/runtime": "workspace:*",
+    "@workspace/regency-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  },
+  "vibestudio": {
+    "title": "Regency Realm",
+    "icon": "./assets/icon.svg",
+    "kind": "worker",
+    "entry": "index.ts",
+    "durable": {
+      "classes": [
+        {
+          "className": "RegencyGameDO"
+        }
+      ]
+    },
+    "authority": {
+      "provides": [],
+      "requests": [],
+      "serviceRequests": []
+    }
+  }
+}

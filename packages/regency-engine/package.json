@@ -1,0 +1,13 @@
+{
+  "name": "@workspace/regency-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic strategy engine for the Regency example: map generation, economy, population, war, diplomacy, laws, victory.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "name": "@workspace-panels/regency",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Regency: rule a realm through a council of agents, treat with rival sovereigns and their ambassadors, and watch the map change season by season.",
+  "vibestudio": {
+    "title": "Regency",
+    "icon": "./assets/icon.svg",
+    "entry": "index.ts",
+    "template": "svelte",
+    "stateArgs": {
+      "type": "object",
+      "properties": {
+        "gameKey": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "authority": {
+      "provides": [],
+      "serviceRequests": [
+        {
+          "protocol": "examples.regency.v1",
+          "availability": "required"
+        },
+        {
+          "protocol": "vibestudio.channel.v1",
+          "availability": "required"
+        },
+        {
+          "protocol": "vibestudio.models.v1",
+          "availability": "required"
+        }
+      ],
+      "requests": [
+        {
+          "capability": "workspace-service:regency",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "context.boundary",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "critical",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "context.materialize",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "subagents.create",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:channel",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:models",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:gad.workspace",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:workspace.state",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace.runtime-state.manage",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace.runtime-state.inspect",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@workspace/runtime": "workspace:*",
+    "@workspace/svelte": "workspace:*",
+    "@workspace/regency-engine": "workspace:*",
+    "@workspace-skills/agents": "workspace:*",
+    "svelte": "^5.56.9",
+    "@workspace/pubsub": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}

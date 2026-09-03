@@ -1,12 +1,16 @@
 systemEpoch: 0
 template:
   name: Examples
-  description: Sample panels and workers for learning and experimentation.
+  description: Sample panels and workers for learning and experimentation, including Regency, a strategy game whose council and rival courts are workspace agents.
   repositories:
     - panels/hello-svelte
     - panels/hello-vanilla
     - workers/hello
     - workers/sample-do
+    - packages/regency-engine
+    - workers/regency-realm
+    - workers/regency-agents
+    - panels/regency
   files: []
 templates:
   use:
