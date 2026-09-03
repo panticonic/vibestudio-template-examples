@@ -42,6 +42,7 @@ const COUNCIL: Array<{ role: string; name: string }> = [
   { role: "marshal", name: "The Marshal" },
   { role: "envoy", name: "The Envoy" },
   { role: "protector", name: "The Lord Protector" },
+  { role: "chronicler", name: "The Chronicler" },
 ];
 
 export function planSeats(gameKey: string, state: GameState): Seat[] {
@@ -131,6 +132,7 @@ export async function seatTheCourt(client: GameClient, state: GameState, onProgr
           name: seat.name,
           ...(seat.character ? { character: seat.character } : {}),
           regencyName: player.name,
+          ...(state.legend && (seat.role.startsWith("sovereign:") || seat.role.startsWith("ambassador:")) ? { legend: state.legend } : {}),
           directory: directoryFor(seat, seats),
           ...(person ? { person: { name: person.name, house: person.house, ambition: person.ambition, temperament: person.temperament, rival: person.rival } } : {}),
           respondPolicy: seat.respondPolicy,

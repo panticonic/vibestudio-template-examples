@@ -9,24 +9,30 @@ const SKINS = ["#f1d3b3", "#e8bf9a", "#d9a877", "#c48a5a", "#a86a3f", "#7d4b2a"]
 const HAIRS = ["#2b1d12", "#4a2f1a", "#7a4a22", "#b07a3a", "#d9b56b", "#8f8f8f", "#e9e4d8", "#3a2a2a"];
 const CLOTH = ["#6b2d2d", "#2d4a6b", "#3d6b3a", "#6b5a2d", "#4b2d6b", "#2d6b66", "#5a5a5a"];
 
-export function portraitSvg(seed: number, accent: string, size = 64): string {
+/**
+ * A face from a seed. `variant: "adult"` grows the same child up: a longer
+ * face, a plainer hairline, a set jaw — the heir at their majority is
+ * recognisably the heir, only older.
+ */
+export function portraitSvg(seed: number, accent: string, size = 64, variant: "default" | "adult" = "default"): string {
   const rng = createRng(seed);
+  const adult = variant === "adult";
   const skin = rng.pick(SKINS);
   const hair = rng.pick(HAIRS);
   const cloth = rng.chance(0.5) ? accent : rng.pick(CLOTH);
-  const faceW = 22 + rng.int(8);
-  const faceH = 28 + rng.int(8);
+  const faceW = 22 + rng.int(8) - (adult ? 1 : 0);
+  const faceH = 28 + rng.int(8) + (adult ? 4 : 0);
   const eyeY = 30 + rng.int(4);
   const eyeGap = 6 + rng.int(3);
   const hairStyle = rng.int(4);
-  const beard = rng.chance(0.35);
-  const brows = rng.chance(0.7);
+  const beard = adult ? rng.chance(0.6) : rng.chance(0.35);
+  const brows = adult ? true : rng.chance(0.7);
   const nose = rng.int(3);
   const mouth = rng.int(3);
   const cx = 32;
   const cy = 34;
   const parts: string[] = [];
-  parts.push(`<rect width="64" height="64" rx="10" fill="${accent}" fill-opacity="0.18"/>`);
+  parts.push(`<rect width="64" height="64" rx="10" fill="${accent}" fill-opacity="${adult ? 0.26 : 0.18}"/>`);
   parts.push(`<circle cx="32" cy="30" r="27" fill="${accent}" fill-opacity="0.12"/>`);
   // shoulders
   parts.push(`<path d="M8 64 q4 -18 24 -18 q20 0 24 18 z" fill="${cloth}"/>`);

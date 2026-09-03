@@ -413,6 +413,64 @@ export interface GameEvent {
 
 // ── Game ────────────────────────────────────────────────────────────────────
 
+// ── Staged intents, promises, debates ───────────────────────────────────────
+
+export type IntentKind = "march" | "edict" | "offer" | "build" | "muster" | "other";
+
+/**
+ * A preview of what a seat means to do, drawn on the map before the order
+ * exists. Intents never touch the world; they are cleared when the related
+ * order is sealed, withdrawn or resolved, and all of them at resolution.
+ */
+export interface StagedIntent {
+  id: string;
+  /** Seat that staged it: "marshal", "sovereign:r1"… */
+  role: string;
+  realm: RealmId;
+  kind: IntentKind;
+  /** One line the Regent reads on the map. */
+  label: string;
+  season: number;
+  payload: {
+    province?: ProvinceId;
+    from?: ProvinceId;
+    to?: ProvinceId;
+    army?: ArmyId;
+    target?: RealmId;
+    /** For edicts: the conditions whose matching provinces light up. */
+    when?: EdictCondition[];
+    building?: BuildingKind;
+    unit?: UnitKind;
+    companies?: number;
+  };
+  /** Order this intent anticipates, once submitted. */
+  orderId: string | null;
+}
+
+/** What would count as the Regent's word being kept. */
+export type PromiseCheck =
+  | { kind: "treaty"; with: RealmId; treatyKind: TreatyKind }
+  | { kind: "no_war"; with: RealmId; seasons: number }
+  | { kind: "cede"; province: ProvinceId; to: RealmId }
+  | { kind: "free_text" };
+
+export type PromiseStatus = "pending" | "kept" | "broken";
+
+/** A promise the Regent made, recorded by the Envoy or the Herald. */
+export interface RegentPromise {
+  id: string;
+  /** Realm the promise was made to. */
+  to: RealmId;
+  text: string;
+  check: PromiseCheck;
+  season: number;
+  status: PromiseStatus;
+  /** Season the promise was settled, if it was. */
+  settled: number | null;
+  /** Who wrote it down. */
+  recordedBy: string;
+}
+
 export type Phase = "orders" | "closing" | "finished";
 
 export interface Outcome {
@@ -464,6 +522,11 @@ export interface GameState {
   crises: Crisis[];
   /** Per-season narrative digest written at resolution. */
   digest: string[];
+  /**
+   * The legend of a previous Regency, read from `projects/regency/legend.md`
+   * when the game was founded. Rival sovereigns quote it as memory.
+   */
+  legend?: string;
 }
 
 export const SEASON_NAMES = ["Spring", "Summer", "Autumn", "Winter"] as const;

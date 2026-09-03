@@ -1,8 +1,25 @@
 <script lang="ts">
   import { dominantTraits, heirAge, seasonLabel, type GameState } from "@workspace/regency-engine";
   import type { GameClient, GameView } from "./lib/client.js";
+  import Why from "./Why.svelte";
 
-  let { view, client, refresh, notice, replaySeason = $bindable<number | null>(null) }: { view: GameView; client: GameClient; refresh: () => Promise<void>; notice: (text: string, kind?: "info" | "error") => void; replaySeason?: number | null } = $props();
+  let {
+    view,
+    client,
+    refresh,
+    notice,
+    replaySeason = $bindable<number | null>(null),
+    sound = false,
+    onSound = undefined,
+  }: {
+    view: GameView;
+    client: GameClient;
+    refresh: () => Promise<void>;
+    notice: (text: string, kind?: "info" | "error") => void;
+    replaySeason?: number | null;
+    sound?: boolean;
+    onSound?: ((on: boolean) => void) | undefined;
+  } = $props();
   const world = $derived(view.state as GameState);
   const player = $derived(world.realms[world.playerRealm]!);
   const awaiting = $derived(view.orders.filter((o) => o.status === "awaiting_seal").length);
@@ -27,8 +44,8 @@
 
 <div class="realm">
   <section class="stats">
-    <div class="stat"><span>Treasury</span><strong>{player.treasury.toFixed(0)}</strong><small>{player.ledger.net >= 0 ? "+" : ""}{player.ledger.net}/season</small></div>
-    <div class="stat"><span>Legitimacy</span><strong class:low={player.legitimacy < 40}>{Math.round(player.legitimacy)}</strong><small>need ≥ 40</small></div>
+    <div class="stat"><span>Treasury <Why world={world} events={view.events} subject={{ kind: "treasury" }} /></span><strong>{player.treasury.toFixed(0)}</strong><small>{player.ledger.net >= 0 ? "+" : ""}{player.ledger.net}/season</small></div>
+    <div class="stat"><span>Legitimacy <Why world={world} events={view.events} subject={{ kind: "legitimacy" }} /></span><strong class:low={player.legitimacy < 40}>{Math.round(player.legitimacy)}</strong><small>need ≥ 40</small></div>
     <div class="stat"><span>Prestige</span><strong>{Math.round(player.prestige)}</strong><small>infamy {Math.round(player.infamy)}</small></div>
     <div class="stat"><span>Reputation</span><strong>{Math.round(world.regent.reputation)}</strong><small>{world.regent.name}</small></div>
   </section>
@@ -87,6 +104,12 @@
     </section>
   {/if}
 
+  <section class="comforts">
+    <h3>Comforts</h3>
+    <label class="toggle"><input type="checkbox" checked={sound} onchange={(e) => onSound?.((e.currentTarget as HTMLInputElement).checked)} /> Sound: a horn when the season turns, steel when armies meet, a stamp when the seal falls</label>
+    <p class="muted small">Keys: <kbd>Space</kbd> closes the season · <kbd>S</kbd> seals the topmost act · <kbd>←</kbd><kbd>→</kbd> walk the provinces · <kbd>Esc</kbd> clears the selection. They do nothing while you are typing.</p>
+  </section>
+
   {#if view.snapshots.length > 1}
     <section>
       <h3>Replay</h3>
@@ -128,4 +151,7 @@
   input[type="range"] { width: 100%; accent-color: var(--accent); }
   .muted { color: var(--muted); }
   .small { font-size: 0.78rem; margin: 6px 0 0; }
+  .toggle { display: flex; gap: 8px; align-items: flex-start; font-size: 0.82rem; line-height: 1.4; cursor: pointer; }
+  .toggle input { margin-top: 3px; }
+  kbd { font-family: ui-monospace, monospace; font-size: 0.72rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--bg); }
 </style>

@@ -16,6 +16,8 @@ export const CARD_VERSION = 1;
 const SEAL_TYPE = "regency.seal";
 const MATTER_TYPE = "regency.matter";
 const SEASON_TYPE = "regency.season";
+const DEBATE_TYPE = "regency.debate";
+const HANDOVER_TYPE = "regency.handover";
 const RENDERER_DIR = "panels/regency/renderers";
 const IMPORTS = { "@radix-ui/themes": "npm:^3.2.1", "@radix-ui/react-icons": "npm:^1.3.2" };
 
@@ -56,6 +58,8 @@ export class CourtCards {
     await client.registerMessageType({ typeId: SEAL_TYPE, displayMode: "inline", source: { type: "file", path: `${RENDERER_DIR}/seal-card.tsx` }, imports: IMPORTS });
     await client.registerMessageType({ typeId: MATTER_TYPE, displayMode: "inline", source: { type: "file", path: `${RENDERER_DIR}/matter-card.tsx` }, imports: IMPORTS });
     await client.registerMessageType({ typeId: SEASON_TYPE, displayMode: "row", source: { type: "file", path: `${RENDERER_DIR}/season-card.tsx` }, imports: IMPORTS });
+    await client.registerMessageType({ typeId: DEBATE_TYPE, displayMode: "inline", source: { type: "file", path: `${RENDERER_DIR}/debate-card.tsx` }, imports: IMPORTS });
+    await client.registerMessageType({ typeId: HANDOVER_TYPE, displayMode: "inline", source: { type: "file", path: `${RENDERER_DIR}/handover-card.tsx` }, imports: IMPORTS });
     await this.game.setCard({ key, channelId: this.channelId, messageId: "-", kind: "types" });
     this.registered = true;
   }
@@ -146,9 +150,54 @@ export class CourtCards {
         const { messageId } = await client.publishCustomMessage({ typeId: SEASON_TYPE, initialState: cardState, displayMode: "row" }, { idempotencyKey: `regency:${key}` });
         await this.game.setCard({ key, channelId: this.channelId, messageId, kind: "season" });
       }
+      // Council debates: one card per debate, updated as the ministers answer.
+      for (const d of view.debates) {
+        const key = `debate:${d.id}`;
+        const cardState = {
+          debateId: d.id,
+          question: d.question,
+          status: d.status,
+          season: seasonLabel({ season: d.season, startYear: state.startYear }),
+          lines: d.lines,
+          waiting: ["chancellor", "treasurer", "marshal", "envoy"].filter((r) => !d.lines.some((l) => l.role === r)),
+        };
+        const existing = cards.get(key);
+        if (!existing) {
+          const client = await this.connect();
+          const { messageId } = await client.publishCustomMessage({ typeId: DEBATE_TYPE, initialState: cardState, displayMode: "inline" }, { idempotencyKey: `regency:${key}` });
+          await this.game.setCard({ key, channelId: this.channelId, messageId, kind: "debate" });
+        } else {
+          const before = previous?.debates.find((p) => p.id === d.id);
+          if (!before || before.lines.length !== d.lines.length || before.status !== d.status) {
+            const client = await this.connect();
+            await client.updateCustomMessage(existing.messageId, cardState, { idempotencyKey: `regency:${key}:${d.lines.length}:${d.status}` });
+          }
+        }
+      }
+      // The Lord Protector's hand-over, when the mandate has run out.
+      for (const h of view.handovers) {
+        const key = `handover:${h.id}`;
+        if (cards.has(key)) continue;
+        const client = await this.connect();
+        const { messageId } = await client.publishCustomMessage(
+          { typeId: HANDOVER_TYPE, initialState: { season: seasonLabel({ season: h.season, startYear: state.startYear }), mandate: h.mandate, text: h.text }, displayMode: "inline" },
+          { idempotencyKey: `regency:${key}` },
+        );
+        await this.game.setCard({ key, channelId: this.channelId, messageId, kind: "handover" });
+      }
     } finally {
       this.busy = false;
     }
+  }
+
+  /**
+   * The Regent points at the map and speaks. The message carries the province
+   * or army as metadata so the Herald routes it without guessing which one was
+   * meant; the Herald's prompt says to expect it.
+   */
+  async speak(text: string, about: { province?: string; army?: string }): Promise<void> {
+    const client = await this.connect();
+    await client.send(text, { metadata: { regency: { ...(about.province ? { province: about.province } : {}), ...(about.army ? { army: about.army } : {}) } } });
   }
 
   async close(): Promise<void> {

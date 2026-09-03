@@ -28,13 +28,20 @@ import {
   requiresSeal,
   resolveSeason,
   seasonLabel,
+  settlePromises,
   validateOrder,
+  validatePromiseCheck,
+  describePromiseCheck,
   TREATY_GUIDE,
   type Crisis,
   type GameEvent,
   type GameState,
+  type IntentKind,
   type Order,
+  type PromiseCheck,
   type RealmId,
+  type RegentPromise,
+  type StagedIntent,
   type SubmittedOrder,
   type WorldOptions,
 } from "@workspace/regency-engine";
@@ -117,6 +124,39 @@ export interface CardRef {
   updatedAt: string;
 }
 
+export interface Debate {
+  id: string;
+  season: number;
+  question: string;
+  openedBy: string;
+  status: "open" | "closed";
+  lines: Array<{ role: string; name: string; text: string }>;
+}
+
+export interface ChronicleEntry {
+  year: number;
+  season: number;
+  text: string;
+}
+
+export interface Handover {
+  id: string;
+  season: number;
+  mandate: string;
+  text: string;
+}
+
+/** Everything the Regent could not see while it mattered, opened at the end. */
+export interface SecretHistory {
+  bribes: Bribe[];
+  dossiers: Array<{ role: string; text: string }>;
+  doctrines: Array<{ realm: RealmId; text: string; season: number }>;
+  promises: RegentPromise[];
+  diaries: Array<{ realm: RealmId; text: string }>;
+  /** The private chambers, so the Regent may finally read them. */
+  chambers: Array<{ role: string; channelId: string }>;
+}
+
 export interface GameView {
   state: GameState | null;
   participants: Participant[];
@@ -133,6 +173,14 @@ export interface GameView {
   cards: CardRef[];
   dossiers: Array<{ role: string; text: string }>;
   doctrines: Array<{ realm: RealmId; text: string; season: number }>;
+  /** What the council means to do, drawn on the map before it is ordered. */
+  intents: StagedIntent[];
+  promises: RegentPromise[];
+  debates: Debate[];
+  chronicles: ChronicleEntry[];
+  handovers: Handover[];
+  /** Null until the game ends; then everything that was hidden. */
+  secrets: SecretHistory | null;
 }
 
 export interface Forecast {
@@ -161,6 +209,7 @@ export type SubmitOrderResult =
   | { ok: false; reason: string };
 
 const EVENT_LIMIT = 80;
+const LEGEND_PATH = "projects/regency/legend.md";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -180,10 +229,10 @@ export function portfolioOf(role: string): string {
 /** Rules text is in the engine; this adds the court's own conventions. */
 
 export class RegencyGameDO extends DurableObjectBase {
-  static override schemaVersion = 1;
+  static override schemaVersion = 2;
 
   protected override requiredTables(): readonly string[] {
-    return ["game", "orders", "events", "participants", "mandates", "briefings", "snapshots", "cards", "bribes", "dossiers", "doctrines", "protectorate"];
+    return ["game", "orders", "events", "participants", "mandates", "briefings", "snapshots", "cards", "bribes", "dossiers", "doctrines", "protectorate", "intents", "promises", "debates", "counsel", "chronicles", "handovers", "diaries"];
   }
 
   protected createTables(): void {
@@ -199,6 +248,13 @@ export class RegencyGameDO extends DurableObjectBase {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS dossiers (role TEXT PRIMARY KEY, text TEXT NOT NULL, updated_at TEXT NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS doctrines (realm TEXT PRIMARY KEY, text TEXT NOT NULL, season INTEGER NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS protectorate (id INTEGER PRIMARY KEY CHECK (id = 1), active INTEGER NOT NULL, mandate TEXT NOT NULL, seasons_left INTEGER NOT NULL, limits_json TEXT NOT NULL, started_season INTEGER NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS intents (id TEXT PRIMARY KEY, role TEXT NOT NULL, realm TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL, season INTEGER NOT NULL, payload_json TEXT NOT NULL, order_id TEXT)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS promises (id TEXT PRIMARY KEY, to_realm TEXT NOT NULL, text TEXT NOT NULL, check_json TEXT NOT NULL, season INTEGER NOT NULL, status TEXT NOT NULL, settled INTEGER, recorded_by TEXT NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS debates (id TEXT PRIMARY KEY, season INTEGER NOT NULL, question TEXT NOT NULL, opened_by TEXT NOT NULL, status TEXT NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS counsel (debate_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (debate_id, role))`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS chronicles (year INTEGER PRIMARY KEY, season INTEGER NOT NULL, text TEXT NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS handovers (id TEXT PRIMARY KEY, season INTEGER NOT NULL, mandate TEXT NOT NULL, text TEXT NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS diaries (realm TEXT PRIMARY KEY, text TEXT NOT NULL, updated_at TEXT NOT NULL)`);
   }
 
   // ── Small readers ─────────────────────────────────────────────────────────
@@ -216,6 +272,69 @@ export class RegencyGameDO extends DurableObjectBase {
 
   private readBribes(): Bribe[] {
     return this.sql.exec<Record<string, unknown>>(`SELECT * FROM bribes ORDER BY season, id`).toArray().map((r) => ({ id: r["id"] as string, season: r["season"] as number, fromRealm: r["from_realm"] as string, targetRole: r["target_role"] as string, gold: r["gold"] as number, note: r["note"] as string, status: r["status"] as Bribe["status"], untilSeason: (r["until_season"] as number | null) ?? null }));
+  }
+
+  private readIntents(realm?: RealmId): StagedIntent[] {
+    return this.sql
+      .exec<Record<string, unknown>>(`SELECT * FROM intents ORDER BY rowid`)
+      .toArray()
+      .map((r) => ({
+        id: r["id"] as string,
+        role: r["role"] as string,
+        realm: r["realm"] as string,
+        kind: r["kind"] as IntentKind,
+        label: r["label"] as string,
+        season: r["season"] as number,
+        payload: JSON.parse(r["payload_json"] as string) as StagedIntent["payload"],
+        orderId: (r["order_id"] as string | null) ?? null,
+      }))
+      .filter((i) => !realm || i.realm === realm);
+  }
+
+  private readPromises(): RegentPromise[] {
+    return this.sql
+      .exec<Record<string, unknown>>(`SELECT * FROM promises ORDER BY season, id`)
+      .toArray()
+      .map((r) => ({
+        id: r["id"] as string,
+        to: r["to_realm"] as string,
+        text: r["text"] as string,
+        check: JSON.parse(r["check_json"] as string) as PromiseCheck,
+        season: r["season"] as number,
+        status: r["status"] as RegentPromise["status"],
+        settled: (r["settled"] as number | null) ?? null,
+        recordedBy: r["recorded_by"] as string,
+      }));
+  }
+
+  private savePromise(p: RegentPromise): void {
+    this.sql.exec(
+      `INSERT INTO promises (id, to_realm, text, check_json, season, status, settled, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET status = excluded.status, settled = excluded.settled`,
+      p.id, p.to, p.text, JSON.stringify(p.check), p.season, p.status, p.settled, p.recordedBy,
+    );
+  }
+
+  private readDebates(state: GameState | null): Debate[] {
+    const lines = this.sql.exec<{ debate_id: string; role: string; text: string }>(`SELECT debate_id, role, text FROM counsel ORDER BY at`).toArray();
+    return this.sql
+      .exec<Record<string, unknown>>(`SELECT * FROM debates ORDER BY season DESC, id DESC LIMIT 20`)
+      .toArray()
+      .map((r) => ({
+        id: r["id"] as string,
+        season: r["season"] as number,
+        question: r["question"] as string,
+        openedBy: r["opened_by"] as string,
+        status: r["status"] as Debate["status"],
+        lines: lines.filter((l) => l.debate_id === r["id"]).map((l) => ({ role: l.role, name: state?.court[l.role]?.name ?? l.role, text: l.text })),
+      }));
+  }
+
+  private readChronicles(): ChronicleEntry[] {
+    return this.sql.exec<{ year: number; season: number; text: string }>(`SELECT year, season, text FROM chronicles ORDER BY year`).toArray();
+  }
+
+  private readHandovers(): Handover[] {
+    return this.sql.exec<{ id: string; season: number; mandate: string; text: string }>(`SELECT id, season, mandate, text FROM handovers ORDER BY season`).toArray();
   }
 
   private readCards(): CardRef[] {
@@ -340,16 +459,61 @@ export class RegencyGameDO extends DurableObjectBase {
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
-  newGame(input: WorldOptions & { keepParticipants?: boolean }): { title: string; season: string; realms: Array<{ id: string; name: string; sovereign: string }> } {
+  async newGame(input: WorldOptions & { keepParticipants?: boolean }): Promise<{ title: string; season: string; realms: Array<{ id: string; name: string; sovereign: string }>; legend: boolean }> {
     this.ensureReady();
     const seed = (input.seed ?? "").trim() || `regency-${Date.now().toString(36)}`;
     const state = generateWorld({ ...input, seed });
-    for (const table of ["orders", "events", "briefings", "snapshots", "cards", "bribes", "dossiers", "doctrines", "protectorate", "mandates"]) this.sql.exec(`DELETE FROM ${table}`);
+    const legend = await this.readLegend();
+    if (legend) state.legend = legend;
+    for (const table of ["orders", "events", "briefings", "snapshots", "cards", "bribes", "dossiers", "doctrines", "protectorate", "mandates", "intents", "promises", "debates", "counsel", "chronicles", "handovers", "diaries"]) this.sql.exec(`DELETE FROM ${table}`);
     if (!input.keepParticipants) this.sql.exec(`DELETE FROM participants`);
     this.saveState(state);
     this.sql.exec(`INSERT INTO snapshots (season, state_json) VALUES (?, ?)`, state.season, JSON.stringify(state));
     this.appendEvents([{ season: 0, kind: "season", text: `${state.title} begins in ${seasonLabel(state)}. The heir comes of age in ${state.majoritySeason} seasons.`, realms: Object.keys(state.realms) }]);
-    return { title: state.title, season: seasonLabel(state), realms: Object.values(state.realms).map((r) => ({ id: r.id, name: r.name, sovereign: r.sovereign })) };
+    return { title: state.title, season: seasonLabel(state), realms: Object.values(state.realms).map((r) => ({ id: r.id, name: r.name, sovereign: r.sovereign })), legend: Boolean(legend) };
+  }
+
+  /** The legend of a previous Regency, if one was left in the workspace. */
+  private async readLegend(): Promise<string | null> {
+    try {
+      const text = await this.fs.readFile(LEGEND_PATH, "utf8");
+      const body = String(text).trim();
+      return body ? body.slice(0, 2000) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** At the end, the Regency passes into legend: the next game will remember it. */
+  private async writeLegend(state: GameState): Promise<void> {
+    const player = state.realms[state.playerRealm]!;
+    const events = this.allEvents();
+    const betrayals = events.filter((e) => e.kind === "war" && e.realms.includes(state.playerRealm)).slice(-3).map((e) => `- ${e.text}`);
+    const broken = this.readPromises().filter((p) => p.status === "broken").slice(-4).map((p) => `- broke a word given to ${state.realms[p.to]?.name ?? p.to}: “${p.text}”`);
+    const kept = this.readPromises().filter((p) => p.status === "kept").length;
+    const body = [
+      `# The Regency of ${player.name}`,
+      "",
+      `${state.outcome?.title ?? "An unfinished Regency"}. ${state.outcome?.reason ?? ""}`,
+      "",
+      `${state.regent.name} ruled for ${state.season} seasons in the name of the heir ${state.heir.name}. The Regency ended holding ${Object.values(state.provinces).filter((p) => p.owner === state.playerRealm).length} provinces, with legitimacy ${Math.round(player.legitimacy)}, prestige ${Math.round(player.prestige)}, infamy ${Math.round(player.infamy)}, and a personal reputation of ${Math.round(state.regent.reputation)}.`,
+      kept ? `\n${kept} promise(s) were kept.` : "",
+      broken.length ? `\n## Words broken\n${broken.join("\n")}` : "",
+      betrayals.length ? `\n## Wars\n${betrayals.join("\n")}` : "",
+      state.outcome?.verdict ? `\n## The heir's verdict\n${state.outcome.verdict}` : "",
+      "",
+      "_Written by the Regency game at the close of play. A new Regency reads this file as the memory of the courts that remember._",
+    ].filter(Boolean).join("\n");
+    try {
+      await this.fs.mkdir("projects/regency", { recursive: true });
+    } catch {
+      // the folder may already exist, or the panel may have no writable project root
+    }
+    try {
+      await this.fs.writeFile(LEGEND_PATH, body);
+    } catch {
+      // a workspace without a writable project folder simply keeps no legend
+    }
   }
 
   @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
@@ -370,6 +534,24 @@ export class RegencyGameDO extends DurableObjectBase {
       cards: this.readCards(),
       dossiers: state?.phase === "finished" ? this.sql.exec<{ role: string; text: string }>(`SELECT role, text FROM dossiers`).toArray() : [],
       doctrines: this.sql.exec<{ realm: string; text: string; season: number }>(`SELECT realm, text, season FROM doctrines`).toArray(),
+      intents: state ? this.readIntents(state.playerRealm) : [],
+      promises: this.readPromises(),
+      debates: this.readDebates(state),
+      chronicles: this.readChronicles(),
+      handovers: this.readHandovers(),
+      secrets: state?.phase === "finished" ? this.secretHistory() : null,
+    };
+  }
+
+  /** Everything that was hidden while it mattered. Only once the game is over. */
+  private secretHistory(): SecretHistory {
+    return {
+      bribes: this.readBribes(),
+      dossiers: this.sql.exec<{ role: string; text: string }>(`SELECT role, text FROM dossiers`).toArray(),
+      doctrines: this.sql.exec<{ realm: string; text: string; season: number }>(`SELECT realm, text, season FROM doctrines`).toArray(),
+      promises: this.readPromises(),
+      diaries: this.sql.exec<{ realm: string; text: string }>(`SELECT realm, text FROM diaries`).toArray(),
+      chambers: this.readParticipants("chambers").map((p) => ({ role: p.role, channelId: p.channelId })),
     };
   }
 
@@ -475,6 +657,7 @@ export class RegencyGameDO extends DurableObjectBase {
     const id = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const status: OrderStatus = needsSeal ? "awaiting_seal" : "pending";
     this.sql.exec(`INSERT INTO orders (id, season, realm, actor, order_json, rationale, status, reason, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)`, id, state.season, input.realm, role, JSON.stringify(input.order), input.rationale ?? "", status, nowIso());
+    this.linkIntent(role, id, input.order);
     const summary = describeOrder(state, input.order);
     this.appendEvents([{ season: state.season, kind: "council", text: `${state.realms[input.realm]!.name}'s ${role} ${needsSeal ? "asks the Regent's seal to" : "ordered:"} ${summary}${input.rationale ? ` — “${input.rationale}”` : ""}`, realms: [input.realm], data: { orderId: id, status } }]);
     return { ok: true, orderId: id, status, summary, needsSeal };
@@ -493,6 +676,7 @@ export class RegencyGameDO extends DurableObjectBase {
     }
     if (row.status !== "pending" && row.status !== "awaiting_seal") return { ok: false, reason: `order is ${row.status}` };
     this.sql.exec(`UPDATE orders SET status = 'withdrawn' WHERE id = ?`, input.orderId);
+    this.sql.exec(`DELETE FROM intents WHERE order_id = ?`, input.orderId);
     return { ok: true };
   }
 
@@ -518,6 +702,7 @@ export class RegencyGameDO extends DurableObjectBase {
     }
     const status: OrderStatus = input.decision === "seal" ? "pending" : "vetoed";
     this.sql.exec(`UPDATE orders SET status = ?, reason = ? WHERE id = ?`, status, input.note ?? null, input.orderId);
+    this.sql.exec(`DELETE FROM intents WHERE order_id = ?`, input.orderId);
     const who = seat === "protector" ? "The Lord Protector" : "The Regent";
     this.appendEvents([{ season: state.season, kind: "council", text: `${who} ${input.decision === "seal" ? "sealed" : "vetoed"} the ${row.actor}'s order to ${describeOrder(state, row.order)}${input.note ? `: “${input.note}”` : "."}`, realms: [row.realm], data: { orderId: row.id, decision: input.decision, by: seat } }]);
     return { ok: true };
@@ -631,8 +816,28 @@ export class RegencyGameDO extends DurableObjectBase {
     if (protectorate && protectorate.active) {
       const left = protectorate.seasonsLeft - 1;
       this.sql.exec(`UPDATE protectorate SET seasons_left = ?, active = ? WHERE id = 1`, Math.max(0, left), left > 0 ? 1 : 0);
-      if (left <= 0) result.events.push({ season: state.season, kind: "council", text: "The Lord Protector's mandate has run its course; the Regent resumes the seal.", realms: [state.playerRealm] });
+      if (left <= 0) {
+        result.events.push({ season: state.season, kind: "council", text: "The Lord Protector's mandate has run its course; the Regent resumes the seal.", realms: [state.playerRealm] });
+        this.queueHandover(result.state, protectorate);
+      }
     }
+    // The Regent's word, judged against the world the season just made.
+    const promises = this.readPromises();
+    const settled = settlePromises(result.state, promises);
+    for (const promise of settled) {
+      this.savePromise(promise);
+      result.events.push({
+        season: result.state.season,
+        kind: "council",
+        text: promise.status === "kept"
+          ? `The Regent kept a word given to ${result.state.realms[promise.to]?.name ?? promise.to}: “${promise.text}”`
+          : `The Regent broke a word given to ${result.state.realms[promise.to]?.name ?? promise.to}: “${promise.text}” — infamy rises and their regard falls.`,
+        realms: [result.state.playerRealm, promise.to],
+        data: { promiseId: promise.id, status: promise.status },
+      });
+    }
+    // Every intent the council staged belonged to the season that has passed.
+    this.sql.exec(`DELETE FROM intents`);
     for (const b of this.readBribes()) {
       if (b.status === "pending" && state.season - b.season >= 2) this.sql.exec(`UPDATE bribes SET status = 'expired' WHERE id = ?`, b.id);
       if (b.status === "accepted" && b.untilSeason !== null && result.state.season >= b.untilSeason) this.sql.exec(`UPDATE bribes SET status = 'expired' WHERE id = ?`, b.id);
@@ -649,7 +854,338 @@ export class RegencyGameDO extends DurableObjectBase {
     for (const r of result.rejected) this.appendEvents([{ season: state.season, kind: "council", text: `Order by ${r.order.actor} could not be carried out: ${r.reason}`, realms: [r.order.realm], data: { orderId: r.order.id } }]);
     this.queueBriefings(result.state, result.events, result.rejected.map((r) => `${r.order.actor}: ${r.reason}`));
     void this.deliverBriefings();
+    if (result.state.outcome && !state.outcome) void this.writeLegend(result.state);
     return result.state;
+  }
+
+  // ── Staged intents: speech drawn on the map before it is an order ────────
+
+  /** The intent kind an order of this kind would fulfil. */
+  private static intentKindFor(kind: Order["kind"]): IntentKind {
+    switch (kind) {
+      case "move":
+        return "march";
+      case "enact_edict":
+      case "repeal_edict":
+      case "set_tax":
+      case "set_conscription":
+      case "set_granary_reserve":
+        return "edict";
+      case "propose":
+      case "respond":
+      case "withdraw":
+      case "cede_province":
+      case "declare_war":
+        return "offer";
+      case "build":
+        return "build";
+      case "muster":
+        return "muster";
+      default:
+        return "other";
+    }
+  }
+
+  /** Bind the newest matching unlinked intent of a seat to the order it became. */
+  private linkIntent(role: string, orderId: string, order: Order): void {
+    const want = RegencyGameDO.intentKindFor(order.kind);
+    const candidates = this.readIntents().filter((i) => i.role === role && i.orderId === null && i.kind === want);
+    const province = (order as { province?: string }).province;
+    const army = (order as { army?: string }).army;
+    const best =
+      candidates.find((i) => (army && i.payload.army === army) || (province && (i.payload.province === province || i.payload.to === province))) ??
+      candidates[candidates.length - 1];
+    if (best) this.sql.exec(`UPDATE intents SET order_id = ? WHERE id = ?`, orderId, best.id);
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  stageIntent(input: { actor: string; kind: IntentKind; label: string; payload?: StagedIntent["payload"] }): { ok: boolean; reason?: string; intent?: StagedIntent } {
+    this.ensureReady();
+    const state = this.requireState();
+    try {
+      this.assertActor(input.actor);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    const kinds: IntentKind[] = ["march", "edict", "offer", "build", "muster", "other"];
+    if (!kinds.includes(input.kind)) return { ok: false, reason: `kind must be one of ${kinds.join(", ")}` };
+    const label = String(input.label ?? "").trim().slice(0, 120);
+    if (!label) return { ok: false, reason: "an intent needs a label the Regent can read on the map" };
+    const realm = roleRealm(input.actor, state.playerRealm);
+    const payload = { ...(input.payload ?? {}) } as StagedIntent["payload"];
+    for (const key of ["province", "from", "to"] as const) {
+      const id = payload[key];
+      if (id !== undefined && !(id in state.provinces)) return { ok: false, reason: `unknown province ${id} in ${key}` };
+    }
+    if (payload.army !== undefined) {
+      const army = state.armies[payload.army];
+      if (!army) return { ok: false, reason: `unknown army ${payload.army}` };
+      if (army.realm !== realm) return { ok: false, reason: `${army.name} is not yours to move` };
+      payload.from ??= army.province;
+    }
+    if (payload.target !== undefined && !(payload.target in state.realms)) return { ok: false, reason: `unknown realm ${payload.target}` };
+    const mine = this.readIntents().filter((i) => i.role === input.actor);
+    if (mine.length >= 8) this.sql.exec(`DELETE FROM intents WHERE id = ?`, mine[0]!.id);
+    const id = `i${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    this.sql.exec(`INSERT INTO intents (id, role, realm, kind, label, season, payload_json, order_id) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`, id, input.actor, realm, input.kind, label, state.season, JSON.stringify(payload));
+    return { ok: true, intent: this.readIntents().find((i) => i.id === id)! };
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  clearIntent(input: { actor: string; intentId?: string }): { ok: boolean; cleared: number; reason?: string } {
+    this.ensureReady();
+    try {
+      this.assertActor(input.actor);
+    } catch (err) {
+      return { ok: false, cleared: 0, reason: err instanceof Error ? err.message : String(err) };
+    }
+    const mine = this.readIntents().filter((i) => i.role === input.actor && (!input.intentId || i.id === input.intentId));
+    for (const i of mine) this.sql.exec(`DELETE FROM intents WHERE id = ?`, i.id);
+    return { ok: true, cleared: mine.length };
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  listIntents(): StagedIntent[] {
+    this.ensureReady();
+    const state = this.loadState();
+    return this.readIntents(state?.playerRealm);
+  }
+
+  // ── Named armies ─────────────────────────────────────────────────────────
+
+  /** The Marshal names the companies he raises; a banner the Regent can follow. */
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  renameArmy(input: { actor: string; army: string; name: string }): { ok: boolean; reason?: string; name?: string } {
+    this.ensureReady();
+    const state = this.requireState();
+    if (state.phase === "finished") return { ok: false, reason: "The game is over." };
+    const portfolio = portfolioOf(input.actor);
+    if (!["marshal", "sovereign", "regent", "protector"].includes(portfolio)) return { ok: false, reason: "Only the Marshal, a sovereign or the Regent names an army." };
+    try {
+      this.assertActor(input.actor);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    const army = state.armies[input.army];
+    if (!army) return { ok: false, reason: `no army ${input.army}` };
+    const realm = roleRealm(input.actor, state.playerRealm);
+    if (army.realm !== realm) return { ok: false, reason: `${army.name} does not answer to you` };
+    const name = String(input.name ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 40);
+    if (name.length < 2) return { ok: false, reason: "a name must be 2–40 characters" };
+    const was = army.name;
+    army.name = name;
+    this.saveState(state);
+    this.appendEvents([{ season: state.season, kind: "muster", text: `${was} takes a new banner: the ${name}.`, realms: [realm], province: army.province, data: { army: army.id } }]);
+    return { ok: true, name };
+  }
+
+  // ── The Regent's word ────────────────────────────────────────────────────
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  recordPromise(input: { actor: string; to: RealmId; text: string; check?: PromiseCheck }): { ok: boolean; reason?: string; promise?: RegentPromise } {
+    this.ensureReady();
+    const state = this.requireState();
+    const portfolio = portfolioOf(input.actor);
+    if (!["envoy", "herald", "regent"].includes(portfolio)) return { ok: false, reason: "Only the Envoy or the Herald writes the Regent's word into the ledger." };
+    try {
+      this.assertActor(input.actor);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    if (!(input.to in state.realms) || input.to === state.playerRealm) return { ok: false, reason: `a promise is made to another realm, not ${input.to}` };
+    const text = String(input.text ?? "").trim().slice(0, 400);
+    if (text.length < 4) return { ok: false, reason: "write down what was actually promised" };
+    const check: PromiseCheck = input.check ?? { kind: "free_text" };
+    const problem = validatePromiseCheck(state, check);
+    if (problem) return { ok: false, reason: problem };
+    const promise: RegentPromise = { id: `pr${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, to: input.to, text, check, season: state.season, status: "pending", settled: null, recordedBy: input.actor };
+    this.savePromise(promise);
+    this.appendEvents([{ season: state.season, kind: "council", text: `The Regent's word to ${state.realms[input.to]!.name} was written down: “${text}” (${describePromiseCheck(state, check)}).`, realms: [state.playerRealm, input.to], data: { promiseId: promise.id } }]);
+    return { ok: true, promise };
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  listPromises(): RegentPromise[] {
+    this.ensureReady();
+    return this.readPromises();
+  }
+
+  /** The Regent (or the Herald on their word) settles a promise the engine cannot judge. */
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  settlePromise(input: { promiseId: string; status: "kept" | "broken" }): { ok: boolean; reason?: string } {
+    this.ensureReady();
+    const state = this.requireState();
+    if (this.callerSeat() === "other") return { ok: false, reason: "Only the Regent, or the Herald on the Regent's word, judges a promise kept or broken." };
+    const promise = this.readPromises().find((p) => p.id === input.promiseId);
+    if (!promise) return { ok: false, reason: `no promise ${input.promiseId}` };
+    if (promise.status !== "pending") return { ok: false, reason: `already ${promise.status}` };
+    promise.status = input.status;
+    promise.settled = state.season;
+    this.savePromise(promise);
+    if (input.status === "broken") {
+      const player = state.realms[state.playerRealm]!;
+      player.infamy = Math.min(100, player.infamy + 5);
+      const other = state.realms[promise.to];
+      if (other) other.relations[state.playerRealm] = Math.max(-100, (other.relations[state.playerRealm] ?? 0) - 20);
+      this.saveState(state);
+    }
+    this.appendEvents([{ season: state.season, kind: "council", text: `The word given to ${state.realms[promise.to]?.name ?? promise.to} — “${promise.text}” — is judged ${input.status}.`, realms: [state.playerRealm, promise.to], data: { promiseId: promise.id } }]);
+    return { ok: true };
+  }
+
+  // ── Council debates ──────────────────────────────────────────────────────
+
+  /** The Herald puts one question to the whole council and records what each says. */
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  convene(input: { actor: string; question: string }): { ok: boolean; reason?: string; debateId?: string; asked?: string[] } {
+    this.ensureReady();
+    const state = this.requireState();
+    const portfolio = portfolioOf(input.actor);
+    if (!["herald", "protector", "regent"].includes(portfolio)) return { ok: false, reason: "The Herald convenes the council." };
+    try {
+      this.assertActor(input.actor);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    const question = String(input.question ?? "").trim().slice(0, 400);
+    if (question.length < 8) return { ok: false, reason: "a debate needs a question the council can answer" };
+    const open = this.sql.exec<{ id: string }>(`SELECT id FROM debates WHERE status = 'open'`).toArray();
+    if (open.length >= 2) return { ok: false, reason: "two debates are already before the council; close one first" };
+    const id = `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    this.sql.exec(`INSERT INTO debates (id, season, question, opened_by, status) VALUES (?, ?, ?, ?, 'open')`, id, state.season, question, input.actor);
+    this.appendEvents([{ season: state.season, kind: "council", text: `The council is convened: “${question}”`, realms: [state.playerRealm], data: { debateId: id } }]);
+    const asked: string[] = [];
+    for (const p of this.readParticipants("court")) {
+      if (!MINISTER_ROLES.includes(p.role as MinisterRole)) continue;
+      asked.push(p.role);
+      const content = [
+        `<council-debate id="${id}" season="${state.season}">`,
+        `The Herald puts a question to the whole council. Answer it once, in one or two sentences, from your own portfolio and your own interest — this is a debate, not a report.`,
+        ``,
+        `**${question}**`,
+        ``,
+        `Read what you need (\`realm_report\`, \`forecast_orders\`), then call \`give_counsel\` with debateId "${id}" and your line. Say it aloud to the court as well, briefly.`,
+        `</council-debate>`,
+      ].join("\n");
+      this.sql.exec(`INSERT INTO briefings (id, season, role, target_id, channel_id, content, status, error) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL) ON CONFLICT(id) DO UPDATE SET content = excluded.content, status = 'pending', error = NULL`, `${id}-${p.role}`, state.season, p.role, p.targetId, p.channelId, content);
+    }
+    void this.deliverBriefings();
+    return { ok: true, debateId: id, asked };
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  giveCounsel(input: { actor: string; debateId: string; text: string }): { ok: boolean; reason?: string; closed?: boolean } {
+    this.ensureReady();
+    const state = this.requireState();
+    if (!MINISTER_ROLES.includes(portfolioOf(input.actor) as MinisterRole)) return { ok: false, reason: "Only a minister gives counsel in a debate." };
+    try {
+      this.assertActor(input.actor);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    const debate = this.sql.exec<Record<string, unknown>>(`SELECT * FROM debates WHERE id = ?`, input.debateId).toArray()[0];
+    if (!debate) return { ok: false, reason: `no debate ${input.debateId}` };
+    if (debate["status"] !== "open") return { ok: false, reason: "that debate is closed" };
+    const text = String(input.text ?? "").trim().slice(0, 600);
+    if (text.length < 4) return { ok: false, reason: "say something" };
+    this.sql.exec(`INSERT INTO counsel (debate_id, role, text, at) VALUES (?, ?, ?, ?) ON CONFLICT(debate_id, role) DO UPDATE SET text = excluded.text, at = excluded.at`, input.debateId, input.actor, text, nowIso());
+    const answered = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM counsel WHERE debate_id = ?`, input.debateId).toArray()[0]?.n ?? 0;
+    const closed = answered >= MINISTER_ROLES.length;
+    if (closed) {
+      this.sql.exec(`UPDATE debates SET status = 'closed' WHERE id = ?`, input.debateId);
+      this.appendEvents([{ season: state.season, kind: "council", text: `The council has answered “${String(debate["question"]).slice(0, 80)}”; four voices are on the record.`, realms: [state.playerRealm], data: { debateId: input.debateId } }]);
+    }
+    return { ok: true, closed };
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  closeDebate(input: { debateId: string }): { ok: boolean; reason?: string } {
+    this.ensureReady();
+    if (this.callerSeat() === "other") return { ok: false, reason: "Only the Regent, or the Herald on the Regent's word, closes a debate." };
+    this.sql.exec(`UPDATE debates SET status = 'closed' WHERE id = ?`, input.debateId);
+    return { ok: true };
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  listDebates(): Debate[] {
+    this.ensureReady();
+    return this.readDebates(this.loadState());
+  }
+
+  // ── The chronicler and the hand-over ─────────────────────────────────────
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  writeChronicle(input: { actor: string; text: string; year?: number }): { ok: boolean; reason?: string; year?: number } {
+    this.ensureReady();
+    const state = this.requireState();
+    if (portfolioOf(input.actor) !== "chronicler") return { ok: false, reason: "Only the chronicler writes the chronicle." };
+    try {
+      this.assertActor(input.actor);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    const text = String(input.text ?? "").trim().slice(0, 3000);
+    if (text.length < 20) return { ok: false, reason: "a year deserves more than a line" };
+    const year = Number.isInteger(input.year) ? Number(input.year) : state.startYear + Math.floor(Math.max(0, state.season - 1) / 4);
+    this.sql.exec(`INSERT INTO chronicles (year, season, text) VALUES (?, ?, ?) ON CONFLICT(year) DO UPDATE SET text = excluded.text, season = excluded.season`, year, state.season, text);
+    return { ok: true, year };
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  listChronicles(): ChronicleEntry[] {
+    this.ensureReady();
+    return this.readChronicles();
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  writeHandover(input: { actor: string; text: string }): { ok: boolean; reason?: string; id?: string } {
+    this.ensureReady();
+    const state = this.requireState();
+    if (portfolioOf(input.actor) !== "protector") return { ok: false, reason: "Only the Lord Protector writes a hand-over." };
+    try {
+      this.assertActor(input.actor);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    const text = String(input.text ?? "").trim().slice(0, 3000);
+    if (text.length < 20) return { ok: false, reason: "the Regent deserves a proper account" };
+    const id = `h${state.season}`;
+    const mandate = this.readProtectorate()?.mandate ?? "";
+    this.sql.exec(`INSERT INTO handovers (id, season, mandate, text) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET text = excluded.text`, id, state.season, mandate, text);
+    this.appendEvents([{ season: state.season, kind: "council", text: `The Lord Protector laid an account of the protectorate before the Regent.`, realms: [state.playerRealm], data: { handoverId: id } }]);
+    return { ok: true, id };
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  listHandovers(): Handover[] {
+    this.ensureReady();
+    return this.readHandovers();
+  }
+
+  // ── Courts that remember ─────────────────────────────────────────────────
+
+  /** A rival court's private book on the Regent, kept by its sovereign. */
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  writeRelationsDiary(input: { actor: string; text: string }): { ok: boolean; reason?: string } {
+    this.ensureReady();
+    const state = this.requireState();
+    if (!input.actor.startsWith("sovereign:")) return { ok: false, reason: "Only a sovereign keeps the court's diary." };
+    try {
+      this.assertActor(input.actor);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+    const realm = roleRealm(input.actor, state.playerRealm);
+    this.sql.exec(`INSERT INTO diaries (realm, text, updated_at) VALUES (?, ?, ?) ON CONFLICT(realm) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at`, realm, String(input.text ?? "").slice(0, 3000), nowIso());
+    return { ok: true };
+  }
+
+  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  readRelationsDiary(input: { actor: string }): string {
+    this.ensureReady();
+    const state = this.requireState();
+    this.assertActor(input.actor);
+    return this.sql.exec<{ text: string }>(`SELECT text FROM diaries WHERE realm = ?`, roleRealm(input.actor, state.playerRealm)).toArray()[0]?.text ?? "";
   }
 
   // ── Crises, intrigue, dossiers, doctrines, protectorate ──────────────────
@@ -888,8 +1424,62 @@ export class RegencyGameDO extends DurableObjectBase {
     return this.readParticipants();
   }
 
+  /**
+   * Whether a minister has cause to interrupt the court, and what about.
+   * Character, not noise: a minister speaks when the season touched their
+   * cause and either their ambition or their standing gives them the nerve.
+   */
+  private notableFor(role: string, state: GameState, events: GameEvent[]): string | null {
+    const player = state.playerRealm;
+    const mine = events.filter((e) => e.realms.includes(player));
+    const courtier = state.court[role];
+    let reason: string | null = null;
+    if (role === "marshal") {
+      const fights = mine.filter((e) => ["battle", "siege", "capture"].includes(e.kind));
+      if (fights.length) reason = `Steel was drawn where you are answerable:\n${fights.slice(0, 4).map((e) => `- ${e.text}`).join("\n")}`;
+    } else if (role === "treasurer") {
+      const realm = state.realms[player]!;
+      const net = realm.ledger.net;
+      if (net < 0 && realm.treasury + net * 2 < 0) reason = `The ledger closed at ${Math.round(net)} a season with ${Math.round(realm.treasury)} gold in the vault. At this rate the treasury is empty within two seasons.`;
+      else {
+        const hungry = mine.filter((e) => e.kind === "famine");
+        if (hungry.length) reason = `Provinces went hungry on your watch:\n${hungry.slice(0, 3).map((e) => `- ${e.text}`).join("\n")}`;
+      }
+    } else if (role === "chancellor") {
+      const revolts = mine.filter((e) => e.kind === "revolt");
+      const realm = state.realms[player]!;
+      const low = (Object.entries(realm.estates) as Array<[string, number]>).filter(([, v]) => v < 30);
+      if (revolts.length) reason = `The peace of the realm broke:\n${revolts.slice(0, 3).map((e) => `- ${e.text}`).join("\n")}`;
+      else if (low.length) reason = `An estate has turned against the Regency: ${low.map(([e, v]) => `${e} at ${Math.round(v)}`).join(", ")}. Legitimacy stands at ${Math.round(realm.legitimacy)}.`;
+    } else if (role === "envoy") {
+      const letters = mine.filter((e) => ["treaty", "proposal", "war"].includes(e.kind));
+      const words = this.readPromises().filter((w) => w.settled === state.season - 1 || w.settled === state.season);
+      if (letters.length) reason = `The foreign account moved:\n${letters.slice(0, 4).map((e) => `- ${e.text}`).join("\n")}`;
+      else if (words.length) reason = `The Regent's word was judged:\n${words.map((w) => `- “${w.text}” — ${w.status}`).join("\n")}`;
+    }
+    if (!reason) return null;
+    const ambitious = courtier ? { marshal: "glory", treasurer: "gold", chancellor: "order", envoy: "peace" }[role] === courtier.ambition : false;
+    const standing = courtier?.standing ?? 50;
+    if (!ambitious && standing > 40 && standing < 60) return null; // a middling minister waits to be asked
+    return reason;
+  }
+
+  /** When the protectorate ends, the Protector is asked for an account of it. */
+  private queueHandover(state: GameState, protectorate: Protectorate): void {
+    const seat = this.readParticipants("court").find((p) => p.role === "protector");
+    if (!seat) return;
+    const content = [
+      `<season-briefing season="${state.season}">`,
+      `Your mandate as Lord Protector has run its course and the Regent resumes the seal. Write the hand-over now with \`write_handover\`: what you were asked to do (“${protectorate.mandate}”), what you decided and why, what you refused and referred back, what you would warn the Regent about, and what you left unfinished. Eight to fifteen lines, plain and honest. Then say the shortest possible version of it aloud to the court.`,
+      `</season-briefing>`,
+    ].join("\n");
+    this.sql.exec(`INSERT INTO briefings (id, season, role, target_id, channel_id, content, status, error) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL) ON CONFLICT(id) DO NOTHING`, `ho${state.season}`, state.season, seat.role, seat.targetId, seat.channelId, content);
+  }
+
   private queueBriefings(state: GameState, events: GameEvent[], rejected: string[]): void {
-    const participants = this.readParticipants("court");
+    // Ministers may also be woken in their private chambers; everyone else is
+    // only ever addressed in the room they hold their seat in.
+    const participants = this.readParticipants().filter((p) => p.kind !== "chambers" || MINISTER_ROLES.includes(portfolioOf(p.role) as MinisterRole));
     const season = state.season;
     const label = seasonLabel(state);
     const eventsFor = (realm: RealmId) => events.filter((e) => e.realms.includes(realm) || ["war", "treaty", "capture", "elimination", "victory", "defeat"].includes(e.kind)).map((e) => `- ${e.text}`).join("\n") || "- A quiet season.";
@@ -920,6 +1510,7 @@ export class RegencyGameDO extends DurableObjectBase {
         ].join("\n");
       } else if (kind === "sovereign") {
         const doctrine = this.sql.exec<{ text: string; season: number }>(`SELECT text, season FROM doctrines WHERE realm = ?`, p.realm).toArray()[0];
+        const diary = this.sql.exec<{ text: string }>(`SELECT text FROM diaries WHERE realm = ?`, p.realm).toArray()[0]?.text;
         const leak = leaks.some((b) => b.fromRealm === p.realm) && orderBook ? `\n## From a friend at the Regent's court\nLast season's order book of ${state.realms[state.playerRealm]!.name}:\n${orderBook}` : "";
         content = [
           `<season-briefing season="${season}">`,
@@ -927,8 +1518,9 @@ export class RegencyGameDO extends DurableObjectBase {
           `News concerning ${state.realms[p.realm]!.name}:`,
           eventsFor(p.realm),
           doctrine ? `\n## Your doctrine (written ${seasonLabel({ season: doctrine.season, startYear: state.startYear })})\n${doctrine.text}` : "",
+          diary ? `\n## Your court's diary on the Regent\n${diary}` : "",
           leak,
-          `\nIt is your turn. Confer with your ambassador at the Regent's court if there is anything to negotiate (use \`notify\` with their directory ref), review your realm with \`realm_report\`, respond to pending proposals, issue this season's orders with \`submit_order\`, then call \`end_turn\`.${yearEnd ? " A year has passed: before ending your turn, write or revise your doctrine with `write_doctrine` — what worked, what did not, what you will do differently." : ""} Speak briefly in character as you decide.`,
+          `\nIt is your turn. Confer with your ambassador at the Regent's court if there is anything to negotiate (use \`notify\` with their directory ref), review your realm with \`realm_report\`, respond to pending proposals, issue this season's orders with \`submit_order\`, then call \`end_turn\`.${yearEnd ? " A year has passed: before ending your turn, write or revise your doctrine with `write_doctrine` — what worked, what did not, what you will do differently." : ""} Speak briefly in character as you decide. Once a year, set down what you have learned of the Regent with \`write_relations_diary\` — what they promised, what they did, whether their word is worth anything; your ambassador reads it too.${yearEnd ? "" : ""}`,
           state.outcome ? `\n**The game has ended: ${state.outcome.title}.** ${state.outcome.reason}` : "",
           `</season-briefing>`,
         ].join("\n");
@@ -936,29 +1528,64 @@ export class RegencyGameDO extends DurableObjectBase {
         const diplomatic = events.filter((e) => e.realms.includes(p.realm) && ["war", "treaty", "proposal", "capture", "elimination", "crisis"].includes(e.kind)).map((e) => `- ${e.text}`).join("\n");
         if (!diplomatic && season % 4 !== 0) continue;
         const dossier = this.sql.exec<{ text: string }>(`SELECT text FROM dossiers WHERE role = ?`, p.role).toArray()[0]?.text;
+        const diary = this.sql.exec<{ text: string }>(`SELECT text FROM diaries WHERE realm = ?`, p.realm).toArray()[0]?.text;
+        const words = this.readPromises().filter((w) => w.to === p.realm);
+        const broken = words.filter((w) => w.status === "broken");
+        const kept = words.filter((w) => w.status === "kept");
+        const pendingWords = words.filter((w) => w.status === "pending");
         content = [
           `<season-briefing season="${season}">`,
           `# ${label}`,
           `Diplomatic news touching ${state.realms[p.realm]!.name} and the Regency:`,
           diplomatic || "- Nothing of note; a good moment to reaffirm ties or raise a grievance.",
           dossier ? `\n## Your dossier on the Regent\n${dossier}` : "\nYou keep no dossier on the Regent yet; start one with `write_dossier` after your first audience.",
+          diary ? `\n## Your sovereign's own book on the Regent\n${diary}` : "",
+          words.length
+            ? `\n## The Regent's word to us\n${broken.length ? `**Broken (${broken.length}):** ${broken.map((w) => `“${w.text}”`).join("; ")}. Raise this; it is the strongest card you hold.\n` : ""}${kept.length ? `Kept (${kept.length}): ${kept.map((w) => `“${w.text}”`).join("; ")}.\n` : ""}${pendingWords.length ? `Still owed: ${pendingWords.map((w) => `“${w.text}”`).join("; ")}.` : ""}`
+            : "",
           `\nConfer with your sovereign by \`notify\` before committing to anything beyond trade. Then say what your sovereign would want said at the Regent's court, briefly, and update your dossier if the Regent has kept or broken a word.`,
           `</season-briefing>`,
         ].join("\n");
-      } else if (["chancellor", "treasurer", "marshal", "envoy"].includes(kind)) {
-        // Ministers are addressed by the Herald; they only get a private word when tempted, in their chambers if they have them.
-        const temptations = this.readBribes().filter((b) => b.status === "pending" && b.targetRole === kind);
-        if (temptations.length === 0) continue;
-        const chambers = this.readParticipants("chambers").find((c) => c.role === kind);
-        if (chambers && chambers.channelId !== p.channelId) continue;
+      } else if (kind === "chronicler") {
+        // The chronicler writes once a year, when the fourth season has turned.
+        if (!yearEnd) continue;
+        const year = state.startYear + Math.floor((state.season - 1) / 4);
+        const yearEvents = events.filter((e) => e.season >= state.season - 4).map((e) => `- [${seasonLabel({ season: e.season, startYear: state.startYear })}] ${e.text}`).join("\n");
         content = [
-          `<private-word season="${season}">`,
-          `A discreet messenger from ${temptations.map((b) => state.realms[b.fromRealm]?.name).join(" and ")} has found you alone. Use \`my_temptations\` to read the offer, then \`respond_bribe\` to accept or to report it to the Regent. Nobody else has seen this.`,
-          `</private-word>`,
+          `<year-briefing season="${season}" year="${year}">`,
+          `# The year ${year} is over`,
+          `Everything the court recorded in it:`,
+          yearEvents || "- A year in which nothing was written down.",
+          `\nYou are the chronicler of ${state.realms[state.playerRealm]!.name}. Write the year as a page of a chronicle: six to twelve sentences of plain narrative prose, in the past tense, naming provinces and people, saying what was decided and what it cost. No bullet points, no advice, no flattery — the Regent's failures belong in it as much as their victories. Then call \`write_chronicle\` with the text and the year ${year}. Say nothing else to the court unless you are addressed.`,
+          `</year-briefing>`,
         ].join("\n");
+      } else if (["chancellor", "treasurer", "marshal", "envoy"].includes(kind)) {
+        // Ministers are addressed by the Herald; they speak unprompted only
+        // when the season touched their cause and their standing gives them
+        // the nerve, and they get a private word when tempted.
+        const temptations = this.readBribes().filter((b) => b.status === "pending" && b.targetRole === kind);
+        const chambers = this.readParticipants("chambers").find((c) => c.role === kind);
+        const isChambers = p.kind === "chambers";
+        if (temptations.length > 0 && (isChambers || !chambers)) {
+          content = [
+            `<private-word season="${season}">`,
+            `A discreet messenger from ${temptations.map((b) => state.realms[b.fromRealm]?.name).join(" and ")} has found you alone. Use \`my_temptations\` to read the offer, then \`respond_bribe\` to accept or to report it to the Regent. Nobody else has seen this.`,
+            `</private-word>`,
+          ].join("\n");
+        } else if (!isChambers) {
+          const outcome = this.notableFor(kind, state, events);
+          if (!outcome) continue;
+          content = [
+            `<notable-outcome season="${season}" role="${kind}">`,
+            `${outcome}`,
+            `\nThis touches your portfolio and you are not the sort to hold your tongue about it. Speak to the court now, unprompted: one or two lines, in character, from where you stand — a warning, a demand, an I-told-you-so, a request for authority. Do not summarise the season; the Herald has done that. Do not issue an order unless it plainly follows from what you say.`,
+            `</notable-outcome>`,
+          ].join("\n");
+        }
+        if (!content) continue;
       }
       if (!content) continue;
-      const id = `b${season}-${p.role}`;
+      const id = `b${season}-${p.role}${p.kind === "chambers" ? "-chambers" : ""}`;
       this.sql.exec(`INSERT INTO briefings (id, season, role, target_id, channel_id, content, status, error) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL) ON CONFLICT(id) DO UPDATE SET content = excluded.content, status = 'pending', error = NULL`, id, season, p.role, p.targetId, p.channelId, content);
     }
   }

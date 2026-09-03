@@ -83,6 +83,48 @@ describe("RegencyAgentWorker", () => {
     expect(w.participant().methods?.some((m) => m.name === "regency.decide")).toBe(true);
   });
 
+  it("gives the new seats the tools the third slate added", async () => {
+    const { instance } = await createTestDO(TestWorker);
+    const w = instance as TestWorker;
+    const names = (tools: AgentTool[]) => tools.map((t) => t.name);
+    const marshal = names(w.gameTools("marshal"));
+    expect(marshal).toEqual(expect.arrayContaining(["stage_intent", "clear_intent", "rename_army", "give_counsel"]));
+    expect(marshal).not.toContain("convene");
+    const herald = names(w.gameTools("herald"));
+    expect(herald).toEqual(expect.arrayContaining(["convene", "record_promise", "list_promises", "settle_promise", "close_debate"]));
+    expect(herald).not.toContain("give_counsel");
+    expect(names(w.gameTools("envoy"))).toContain("record_promise");
+    expect(names(w.gameTools("chronicler"))).toEqual(expect.arrayContaining(["write_chronicle", "read_chronicle"]));
+    expect(names(w.gameTools("chronicler"))).not.toContain("submit_order");
+    const sovereign = names(w.gameTools("sovereign:r1"));
+    expect(sovereign).toEqual(expect.arrayContaining(["write_relations_diary", "read_relations_diary", "rename_army", "stage_intent"]));
+    expect(names(w.gameTools("ambassador:r1"))).toContain("read_relations_diary");
+    expect(names(w.gameTools("ambassador:r1"))).not.toContain("write_relations_diary");
+    expect(names(w.gameTools("protector"))).toContain("write_handover");
+  });
+
+  it("seats a chronicler who writes the year and gives no counsel", () => {
+    const prompt = buildPrompt({ role: "chronicler", realm: "regency", gameKey: "main", realmName: "Aster" });
+    expect(prompt).toContain("Chronicler of Aster");
+    expect(prompt).toContain("write_chronicle");
+    expect(prompt).toContain("give no counsel");
+    expect(prompt).toContain("projects/regency/");
+  });
+
+  it("carries the legend of a previous Regency into the rival courts", () => {
+    const prompt = buildPrompt({ role: "sovereign:r1", realm: "r1", gameKey: "main", realmName: "Dulia", legend: "The last Regent of Aster broke three treaties." });
+    expect(prompt).toContain("What the courts remember");
+    expect(prompt).toContain("broke three treaties");
+    expect(buildPrompt({ role: "sovereign:r1", realm: "r1", gameKey: "main", realmName: "Dulia" })).not.toContain("What the courts remember");
+  });
+
+  it("tells the Herald to expect the map's metadata and to end the welcome with a first move", () => {
+    const prompt = buildPrompt({ role: "herald", realm: "regency", gameKey: "main", realmName: "Aster" });
+    expect(prompt).toContain("regency: { province:");
+    expect(prompt).toContain("convene");
+    expect(prompt).toContain("something for the Regent to do");
+  });
+
   it("writes a directory into every persona so seats can reach each other", () => {
     const prompt = buildPrompt({ role: "envoy", realm: "regency", gameKey: "main", realmName: "Aster", directory: [{ role: "ambassador:r1", name: "Ambassador of Dulia", ref: "agent:ambassador-r1@regency-main-embassy-r1" }] });
     expect(prompt).toContain("agent:ambassador-r1@regency-main-embassy-r1");

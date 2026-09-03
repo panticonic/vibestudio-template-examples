@@ -3,7 +3,7 @@
  * One game per object key; the panel's `stateArgs.gameKey` selects it.
  */
 import { rpc, workers } from "@workspace/runtime";
-import type { Crisis, GameState, Order, RealmId } from "@workspace/regency-engine";
+import type { Crisis, GameState, Order, RealmId, RegentPromise, StagedIntent } from "@workspace/regency-engine";
 
 export const REGENCY_PROTOCOL = "examples.regency.v1";
 
@@ -89,6 +89,37 @@ export interface CardRef {
   updatedAt: string;
 }
 
+export interface Debate {
+  id: string;
+  season: number;
+  question: string;
+  openedBy: string;
+  status: "open" | "closed";
+  lines: Array<{ role: string; name: string; text: string }>;
+}
+
+export interface ChronicleEntry {
+  year: number;
+  season: number;
+  text: string;
+}
+
+export interface Handover {
+  id: string;
+  season: number;
+  mandate: string;
+  text: string;
+}
+
+export interface SecretHistory {
+  bribes: Bribe[];
+  dossiers: Array<{ role: string; text: string }>;
+  doctrines: Array<{ realm: RealmId; text: string; season: number }>;
+  promises: RegentPromise[];
+  diaries: Array<{ realm: RealmId; text: string }>;
+  chambers: Array<{ role: string; channelId: string }>;
+}
+
 export interface GameView {
   state: GameState | null;
   participants: Participant[];
@@ -103,6 +134,12 @@ export interface GameView {
   cards: CardRef[];
   dossiers: Array<{ role: string; text: string }>;
   doctrines: Array<{ realm: RealmId; text: string; season: number }>;
+  intents: StagedIntent[];
+  promises: RegentPromise[];
+  debates: Debate[];
+  chronicles: ChronicleEntry[];
+  handovers: Handover[];
+  secrets: SecretHistory | null;
 }
 
 export interface Forecast {
@@ -200,6 +237,22 @@ export class GameClient {
 
   setCard(ref: { key: string; channelId: string; messageId: string; kind: string }): Promise<CardRef[]> {
     return this.call("setCard", ref);
+  }
+
+  closeDebate(debateId: string): Promise<{ ok: boolean; reason?: string }> {
+    return this.call("closeDebate", { debateId });
+  }
+
+  settlePromise(promiseId: string, status: "kept" | "broken"): Promise<{ ok: boolean; reason?: string }> {
+    return this.call("settlePromise", { promiseId, status });
+  }
+
+  clearIntent(actor: string, intentId?: string): Promise<{ ok: boolean; cleared: number }> {
+    return this.call("clearIntent", { actor, ...(intentId ? { intentId } : {}) });
+  }
+
+  renameArmy(army: string, name: string): Promise<{ ok: boolean; reason?: string; name?: string }> {
+    return this.call("renameArmy", { actor: "regent", army, name });
   }
 
   report(input: { kind: "realm" | "province" | "map" | "chronicle" | "rules"; realm?: string; province?: string }): Promise<string> {

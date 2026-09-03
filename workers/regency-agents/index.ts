@@ -34,6 +34,7 @@ function asConfig(config: unknown): RegencyAgentConfig | null {
     persona: typeof c["persona"] === "string" ? c["persona"] : undefined,
     directory: Array.isArray(c["directory"]) ? (c["directory"] as RegencyAgentConfig["directory"]) : undefined,
     person: c["person"] && typeof c["person"] === "object" ? (c["person"] as RegencyAgentConfig["person"]) : undefined,
+    legend: typeof c["legend"] === "string" ? c["legend"] : undefined,
   };
 }
 
@@ -162,12 +163,74 @@ export class RegencyAgentWorker extends AiChatWorker {
       includeOrderIds: { type: "array", items: { type: "string" }, description: "Ids of orders awaiting the seal to include as if sealed." },
     }, (p) => client.call("forecast", { orders: Array.isArray(p["orders"]) ? p["orders"] : [], includeOrderIds: Array.isArray(p["includeOrderIds"]) ? p["includeOrderIds"] : [], realm: cfg.realm })));
 
-    if (kind !== "herald" && kind !== "protector") {
+    if (!["herald", "protector", "chronicler"].includes(kind)) {
       tools.push(read("submit_order", `Submit one order for ${cfg.realmName} as the ${kind}. The order object must have a "kind" and that kind's fields (see game_rules). Portfolios are enforced: the engine tells you if your seat may not issue it, if it is illegal, or if it awaits the Regent's seal.`, {
         order: { type: "object", description: "e.g. {\"kind\":\"build\",\"province\":\"p3\",\"building\":\"farm\"}", additionalProperties: true },
         rationale: { type: "string", description: "One sentence for the chronicle and the Regent." },
       }, (p) => client.call("submitOrder", { realm: cfg.realm, actor: cfg.role, order: p["order"], rationale: typeof p["rationale"] === "string" ? p["rationale"] : undefined })));
       tools.push(read("withdraw_order", "Withdraw one of your own pending orders by id.", { orderId: { type: "string" } }, (p) => client.call("withdrawOrder", { orderId: String(p["orderId"] ?? ""), actor: cfg.role })));
+    }
+    // Staging: what a seat means to do, drawn on the map before it is an order.
+    if (["chancellor", "treasurer", "marshal", "envoy", "sovereign", "protector"].includes(kind)) {
+      tools.push(read("stage_intent", "Draw what you mean to do on the Regent's map before you order it: a ghost arrow for a march, the provinces an edict would touch, a dotted line to a rival capital for an offer, a mason's mark for a building, a banner for a muster. Stage first, then argue for it, then submit the order — the intent binds itself to the order and disappears when the order is sealed, withdrawn or carried out. Everything staged is wiped when the season turns.", {
+        kind: { type: "string", enum: ["march", "edict", "offer", "build", "muster", "other"] },
+        label: { type: "string", description: "One line the Regent reads on the map, e.g. \"Screen the northern border\"." },
+        payload: {
+          type: "object",
+          additionalProperties: true,
+          description: "Ids that place it: {army,to} for a march, {province} for a build or muster, {target} for an offer to a realm, {when:[…conditions]} for an edict (the matching provinces light up).",
+        },
+      }, (p) => client.call("stageIntent", { actor: cfg.role, kind: String(p["kind"] ?? "other"), label: String(p["label"] ?? ""), payload: (p["payload"] as Record<string, unknown>) ?? {} })));
+      tools.push(read("clear_intent", "Take one of your staged intents off the map, or all of them if you name none.", { intentId: { type: "string" } }, (p) => client.call("clearIntent", { actor: cfg.role, ...(typeof p["intentId"] === "string" ? { intentId: p["intentId"] } : {}) })));
+      tools.push(read("list_intents", "Everything the Regent's council has staged on the map this season.", {}, () => client.call("listIntents")));
+    }
+    if (kind === "marshal" || kind === "sovereign" || kind === "protector") {
+      tools.push(read("rename_army", "Give one of your armies a name and a banner (2–40 characters). The Regent sees it on the map; the chronicle remembers it.", {
+        army: { type: "string" },
+        name: { type: "string" },
+      }, (p) => client.call("renameArmy", { actor: cfg.role, army: String(p["army"] ?? ""), name: String(p["name"] ?? "") })));
+    }
+    if (["chancellor", "treasurer", "marshal", "envoy"].includes(kind)) {
+      tools.push(read("give_counsel", "Answer a debate the Herald has put to the council: one or two sentences from your own portfolio and your own interest. One line per minister per debate; a later call replaces yours.", {
+        debateId: { type: "string" },
+        text: { type: "string" },
+      }, (p) => client.call("giveCounsel", { actor: cfg.role, debateId: String(p["debateId"] ?? ""), text: String(p["text"] ?? "") })));
+      tools.push(read("list_debates", "Questions the Herald has put to the council, and what each minister answered.", {}, () => client.call("listDebates")));
+    }
+    if (kind === "envoy" || kind === "herald" || kind === "protector") {
+      tools.push(read("record_promise", "Write a promise the Regent made to a foreign realm into the ledger, so the world can judge whether it was kept. Only what the Regent actually said. A structured check lets the engine settle it by itself; use free_text only when nothing else fits. A broken promise costs the Regency infamy and that realm's regard.", {
+        to: { type: "string", description: "Realm id the promise was made to." },
+        text: { type: "string", description: "What was promised, in the Regent's own words." },
+        check: { type: "object", additionalProperties: true, description: '{"kind":"treaty","with":"r1","treatyKind":"trade"} | {"kind":"no_war","with":"r1","seasons":4} | {"kind":"cede","province":"p7","to":"r1"} | {"kind":"free_text"}' },
+      }, (p) => client.call("recordPromise", { actor: cfg.role, to: String(p["to"] ?? ""), text: String(p["text"] ?? ""), check: p["check"] })));
+      tools.push(read("list_promises", "The Regent's word as a ledger: what was promised, to whom, and whether it stands kept, broken or owed.", {}, () => client.call("listPromises")));
+    }
+    if (kind === "herald" || kind === "protector") {
+      tools.push(read("convene", "Put one question to the whole council. Each of the four ministers is woken with it and answers on the record with `give_counsel`; the debate closes when all four have spoken. Use it when the Regent asks what the council thinks, or when a decision deserves more than one voice. One question at a time, and never more than two open.", {
+        question: { type: "string" },
+      }, (p) => client.call("convene", { actor: cfg.role, question: String(p["question"] ?? "") })));
+      tools.push(read("close_debate", "Close a debate on the Regent's word without waiting for the last minister.", { debateId: { type: "string" } }, (p) => client.call("closeDebate", { debateId: String(p["debateId"] ?? "") })));
+      tools.push(read("settle_promise", "Carry out the Regent's explicit judgement that a free-text promise was kept or broken. Only on the Regent's word; the engine settles the structured ones itself.", {
+        promiseId: { type: "string" },
+        status: { type: "string", enum: ["kept", "broken"] },
+      }, (p) => client.call("settlePromise", { promiseId: String(p["promiseId"] ?? ""), status: p["status"] === "broken" ? "broken" : "kept" })));
+      tools.push(read("list_debates", "Questions before the council and what each minister answered.", {}, () => client.call("listDebates")));
+    }
+    if (kind === "chronicler") {
+      tools.push(read("write_chronicle", "Set down one year of the Regency as a page of chronicle prose. Called once a year, when the briefing asks for it.", {
+        text: { type: "string" },
+        year: { type: "integer" },
+      }, (p) => client.call("writeChronicle", { actor: cfg.role, text: String(p["text"] ?? ""), ...(Number.isInteger(p["year"]) ? { year: Number(p["year"]) } : {}) })));
+      tools.push(read("read_chronicle", "The years already written.", {}, () => client.call("listChronicles")));
+    }
+    if (kind === "protector") {
+      tools.push(read("write_handover", "Write the account of your protectorate for the Regent: what you were asked to do, what you decided and why, what you refused, what you would warn them about, what is unfinished.", { text: { type: "string" } }, (p) => client.call("writeHandover", { actor: cfg.role, text: String(p["text"] ?? "") })));
+    }
+    if (kind === "sovereign") {
+      tools.push(read("write_relations_diary", "Your court's private book on the Regent: what they promised, what they did, whether their word is worth anything, what they want and fear. Replaces the last entry. Your ambassador at their court reads it too.", { text: { type: "string" } }, (p) => client.call("writeRelationsDiary", { actor: cfg.role, text: String(p["text"] ?? "") })));
+    }
+    if (kind === "sovereign" || kind === "ambassador") {
+      tools.push(read("read_relations_diary", "Your court's book on the Regent.", {}, () => client.call("readRelationsDiary", { actor: cfg.role })));
     }
     if (kind === "sovereign") {
       tools.push(read("end_turn", `Declare that ${cfg.realmName} has no further orders this season. Call it last.`, {}, () => client.call("endTurn", { realm: cfg.realm, actor: cfg.role })));

@@ -193,3 +193,16 @@ export function terrainSymbol(p: Province): string {
       return "";
   }
 }
+
+/**
+ * Snow on the high ground: a cap over a peak, a dusting over a hill. Winter
+ * only; the map draws it from the same decorations as the terrain art, so the
+ * snow always lies exactly where the mountains are.
+ */
+export function snowPath(d: Decoration): string {
+  const s = d.scale * 6;
+  if (d.kind === "peak") {
+    return `M${d.x - s * 0.55} ${d.y - s * 0.35} l${s * 0.4} -${s * 0.75} l${s * 0.5} ${s * 0.7} l${s * 0.4} -${s * 0.5} l${s * 0.45} ${s * 0.65} q-${s * 0.5} ${s * 0.25} -${s * 0.9} 0 q-${s * 0.45} -${s * 0.2} -${s * 0.85} -0.1 z`;
+  }
+  return `M${d.x - s * 1.1} ${d.y + s * 0.2} q${s * 1.1} -${s * 1.1} ${s * 2.2} 0 q-${s * 1.1} ${s * 0.35} -${s * 2.2} 0 z`;
+}

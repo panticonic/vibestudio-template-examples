@@ -10,6 +10,9 @@ import { hexKey } from "./hex.js";
 import { NEUTRAL, type GameState, type SubmittedOrder } from "./types.js";
 import { tradeRoutes, hasAccessTo } from "./state.js";
 import { consentOf } from "./tick.js";
+import { explain } from "./explain.js";
+import { BROKEN_PROMISE_INFAMY, BROKEN_PROMISE_REGARD, describePromiseCheck, settlePromises, validatePromiseCheck } from "./promises.js";
+import type { RegentPromise } from "./types.js";
 
 function world(seed = "test-seed"): GameState {
   return generateWorld({ seed, rivals: 3, realmName: "Aster" });
@@ -248,5 +251,69 @@ describe("season resolution", () => {
     const r = resolveSeason(s, []);
     expect(r.state.outcome?.kind).toBe("defeat");
     expect(r.state.outcome?.title).toBe("The capital has fallen");
+  });
+});
+
+describe("explaining a number", () => {
+  it("walks the ledger and the estates for legitimacy and treasury", () => {
+    const s = world("explain");
+    const r = resolveSeason(s, submit(s, "regency", [{ kind: "set_tax", taxRate: 0.55 }], "chancellor"));
+    const leg = explain(r.state, r.events, { kind: "legitimacy" });
+    expect(leg.title).toContain("Legitimacy");
+    expect(leg.causes.some((c) => c.text.includes("peasants"))).toBe(true);
+    expect(leg.causes.some((c) => c.text.includes("tax of 55%"))).toBe(true);
+    const tre = explain(r.state, r.events, { kind: "treasury" });
+    expect(tre.headline).toMatch(/Last season closed/);
+    expect(tre.causes.some((c) => c.text.includes("taxes brought"))).toBe(true);
+  });
+
+  it("explains a province's bread and unrest, and an army's position", () => {
+    const s = world("explain2");
+    const cap = s.realms["regency"]!.capital;
+    const hunger = explain(s, [], { kind: "province", province: cap, aspect: "hunger" });
+    expect(hunger.causes.some((c) => c.text.includes("rations"))).toBe(true);
+    const unrest = explain(s, [], { kind: "province", province: cap, aspect: "unrest" });
+    expect(unrest.causes.some((c) => c.text.includes("unrest stands at"))).toBe(true);
+    const army = Object.values(s.armies).find((a) => a.realm === "regency")!;
+    const ex = explain(s, [], { kind: "army", army: army.id });
+    expect(ex.title).toContain(army.name);
+    expect(ex.causes.some((c) => c.text.includes("morale"))).toBe(true);
+    expect(explain(s, [], { kind: "army", army: "nope" }).headline).toContain("No army");
+  });
+});
+
+describe("the Regent's promises", () => {
+  it("settles structured promises and charges infamy for a broken word", () => {
+    const s = world("promise");
+    const other = Object.keys(s.realms).find((r) => r !== "regency")!;
+    const problem = validatePromiseCheck(s, { kind: "no_war", with: other, seasons: 2 });
+    expect(problem).toBeNull();
+    expect(validatePromiseCheck(s, { kind: "no_war", with: "nowhere", seasons: 2 })).toContain("unknown realm");
+    const promises: RegentPromise[] = [
+      { id: "pr1", to: other, text: "We shall not march on you.", check: { kind: "no_war", with: other, seasons: 2 }, season: 0, status: "pending", settled: null, recordedBy: "envoy" },
+      { id: "pr2", to: other, text: "A treaty of trade before the year is out.", check: { kind: "treaty", with: other, treatyKind: "trade" }, season: 0, status: "pending", settled: null, recordedBy: "envoy" },
+    ];
+    // Still pending while nothing has happened.
+    expect(settlePromises(s, promises)).toHaveLength(0);
+    // The treaty is signed: kept.
+    s.treaties.push({ id: "t1", kind: "trade", parties: ["regency", other], signed: 0, seasonsLeft: null });
+    expect(settlePromises(s, promises).map((p) => p.status)).toEqual(["kept"]);
+    // War: the other promise breaks, and it costs infamy and regard.
+    const infamyBefore = s.realms["regency"]!.infamy;
+    const regardBefore = s.realms[other]!.relations["regency"] ?? 0;
+    s.wars.push(["regency", other]);
+    const changed = settlePromises(s, promises);
+    expect(changed.map((p) => p.status)).toEqual(["broken"]);
+    expect(s.realms["regency"]!.infamy).toBe(infamyBefore + BROKEN_PROMISE_INFAMY);
+    expect(s.realms[other]!.relations["regency"]).toBe(regardBefore - BROKEN_PROMISE_REGARD);
+    expect(describePromiseCheck(s, promises[1]!.check)).toContain("trade");
+  });
+});
+
+describe("the opening matter", () => {
+  it("puts one matter before the Regent at season 0 of the long Regency", () => {
+    const s = world("opening");
+    expect(s.crises.filter((c) => c.chosen === null).length).toBeGreaterThan(0);
+    expect(s.season).toBe(0);
   });
 });

@@ -491,7 +491,12 @@ export function generateWorld(options: WorldOptions): GameState {
       }
     }
     forced.push("claimant", "defection");
+  } else {
+    // The long Regency opens with one low-stakes matter, so the very first
+    // thing the Regent does is decide something rather than stare at a map.
+    forced.push("guild");
   }
   state.crises = generateCrises(state, createRng(`${options.seed}:crises:${state.season}`), forced);
+  if (state.crises.length === 0) state.crises = generateCrises(state, createRng(`${options.seed}:crises:fallback`), ["tutor"]);
   return state;
 }

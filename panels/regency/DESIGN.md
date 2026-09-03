@@ -157,6 +157,98 @@ council in character and explains how the court works; ambassadors present
 credentials; sovereigns write an opening doctrine and instruct their
 ambassadors.
 
+## The third slate: speech that moves the world, and a world that answers
+
+**Speech becomes visible.** Ministers stage what they mean to do before they
+order it. `stage_intent` records a preview on the Durable Object — a ghost
+arrow for a march, the provinces an edict's conditions actually match, a
+dotted line to a rival capital for an offer, a mason's mark for a building, a
+banner for a muster — and the map draws it. An intent binds itself to the order
+it becomes and disappears when that order is sealed, vetoed, withdrawn or
+carried out; everything staged is wiped when the season turns. The Marshal's
+prompt now says: stage, then argue, then submit.
+
+The Regent can point rather than describe. *Speak about &lt;province&gt;* on the
+province card (and on each of its armies) opens a short composer and publishes
+the message into the council conversation with `{ regency: { province } }` or
+`{ regency: { army } }` metadata; the Herald's persona says to take that as the
+subject and never to ask which one was meant.
+
+Ministers also interrupt. After a resolution the Durable Object asks itself, per
+seat, whether the season touched that minister's cause — the Marshal after
+battles and sieges, the Treasurer when the ledger says the vault empties within
+two seasons or provinces went hungry, the Chancellor on a revolt or an estate
+below 30, the Envoy on treaties and on the Regent's word being judged — and
+wakes them for one or two unprompted lines. A minister of middling standing
+whose ambition the news does not touch stays quiet; character, not noise.
+
+**A second layer of beauty.** The season paints the map: spring green, summer
+gold, autumn brown, winter frost with snow settling on the hills and peaks
+(from the same decorations the terrain art uses, so the snow lies exactly where
+the mountains are). The camera zooms and pans with wheel and drag, has buttons,
+and eases onto a province when the chronicle, a matter card or the arrow keys
+ask for it. Armies carry names — `rename_army`, forty characters — and show a
+pennant in the realm's colour on hover; a besieged province gets a ring of
+tents. A resolution plays as four beats over about three seconds — marches,
+clashes, captures, harvest — with a caption strip narrating each from the event
+text, skippable by click or by <kbd>Space</kbd>, and then the season banner.
+
+The end is a scene rather than a line: a full-panel illuminated page with the
+heir grown up (the same procedural portrait, aged), the tutor beside them, the
+verdict, a timeline of turning points drawn from the events, the chronicler's
+years, and a *Secret history* tab.
+
+**The machinery, shown.** Legitimacy, the treasury, a province's bread and
+unrest and an army's position each carry a *why?* button; `explain(state,
+events, subject)` in the engine walks the ledger, the province's own arithmetic
+and the recent chronicle and returns a short causal list, largest cause first,
+with the lines of chronicle that bear on it.
+
+The Regent's word is a ledger. `record_promise` stores what was promised, to
+whom, and a structured check — `{treaty}`, `{no_war}`, `{cede}` or
+`free_text` — that the engine settles at every resolution. A broken promise
+costs five infamy and twenty of that realm's regard; a kept one wins a little
+of both back. The Realms tab lists them; the ambassadors' briefings quote the
+broken ones back at the Regent.
+
+Laws read as data: each edict renders as coloured tokens (`when field op
+value`, `then action key=value`), and selecting one lights the provinces it
+touches on the map. When an edict or a repeal waits for the seal, the law book
+shows a diff of what it would become.
+
+**Deeper play.** Each seat has a workshop folder at
+`projects/regency/&lt;role&gt;/`; the prompts tell ministers to write scripts there
+and reuse them instead of redoing arithmetic, and the Council tab lists what
+they have actually written through the panel's `fs`. The Herald can `convene`
+the council: one question fans out to all four ministers, each answers once
+with `give_counsel`, the debate closes when all four have spoken, and it shows
+both in the Matters tab and as a chat card. Rival courts remember —
+`write_relations_diary` keeps a per-realm book on the Regent that folds into
+the sovereign's and its ambassador's briefings — and at the end the game writes
+`projects/regency/legend.md`, which the *next* Regency reads and hands to every
+rival court as memory of the Regent who came before. A chronicler sits in the
+court, silent except once a year, when the Durable Object hands it the year's
+events and asks for a page of prose; the Chronicle tab shows it above the
+ledger for that year.
+
+**Small things.** Sound cues are generated with WebAudio and no audio files (a
+horn for the season, struck steel for a battle, a low stamp for the seal), off
+by default and remembered in `stateArgs`. Keys: <kbd>Space</kbd> closes the
+season, <kbd>S</kbd> seals the topmost act, the arrows walk the provinces and
+ease the camera onto each, <kbd>Esc</kbd> clears the selection — and none of
+them fire while you are typing. Both scenarios now open with something to
+decide: the long Regency forces a guild petition at season 0, the winter one
+already had its claimant and its wavering lord, and the Herald's welcome is
+required to end with one concrete first move. When a Lord Protector's mandate
+runs out the Durable Object asks for a hand-over — what was decided, what was
+refused, what is unfinished — and it appears as a chat card and in the Council
+tab.
+
+The Durable Object's schema is at version 2: `intents`, `promises`, `debates`,
+`counsel`, `chronicles`, `handovers` and `diaries` join the original tables.
+There is no migration path — an object founded on version 1 must start a new
+game, which is the platform's rule for schema change.
+
 ## Engine notes
 
 - Map: a hex board with a noise-shaped landmass; provinces are grown from
@@ -194,7 +286,8 @@ ambassadors.
 4. Seal or veto what appears under *The Regent's seal*, then **Close the
    season**. Watch the map change; read the chronicle; receive the ambassadors.
 
-Tests: `packages/regency-engine` (rules and a forty-season simulation),
+Tests: `packages/regency-engine` (rules, explanations, promises and a
+forty-season simulation),
 `workers/regency-realm` (order book, seal, identity, clock), `workers/regency-agents`
 (seats, tools, prompts), `panels/regency` (component compilation). Run them
 through the workspace's ordinary `verify` flow or the host's userland Vitest

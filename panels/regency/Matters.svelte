@@ -1,9 +1,24 @@
 <script lang="ts">
-  import { describeEffects, describeOrder, type GameState, type Order } from "@workspace/regency-engine";
+  import { describeEffects, describeOrder, type EdictCondition, type GameState, type Order } from "@workspace/regency-engine";
   import type { Forecast, GameClient, GameView } from "./lib/client.js";
+  import { edictDiff, edictLines } from "./lib/laws.js";
   import Portrait from "./Portrait.svelte";
 
-  let { view, client, refresh, notice }: { view: GameView; client: GameClient; refresh: () => Promise<void>; notice: (text: string, kind?: "info" | "error") => void } = $props();
+  let {
+    view,
+    client,
+    refresh,
+    notice,
+    onFocusProvince = undefined,
+    onHighlightEdict = undefined,
+  }: {
+    view: GameView;
+    client: GameClient;
+    refresh: () => Promise<void>;
+    notice: (text: string, kind?: "info" | "error") => void;
+    onFocusProvince?: ((province: string) => void) | undefined;
+    onHighlightEdict?: ((when: EdictCondition[] | null) => void) | undefined;
+  } = $props();
   const world = $derived(view.state as GameState);
   const player = $derived(world.realms[world.playerRealm]!);
   const awaiting = $derived(view.orders.filter((o) => o.status === "awaiting_seal"));
@@ -13,6 +28,14 @@
   let forecasts = $state<Record<string, Forecast | "loading">>({});
   let directOrder = $state('{"kind":"build","province":"p1","building":"farm"}');
   let directError = $state<string | null>(null);
+  const debates = $derived(view.debates.filter((d) => d.status === "open" || d.season >= world.season - 1));
+  const proposedLaws = $derived(awaiting.filter((o) => o.order.kind === "enact_edict" || o.order.kind === "repeal_edict").map((o) => o.order));
+  const lawDiff = $derived(proposedLaws.length ? edictDiff(player.laws.edicts, proposedLaws) : []);
+  let openEdict = $state<string | null>(null);
+  function readEdict(id: string, when: EdictCondition[] | null) {
+    openEdict = openEdict === id ? null : id;
+    onHighlightEdict?.(openEdict ? when : null);
+  }
 
   async function run(label: string, fn: () => Promise<unknown>) {
     busy = label;
@@ -76,7 +99,13 @@
         </header>
         {#if o.rationale}<p class="rationale">“{o.rationale}”</p>{/if}
         {#if o.order.kind === "enact_edict"}
-          <pre>{JSON.stringify({ when: o.order.edict.when, then: o.order.edict.then }, null, 1)}</pre>
+          {@const proposed = o.order.edict}
+          <pre class="code">{#each edictLines(proposed) as line, i (i)}<span class="lead">{line.lead}</span>{#each line.tokens as t, j (j)}<span class={`tok ${t.kind}`}>{t.text}</span>{/each}{"\n"}{/each}</pre>
+          <button class="ghost tiny" onmouseenter={() => onHighlightEdict?.(proposed.when)} onmouseleave={() => onHighlightEdict?.(null)} onclick={() => onHighlightEdict?.(proposed.when)}>Light the provinces it would touch</button>
+        {/if}
+        {#if "province" in o.order && typeof o.order.province === "string" && onFocusProvince}
+          {@const target = o.order.province}
+          <button class="ghost tiny" onclick={() => onFocusProvince(target)}>Show me {world.provinces[target]?.name ?? target}</button>
         {/if}
         {#if fc && fc !== "loading"}
           <div class="forecast">
@@ -95,6 +124,61 @@
         </div>
       </article>
     {/each}
+  </section>
+
+  {#if debates.length}
+    <section>
+      <h3>The council debates</h3>
+      {#each debates as d (d.id)}
+        <article class="debate" class:open={d.status === "open"}>
+          <header><strong>{d.question}</strong><small>{d.status === "open" ? `${d.lines.length} of 4 have answered` : "closed"}</small></header>
+          <ul class="counsel">
+            {#each d.lines as l (l.role)}
+              <li>
+                {#if world.court[l.role]}<Portrait seed={world.court[l.role]!.portrait} color={player.color} size={26} crest={false} name={l.name} />{/if}
+                <div><strong>{l.name}</strong> <small>({l.role})</small><p>{l.text}</p></div>
+              </li>
+            {/each}
+            {#each ["chancellor", "treasurer", "marshal", "envoy"].filter((r) => !d.lines.some((l) => l.role === r)) as role (role)}
+              <li class="waiting"><div><small>the {role} has not spoken</small></div></li>
+            {/each}
+          </ul>
+          {#if d.status === "open"}
+            <button class="ghost tiny" disabled={busy !== null} onclick={() => run("close-debate", () => client.closeDebate(d.id))}>Close the debate</button>
+          {/if}
+        </article>
+      {/each}
+      <p class="muted small">Ask the Herald to “put it to the council” and each minister answers on the record.</p>
+    </section>
+  {/if}
+
+  <section>
+    <h3>The law book</h3>
+    {#if player.laws.edicts.length === 0 && lawDiff.length === 0}
+      <p class="muted">Three standing laws — tax {Math.round(player.laws.taxRate * 100)}%, conscription {player.laws.conscription}, granary reserve {Math.round(player.laws.granaryReserve * 100)}% — and no edicts. The Chancellor writes edicts as data; ask for one.</p>
+    {:else}
+      <p class="muted small">tax {Math.round(player.laws.taxRate * 100)}% · conscription {player.laws.conscription} · granary reserve {Math.round(player.laws.granaryReserve * 100)}%</p>
+    {/if}
+    {#each player.laws.edicts as e (e.id)}
+      <article class="edict" class:reading={openEdict === e.id}>
+        <button class="edict-head" onclick={() => readEdict(e.id, e.when)} aria-expanded={openEdict === e.id}>
+          <span class="title">{e.title}</span>
+          <small>[{e.id}] · by the {e.author}</small>
+        </button>
+        {#if openEdict === e.id}
+          <pre class="code">{#each edictLines(e) as line, i (i)}<span class="lead">{line.lead}</span>{#each line.tokens as t, j (j)}<span class={`tok ${t.kind}`}>{t.text}</span>{/each}{"\n"}{/each}</pre>
+          <p class="muted small">The provinces it touches are lit on the map.</p>
+        {/if}
+      </article>
+    {/each}
+    {#if lawDiff.length}
+      <h4>If you seal what is waiting</h4>
+      <ul class="diff">
+        {#each lawDiff as row (row.kind + row.id)}
+          <li class={row.kind}><span class="sign">{row.kind === "added" ? "+" : row.kind === "removed" ? "−" : " "}</span>{row.title}</li>
+        {/each}
+      </ul>
+    {/if}
   </section>
 
   <section>
@@ -135,6 +219,34 @@
 
 <style>
   .matters { display: grid; gap: 12px; }
+  .debate { border-top: 1px solid var(--border); padding: 10px 0; }
+  .debate.open { border-left: 3px solid var(--accent); padding-left: 8px; }
+  .debate header { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .debate header strong { font-family: "Georgia", serif; font-size: 0.9rem; }
+  .debate header small { color: var(--muted); flex: none; }
+  .counsel { list-style: none; margin: 8px 0 6px; padding: 0; display: grid; gap: 8px; }
+  .counsel li { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; font-size: 0.82rem; }
+  .counsel li.waiting { grid-template-columns: 1fr; color: var(--muted); font-style: italic; }
+  .counsel p { margin: 2px 0 0; line-height: 1.4; }
+  .counsel small { color: var(--muted); }
+  .edict { border-top: 1px solid var(--border); }
+  .edict-head { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: left; background: none; border: none; padding: 7px 0; cursor: pointer; color: inherit; }
+  .edict-head .title { font-weight: 600; font-size: 0.86rem; }
+  .edict-head small { color: var(--muted); font-size: 0.72rem; }
+  .edict.reading { border-left: 3px solid #7a4fb0; padding-left: 8px; }
+  .code { font-size: 0.74rem; background: var(--code-bg); padding: 8px 10px; border-radius: 8px; overflow: auto; max-height: 180px; line-height: 1.6; white-space: pre; }
+  .lead { display: inline-block; width: 42px; color: var(--muted); font-style: italic; }
+  .tok.field { color: #2d6b8f; font-weight: 600; }
+  .tok.op { color: #8b5e00; }
+  .tok.value { color: #3a8f4a; }
+  .tok.action { color: #7a4fb0; font-weight: 600; }
+  .tok.key { color: var(--muted); }
+  .diff { list-style: none; margin: 6px 0 0; padding: 0; font-size: 0.82rem; font-family: ui-monospace, monospace; }
+  .diff li { padding: 3px 6px; border-radius: 5px; }
+  .diff li.added { background: rgba(58,143,74,0.16); }
+  .diff li.removed { background: rgba(192,57,43,0.16); text-decoration: line-through; }
+  .diff .sign { display: inline-block; width: 14px; font-weight: 700; }
+  h4 { margin: 12px 0 4px; font-size: 0.85rem; }
   section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
   h3 { margin: 0 0 8px; font-size: 0.95rem; font-family: "Georgia", serif; display: flex; align-items: center; gap: 8px; }
   .pill { background: var(--accent); color: var(--accent-fg); border-radius: 999px; font-size: 0.7rem; padding: 1px 7px; font-family: system-ui, sans-serif; }

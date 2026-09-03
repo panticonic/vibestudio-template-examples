@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { moodOf, type GameState } from "@workspace/regency-engine";
+  import { onMount } from "svelte";
+  import { moodOf, seasonLabel, type GameState } from "@workspace/regency-engine";
+  import { fs } from "@workspace/runtime";
   import type { GameClient, GameView, MandateLevel } from "./lib/client.js";
   import { chambersChannel, courtChannel, MINISTERS, openCourt, seatTheCourt, type SeatProgress } from "./lib/court.js";
   import Portrait from "./Portrait.svelte";
@@ -17,6 +19,33 @@
   let limits = $state({ maySealWar: false, maySealLaws: true, maySealTreaties: true, mayDecideCrises: true, mayCloseSeason: true });
   const MANDATES: MandateLevel[] = ["advise", "act", "plenary"];
   const ROLES = ["herald", ...MINISTERS] as const;
+
+  // The workshop: what the ministers have actually written for themselves.
+  let workshop = $state<Array<{ role: string; files: string[] }>>([]);
+  let workshopError = $state<string | null>(null);
+  async function readWorkshop() {
+    try {
+      const roots = await fs.readdir("projects/regency");
+      const rows: Array<{ role: string; files: string[] }> = [];
+      for (const entry of roots) {
+        if (entry.includes(".")) continue; // legend.md and other loose files
+        try {
+          const files = await fs.readdir(`projects/regency/${entry}`);
+          rows.push({ role: entry, files: files.slice(0, 12) });
+        } catch {
+          // a folder we cannot read is simply not shown
+        }
+      }
+      workshop = rows;
+      workshopError = null;
+    } catch (err) {
+      workshop = [];
+      workshopError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  onMount(() => {
+    void readWorkshop();
+  });
 
   async function run(label: string, fn: () => Promise<unknown>) {
     busy = label;
@@ -74,6 +103,33 @@
     {/each}
   </section>
   <p class="muted small">Mandates: <em>advise</em> may only counsel; <em>act</em> issues orders but sensitive acts need your seal; <em>plenary</em> acts without the seal. Standing rises and falls with each minister's cause and colours how they speak.</p>
+
+  <section class="workshop">
+    <h3>The workshop</h3>
+    <p class="muted small">Each minister keeps a folder at <code>projects/regency/&lt;role&gt;/</code> for the scripts they write to answer their own questions — odds, forecasts, food balances. Their prompts tell them to work there and to reuse what is already in it.</p>
+    {#if workshop.length === 0}
+      <p class="muted small">{workshopError ? "No workshop folder yet — the ministers have not written anything, or this panel cannot read the project folder." : "Nothing written yet. Ask a minister to work something out and it will appear here."}</p>
+    {:else}
+      <ul class="files">
+        {#each workshop as row (row.role)}
+          <li><strong>{world.court[row.role]?.name ?? row.role}</strong> <small>({row.role})</small><span>{row.files.join(" · ")}</span></li>
+        {/each}
+      </ul>
+    {/if}
+    <button class="tiny" onclick={() => void readWorkshop()}>Look again</button>
+  </section>
+
+  {#if view.handovers.length}
+    <section class="handover">
+      <h3>The Lord Protector's account</h3>
+      {#each [...view.handovers].reverse() as h (h.id)}
+        <article>
+          <small class="muted">{seasonLabel({ season: h.season, startYear: world.startYear })} · mandate: “{h.mandate}”</small>
+          <p>{h.text}</p>
+        </article>
+      {/each}
+    </section>
+  {/if}
 
   <section class="protector">
     <h3>The Lord Protector</h3>
@@ -133,4 +189,10 @@
   .progress .failed { color: #c0392b; }
   .muted { color: var(--muted); }
   .small { font-size: 0.78rem; margin: 0; }
+  code { font-size: 0.75rem; background: var(--code-bg); padding: 1px 4px; border-radius: 4px; }
+  .files { list-style: none; margin: 8px 0; padding: 0; font-size: 0.82rem; display: grid; gap: 4px; }
+  .files li { display: grid; gap: 1px; border-top: 1px solid var(--border); padding-top: 5px; }
+  .files span { color: var(--muted); font-size: 0.76rem; font-family: ui-monospace, monospace; }
+  .handover article { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }
+  .handover p { margin: 4px 0 0; font-size: 0.85rem; line-height: 1.55; white-space: pre-wrap; }
 </style>

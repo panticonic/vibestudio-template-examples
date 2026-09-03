@@ -3,6 +3,8 @@
   import type { GameView } from "./lib/client.js";
 
   let { view, onSelectProvince }: { view: GameView; onSelectProvince: (id: string) => void } = $props();
+  const chronicleByYear = $derived(new Map(view.chronicles.map((c) => [c.year, c.text])));
+  const yearOf = (season: number) => world.startYear + Math.floor(season / 4);
   const world = $derived(view.state as GameState);
   const ICONS: Record<string, string> = { season: "❧", battle: "⚔", siege: "⛨", capture: "🏴", war: "🔥", treaty: "📜", proposal: "✉", law: "⚖", council: "🕯", famine: "🌾", revolt: "✊", build: "🏗", muster: "🛡", march: "➶", legitimacy: "♛", victory: "🏆", defeat: "☠", elimination: "✝", colonize: "⚑", growth: "✿", unrest: "⚠", economy: "◈", crisis: "❗", court: "👑", trade: "⚖" };
   let filter = $state("all");
@@ -34,6 +36,12 @@
   {/if}
   {#each groups as g (g.season)}
     <section class="season">
+      {#if g.season % 4 === 3 && chronicleByYear.has(yearOf(g.season))}
+        <article class="prose">
+          <h5>The chronicler on {yearOf(g.season)}</h5>
+          <p>{chronicleByYear.get(yearOf(g.season))}</p>
+        </article>
+      {/if}
       <h4>❧ {g.label}</h4>
       <ol>
         {#each g.rows as e (e.seq)}
@@ -58,6 +66,9 @@
   .digest h4 { margin: 0 0 4px; font-family: "Georgia", serif; font-size: 0.95rem; }
   .digest p { margin: 0; font-size: 0.86rem; line-height: 1.5; }
   .dropcap { float: left; font-family: "Georgia", serif; font-size: 2.4rem; line-height: 0.8; padding: 4px 6px 0 0; color: var(--accent); }
+  .prose { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin: 10px 0 4px; background: linear-gradient(135deg, rgba(122,79,176,0.10), transparent); }
+  .prose h5 { margin: 0 0 4px; font-family: "Georgia", serif; font-size: 0.8rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.6px; }
+  .prose p { margin: 0; font-family: "Georgia", serif; font-size: 0.88rem; line-height: 1.6; white-space: pre-wrap; }
   .season h4 { margin: 10px 0 4px; font-family: "Georgia", serif; font-size: 0.9rem; color: var(--accent); letter-spacing: 0.5px; }
   ol { list-style: none; margin: 0; padding: 0; }
   li { display: flex; gap: 10px; padding: 5px 0; border-top: 1px solid var(--border); font-size: 0.84rem; }

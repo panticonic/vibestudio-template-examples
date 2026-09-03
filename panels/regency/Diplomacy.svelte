@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { atWar, realmProvinces, realmStrength, tradeRoutes, treatyBetween, type GameState } from "@workspace/regency-engine";
+  import { atWar, describePromiseCheck, realmProvinces, realmStrength, seasonLabel, tradeRoutes, treatyBetween, type GameState } from "@workspace/regency-engine";
   import type { GameClient, GameView } from "./lib/client.js";
   import { embassyChannel, openCourt, rivalCourtChannel } from "./lib/court.js";
   import Portrait from "./Portrait.svelte";
@@ -11,6 +11,17 @@
   const pending = $derived(world.proposals.filter((p) => p.status === "pending"));
   const seated = (role: string) => view.participants.some((p) => p.role === role);
   const routesTo = (realm: string) => tradeRoutes(world, me).filter((r) => r.realm === realm).length;
+  const promisesTo = (realm: string) => view.promises.filter((p) => p.to === realm);
+  const brokenTo = (realm: string) => promisesTo(realm).filter((p) => p.status === "broken").length;
+  let busy = $state(false);
+  async function judge(id: string, status: "kept" | "broken") {
+    busy = true;
+    try {
+      await client.settlePromise(id, status);
+    } finally {
+      busy = false;
+    }
+  }
 </script>
 
 <div class="diplomacy">
@@ -29,6 +40,7 @@
         <dt>Standing</dt><dd>{atWar(world, me, r.id) ? "⚔ at war" : "at peace"} · they regard us {r.relations[me] ?? 0}, we them {world.realms[me]!.relations[r.id] ?? 0}</dd>
         <dt>Treaties</dt><dd>{world.treaties.filter((t) => t.parties.includes(me) && t.parties.includes(r.id)).map((t) => t.kind.replace("_", "-")).join(", ") || "none"}</dd>
         <dt>Trade</dt><dd>{routesTo(r.id)} route{routesTo(r.id) === 1 ? "" : "s"} open{atWar(world, me, r.id) ? " (blockaded)" : ""}</dd>
+        <dt>Our word</dt><dd class:bad={brokenTo(r.id) > 0}>{promisesTo(r.id).length === 0 ? "nothing promised" : `${promisesTo(r.id).filter((p) => p.status === "kept").length} kept, ${brokenTo(r.id)} broken, ${promisesTo(r.id).filter((p) => p.status === "pending").length} owed`}</dd>
         <dt>Realm</dt><dd>{realmProvinces(world, r.id).length} provinces · strength {Math.round(realmStrength(world, r.id))} · prestige {Math.round(r.prestige)} · infamy {Math.round(r.infamy)}{treatyBetween(world, me, r.id, "alliance") ? " · ally" : ""}</dd>
       </dl>
       {#if !r.eliminated}
@@ -39,6 +51,32 @@
       {/if}
     </section>
   {/each}
+  <section>
+    <h3>The Regent's word</h3>
+    {#if view.promises.length === 0}
+      <p class="muted">Nothing you have said to a foreign court has been written down. Ask the Herald or the Envoy to record a promise when you make one; the world then judges it for itself, and a broken word costs infamy and regard.</p>
+    {/if}
+    <ul class="promises">
+      {#each view.promises as p (p.id)}
+        <li class={p.status}>
+          <div class="line"><span class="mark">{p.status === "kept" ? "✓" : p.status === "broken" ? "✗" : "…"}</span>
+            <div>
+              <strong>to {world.realms[p.to]?.name ?? p.to}</strong> <small>{seasonLabel({ season: p.season, startYear: world.startYear })} · recorded by the {p.recordedBy}</small>
+              <p>“{p.text}”</p>
+              <small class="check">kept when: {describePromiseCheck(world, p.check)}</small>
+            </div>
+          </div>
+          {#if p.status === "pending" && p.check.kind === "free_text"}
+            <div class="row">
+              <button class="tiny" disabled={busy} onclick={() => void judge(p.id, "kept")}>I kept it</button>
+              <button class="tiny" disabled={busy} onclick={() => void judge(p.id, "broken")}>I did not</button>
+            </div>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  </section>
+
   <section>
     <h3>Proposals on the table</h3>
     {#if pending.length === 0}<p class="muted">None. The Envoy or an ambassador can put one forward.</p>{/if}
@@ -78,4 +116,16 @@
   code { font-size: 0.75rem; background: var(--code-bg); padding: 1px 4px; border-radius: 4px; }
   .muted { color: var(--muted); }
   .small { font-size: 0.8rem; margin: 4px 0; }
+  dd.bad { color: #c0392b; }
+  .promises { list-style: none; margin: 0; padding: 0; font-size: 0.83rem; }
+  .promises li { border-top: 1px solid var(--border); padding: 7px 0; }
+  .promises .line { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; }
+  .promises .mark { font-weight: 700; }
+  .promises li.kept .mark { color: #3a8f4a; }
+  .promises li.broken .mark { color: #c0392b; }
+  .promises li.pending .mark { color: var(--muted); }
+  .promises p { margin: 2px 0; font-style: italic; }
+  .promises small { color: var(--muted); font-size: 0.74rem; }
+  .promises .check { display: block; }
+  .tiny { font-size: 0.75rem; padding: 3px 8px; }
 </style>
