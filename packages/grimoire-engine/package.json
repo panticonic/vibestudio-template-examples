@@ -7,6 +7,17 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "vibestudio": {
+    "tests": [
+      {
+        "name": "native",
+        "runtime": "native",
+        "include": [
+          "**/*.test.ts"
+        ]
+      }
+    ]
+  },
   "devDependencies": {
     "vitest": "^3.2.7"
   }

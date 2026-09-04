@@ -17,8 +17,8 @@ import { createDurableObjectServiceClient, rpc } from "@workspace/runtime/worker
 import { CARD_IMPORTS, CARD_KEY_PREFIX, CARD_SPECS, CARD_UI_VERSION, type CardOp } from "@workspace/regency-engine";
 import { buildPrompt, defaultHandle, defaultName, type RegencyAgentConfig } from "./prompts.js";
 
-export const REGENCY_PROTOCOL = "examples.regency.v1";
-export const REGENCY_DECIDE_METHOD = "regency.decide";
+const REGENCY_PROTOCOL = "examples.regency.v1";
+const REGENCY_DECIDE_METHOD = "regency.decide";
 
 function asConfig(config: unknown): RegencyAgentConfig | null {
   if (!config || typeof config !== "object") return null;

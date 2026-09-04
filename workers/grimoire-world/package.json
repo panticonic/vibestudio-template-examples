@@ -1,18 +1,19 @@
 {
-  "name": "@workspace-workers/regency-realm",
+  "name": "@workspace-workers/grimoire-world",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "State service for the Regency example: the world, the season clock, the council's order book, and briefings to the agents who play in it.",
+  "description": "The valley of Grimoire: one Durable Object per estate holding the regions, the sky, every spell record and its writing, the persistent wards and bindings, the spirits' wants, the council, the undone list and the news.",
   "dependencies": {
+    "@vibestudio/service-schemas": "workspace:*",
     "@workspace/runtime": "workspace:*",
-    "@workspace/regency-engine": "workspace:*"
+    "@workspace/grimoire-engine": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^3.2.7"
   },
   "vibestudio": {
-    "title": "Regency Realm",
+    "title": "Grimoire World",
     "icon": "./assets/icon.svg",
     "kind": "worker",
     "entry": "index.ts",
@@ -28,7 +29,7 @@
     "durable": {
       "classes": [
         {
-          "className": "RegencyGameDO"
+          "className": "GrimoireWorldDO"
         }
       ]
     },

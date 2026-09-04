@@ -1,11 +1,11 @@
 {
-  "name": "@workspace-panels/regency",
+  "name": "@workspace-panels/grimoire",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Regency: rule a realm through a council of agents, treat with rival sovereigns and their ambassadors, and watch the map change season by season.",
+  "description": "Grimoire: inherit a dead sorcerer's estate, speak verse in the circle, and watch your familiar turn it into the writing under the words. The valley, the study, the spellbook, the scrying page, the spirits and the estate's news.",
   "vibestudio": {
-    "title": "Regency",
+    "title": "Grimoire",
     "icon": "./assets/icon.svg",
     "entry": "index.ts",
     "template": "svelte",
@@ -21,11 +21,17 @@
     "stateArgs": {
       "type": "object",
       "properties": {
-        "gameKey": {
+        "estateKey": {
+          "type": "string"
+        },
+        "apprentice": {
           "type": "string"
         },
         "sound": {
           "type": "boolean"
+        },
+        "view": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -34,7 +40,7 @@
       "provides": [],
       "serviceRequests": [
         {
-          "protocol": "examples.regency.v1",
+          "protocol": "examples.grimoire.v1",
           "availability": "required"
         },
         {
@@ -48,7 +54,7 @@
       ],
       "requests": [
         {
-          "capability": "workspace-service:regency",
+          "capability": "workspace-service:grimoire",
           "resource": {
             "kind": "prefix",
             "prefix": ""
@@ -143,10 +149,10 @@
   "dependencies": {
     "@workspace/runtime": "workspace:*",
     "@workspace/svelte": "workspace:*",
-    "@workspace/regency-engine": "workspace:*",
+    "@workspace/grimoire-engine": "workspace:*",
     "@workspace-skills/agents": "workspace:*",
-    "svelte": "^5.56.9",
-    "@workspace/pubsub": "workspace:*"
+    "@workspace/pubsub": "workspace:*",
+    "svelte": "^5.56.9"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

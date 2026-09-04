@@ -1,9 +1,9 @@
 {
-  "name": "@workspace-workers/regency-agents",
+  "name": "@workspace-workers/grimoire-agents",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Chat agents that sit at the courts of the Regency example: the Regent's council, rival sovereigns and their ambassadors.",
+  "description": "The voices of the Grimoire estate: the familiar who carries verse into code, the spirits bound to the valley's features, the Moor beyond the wall, and chartered golems.",
   "vibestudio": {
     "icon": "./assets/icon.svg",
     "entry": "index.ts",
@@ -19,13 +19,13 @@
     "durable": {
       "classes": [
         {
-          "className": "RegencyAgentWorker"
+          "className": "GrimoireAgentWorker"
         }
       ]
     },
     "agent": {
-      "displayName": "Regency Courtier",
-      "description": "Minister, sovereign or ambassador in a game of Regency"
+      "displayName": "Grimoire Familiar",
+      "description": "Familiar, spirit, golem or the Moor in a game of Grimoire"
     },
     "exposeModules": [
       "@workspace/runtime",
@@ -36,7 +36,7 @@
       "provides": [],
       "serviceRequests": [
         {
-          "protocol": "examples.regency.v1",
+          "protocol": "examples.grimoire.v1",
           "availability": "required"
         },
         {
@@ -50,7 +50,7 @@
       ],
       "requests": [
         {
-          "capability": "workspace-service:regency",
+          "capability": "workspace-service:grimoire",
           "resource": {
             "kind": "prefix",
             "prefix": ""
@@ -279,14 +279,15 @@
   },
   "dependencies": {
     "@sinclair/typebox": "^0.27.12",
-    "@workspace-workers/agent-worker": "workspace:*",
+    "@vibestudio/service-schemas": "workspace:*",
     "@workspace/agentic-core": "workspace:*",
     "@workspace/agentic-do": "workspace:*",
+    "@workspace/grimoire-engine": "workspace:*",
     "@workspace/harness": "workspace:*",
     "@workspace/pi-core": "workspace:*",
     "@workspace/pubsub": "workspace:*",
-    "@workspace/regency-engine": "workspace:*",
     "@workspace/runtime": "workspace:*",
+    "@workspace-workers/agent-worker": "workspace:*",
     "zod": "^3.25.76"
   },
   "devDependencies": {

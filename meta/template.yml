@@ -1,17 +1,67 @@
 systemEpoch: 0
 template:
   name: Examples
-  description: Sample panels and workers for learning and experimentation, including Regency, a strategy game whose council and rival courts are workspace agents.
+  description: Sample panels and workers for learning and experimentation, including Regency, a strategy game whose council and rival courts are workspace agents, and Grimoire, a game where verse becomes code and a familiar agent carries it into a living valley.
   repositories:
+    - packages/grimoire-engine
+    - packages/regency-engine
+    - panels/grimoire
     - panels/hello-svelte
     - panels/hello-vanilla
-    - workers/hello
-    - workers/sample-do
-    - packages/regency-engine
-    - workers/regency-realm
-    - workers/regency-agents
     - panels/regency
+    - workers/grimoire-agents
+    - workers/grimoire-world
+    - workers/hello
+    - workers/regency-agents
+    - workers/regency-realm
+    - workers/sample-do
   files: []
 templates:
   use:
     - url: git+https://github.com/panticonic/vibestudio-workspace-base.git
+# These services are factories rather than singletons. Every caller supplies
+# the game or estate key it means, so multiple instances can coexist.
+services:
+  - source: workers/regency-realm
+    name: regency
+    title: Regency game
+    action: read and change the state of a Regency game
+    description: Holds the world, orders and season clock of the Regency strategy game so its panel and agents share one truth.
+    notability: everyday
+    presentation:
+      domain: automation
+      verb: manage
+    protocols:
+      - examples.regency.v1
+    authority:
+      principals:
+        - user
+        - code
+      binding:
+        declaredFor:
+          - panels/regency
+          - workers/regency-agents
+    durableObject:
+      className: RegencyGameDO
+  - source: workers/grimoire-world
+    name: grimoire
+    title: Grimoire estate
+    action: read and change the state of a Grimoire estate
+    description: Holds the valley, the sky, every spell and its writing, the wards and bindings, the spirits and the news of the Grimoire game so its panel and agents share one truth.
+    notability: everyday
+    presentation:
+      domain: automation
+      verb: manage
+    protocols:
+      - examples.grimoire.v1
+    authority:
+      principals:
+        - host
+        - user
+        - code
+      binding:
+        declaredFor:
+          - panels/grimoire
+          - workers/grimoire-agents
+    durableObject:
+      className: GrimoireWorldDO

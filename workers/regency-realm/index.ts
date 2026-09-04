@@ -55,7 +55,7 @@ import {
 } from "@workspace/regency-engine";
 
 export type MinisterRole = "chancellor" | "treasurer" | "marshal" | "envoy";
-export const MINISTER_ROLES: readonly MinisterRole[] = ["chancellor", "treasurer", "marshal", "envoy"];
+const MINISTER_ROLES: readonly MinisterRole[] = ["chancellor", "treasurer", "marshal", "envoy"];
 export type MandateLevel = "advise" | "act" | "plenary";
 
 export type OrderStatus = "pending" | "awaiting_seal" | "vetoed" | "withdrawn" | "resolved" | "rejected";

@@ -1,0 +1,155 @@
+import { describe, expect, it } from "vitest";
+import { createTestDO } from "@workspace/runtime/worker/test-utils";
+import { localExecutor, type Overview, type ScryPage, type SpeakResult, type SpellRecord, type Snapshot, type RunResult, type RegionView, type SpellbookView } from "@workspace/grimoire-engine";
+import { composeProgram } from "@workspace/grimoire-engine";
+import { GrimoireWorldDO } from "./index.js";
+
+/** The world runs unattended source through a local executor in tests. */
+class TestWorld extends GrimoireWorldDO {
+  constructor(ctx: ConstructorParameters<typeof GrimoireWorldDO>[0], env: unknown) {
+    super(ctx, env as Record<string, unknown>);
+    this.sourceExecutor = localExecutor;
+    this.idleCadence = false;
+  }
+}
+
+const FAMILIAR = { callerId: "do:workers/grimoire-agents:GrimoireAgentWorker:familiar-circle", callerKind: "do" as const };
+
+async function founded() {
+  const t = await createTestDO(TestWorld);
+  await t.call("newEstate", { seed: "test", apprentice: "ada", apprenticeName: "Ada" });
+  await t.call("registerParticipant", { role: "familiar", channelId: "ch-circle", participantId: "p1", targetId: FAMILIAR.callerId, handle: "familiar", name: "The familiar", apprentice: "ada", room: "circle" });
+  return t;
+}
+
+/** Run the familiar's side of a cast locally: snapshot → program → result. */
+async function familiarRun(t: Awaited<ReturnType<typeof founded>>, spellId: string, source: string, fork: boolean): Promise<RunResult> {
+  const snap = (await t.callAs(FAMILIAR, "snapshot", { spellId, fork })) as Snapshot;
+  return localExecutor(composeProgram(source, snap));
+}
+
+describe("GrimoireWorldDO", () => {
+  it("founds an estate with the letter, the undone list and the stale workings", async () => {
+    const t = await founded();
+    const ov = await t.call<Overview>("overview", { apprentice: "ada" });
+    expect(ov.regions.length).toBe(27);
+    expect(ov.undone.length).toBe(9);
+    expect(ov.activeSpells.some((s) => s.id === "stale:ilvane-sluice")).toBe(true);
+    expect(ov.firstHour.hearthLit).toBe(false);
+    const letter = await t.call<{ text: string }>("letter", {});
+    expect(letter.text).toContain("The hearth will light for you");
+  });
+
+  it("glances at prose, opens the study after three, and lights the hearth on the first verse", async () => {
+    const t = await founded();
+    for (let i = 0; i < 3; i++) {
+      const r = await t.call<SpeakResult>("speak", { apprentice: "ada", verse: "please can you make the orchard less flooded because it bothers me and the trees are dying and I would like it dry now thank you" });
+      expect(r.kind).toBe("gate");
+      expect(r.line).toBeTruthy();
+      if (i === 2) expect(r.studyOpened).toBe(true);
+    }
+    const lit = await t.call<SpeakResult>("speak", { apprentice: "ada", verse: "Small fire, wake and warm this room\nhama, come up from the ash" });
+    expect(lit.kind).toBe("instant");
+    expect(lit.receipts?.length).toBe(9);
+    const ov = await t.call<Overview>("overview", { apprentice: "ada" });
+    expect(ov.firstHour.hearthLit).toBe(true);
+    const region = await t.call<RegionView>("region", { id: "manor" });
+    const h = region.region.places["hearth"]!;
+    expect(region.region.layers.heat[h.y * region.region.w + h.x]).toBeGreaterThanOrEqual(4);
+    // The familiar was woken (delivery fails in the harness and stays retryable).
+    const wakes = t.sql.exec(`SELECT status FROM wakes`).toArray();
+    expect(wakes.length).toBe(1);
+  });
+
+  it("carries a verse through hear, rehearse and commit, and then recasts it instantly", async () => {
+    const t = await founded();
+    await t.call("speak", { apprentice: "ada", verse: "Small fire, wake and warm this room\nhama, come up from the ash" });
+    const spoken = await t.call<SpeakResult>("speak", { apprentice: "ada", verse: "Light for the green things, a little more\nand water where the earth is dry", focusCell: { region: "garden", x: 8, y: 4 } });
+    expect(spoken.kind).toBe("deliberating");
+    const spellId = spoken.spellId!;
+    const heard = await t.callAs<{ ok: boolean; lacking: string[] }>(FAMILIAR, "hear", { spellId, intent: { subject: { kind: "cells", ref: "the herb beds", region: "garden", rect: { x: 6, y: 2, w: 5, h: 5 } }, effect: "a little light and water on the herb beds", concepts: [{ concept: "light", confidence: 0.9, fromWord: "Light" }, { concept: "water", confidence: 0.9, fromWord: "water" }, { concept: "more", confidence: 0.7, fromWord: "more" }], unsure: [], tier: "cantrip" } });
+    expect(heard.ok).toBe(true);
+    const source = `const beds = read.places("garden")["herb-beds"];\nfor (const c of read.neighbours({ region: "garden", x: beds.x, y: beds.y }, 1)) effect.transmute(c, { light: 1, water: c.water < 2 ? 1 : 0 });`;
+    const rehearsal = await familiarRun(t, spellId, source, true);
+    const reh = await t.callAs<{ ok: boolean; rehearsal: { summary: string } }>(FAMILIAR, "rehearse", { spellId, source, result: rehearsal });
+    expect(reh.ok).toBe(true);
+    expect(reh.rehearsal.summary).toMatch(/light|water/);
+    const result = await familiarRun(t, spellId, source, false);
+    const committed = await t.callAs<{ ok: boolean; status: string; receipts: unknown[]; line: string }>(FAMILIAR, "commit", { spellId, source, result, name: "a little light", gloss: { "1": "the herb beds" }, margin: "Small, and correct." });
+    expect(committed.ok).toBe(true);
+    expect(committed.status).toBe("cast");
+    expect(committed.receipts.length).toBeGreaterThan(0);
+    // Fast path: the same verse again is instant and a variation of the first.
+    const again = await t.call<SpeakResult>("speak", { apprentice: "ada", verse: "Light for the green things, a little more\nand water where the earth is dry" });
+    expect(again.kind).toBe("instant");
+    const rec = await t.call<SpellRecord>("spell", { id: again.spellId! });
+    expect(rec.variantOf).toBe(spellId);
+    expect(rec.fromCache).toBe(true);
+    const book = await t.call<SpellbookView>("spellbook", { apprentice: "ada" });
+    expect(book.spells.some((s) => s.name === "a little light")).toBe(true);
+    // Scrying shows the words heard and the writing.
+    const page = await t.call<ScryPage>("scry", { apprentice: "ada", kind: "spell", ref: spellId });
+    expect(page.spell.writing).toContain("herb-beds");
+    expect(page.words.some((w) => w.concept === "light" || w.concept === "kindle")).toBe(true);
+  });
+
+  it("installs a ward that fires on its trigger when the world advances", async () => {
+    const t = await founded();
+    await t.call("speak", { apprentice: "ada", verse: "Small fire, wake and warm this room" });
+    // Give the apprentice the binding words the sparrow would teach.
+    await t.call("scry", { apprentice: "ada", kind: "entity", ref: Object.keys((await t.call<{ entities: Record<string, { sub: string }> }>("dump", {})).entities).find((n) => n.startsWith("sparrow"))! });
+    const spoken = await t.call<SpeakResult>("speak", { apprentice: "ada", verse: "Whenever a grey thing creeps in the dark of the beds,\nlet light come down on that cell and hold, hara", focusCell: { region: "garden", x: 8, y: 8 } });
+    const spellId = spoken.spellId!;
+    await t.callAs(FAMILIAR, "hear", { spellId, intent: { subject: { kind: "cells", ref: "the beds", region: "garden", rect: { x: 0, y: 0, w: 16, h: 16 } }, effect: "light on any cell where vermin stands", binding: { kind: "whenever", condition: "vermin on a dark cell" }, concepts: [{ concept: "whenever", confidence: 1, fromWord: "Whenever" }, { concept: "light", confidence: 0.9, fromWord: "light" }, { concept: "ward", confidence: 1, fromWord: "hara" }], unsure: [], tier: "ward" } });
+    const source = `const t = read.trigger();\nconst cells = t && t.payload && t.payload.cells ? t.payload.cells : [];\nfor (const p of cells) effect.transmute({ region: "garden", x: p.x, y: p.y }, { light: 2 });`;
+    const rehearsal = await familiarRun(t, spellId, source, true);
+    await t.callAs(FAMILIAR, "rehearse", { spellId, source, result: rehearsal });
+    const result = await familiarRun(t, spellId, source, false);
+    const committed = await t.callAs<{ ok: boolean; status: string; line: string }>(FAMILIAR, "commit", { spellId, source, result, name: "the vermin ward", persistent: { kind: "ward", trigger: { kind: "cell", region: "garden", predicate: "cell.growth > 0 && cell.light < 6", rect: { x: 0, y: 0, w: 16, h: 16 } } } });
+    expect(committed.ok).toBe(true);
+    const adv = await t.call<{ fired: number; tick: number }>("advance", { ticks: 6 });
+    expect(adv.tick).toBe(6);
+    const rec = await t.call<SpellRecord>("spell", { id: spellId });
+    expect(rec.persistent?.active).toBe(true);
+    expect(rec.firings.length).toBeGreaterThan(0);
+    const ov = await t.call<Overview>("overview", { apprentice: "ada" });
+    expect(ov.firstHour.firstWard).toBe(true);
+  });
+
+  it("lets Ilvane's ward be read, released, and crossed off the undone list", async () => {
+    const t = await founded();
+    await t.call("speak", { apprentice: "ada", verse: "Small fire, wake and warm this room" });
+    const page = await t.call<ScryPage>("scry", { apprentice: "ada", kind: "spell", ref: "stale:ilvane-sluice" });
+    expect(page.spell.writing).toContain("there.stone > 0");
+    expect(page.echo).toBeTruthy();
+    const refused = await t.call<{ ok: boolean; reason?: string }>("release", { apprentice: "ada", spellId: "stale:ilvane-sluice" });
+    expect(refused.ok).toBe(false);
+    // Learn kaer from the notebook page by scrying a cast that used it... in the test, grant it through a bargain answer path is heavy; use the direct grant via a spirit seat instead.
+    await t.call("registerParticipant", { role: "spirit:hearth", channelId: "ch-hearth", participantId: "p2", targetId: "do:x:y:hearth", handle: "hearth", name: "the Hearth", apprentice: null, room: null });
+    t.sql.exec(`UPDATE estate SET state_json = json_set(state_json, '$.apprentices.ada.words', json(?))`, JSON.stringify(["heat", "release", "ward"]));
+    const fresh = await createTestDO(TestWorld, undefined, { db: t.db });
+    const released = await fresh.call<{ ok: boolean }>("release", { apprentice: "ada", spellId: "stale:ilvane-sluice" });
+    expect(released.ok).toBe(true);
+    const ov = await fresh.call<Overview>("overview", { apprentice: "ada" });
+    expect(ov.activeSpells.some((s) => s.id === "stale:ilvane-sluice")).toBe(false);
+  });
+
+  it("refuses a stranger's hand at the familiar's tools", async () => {
+    const t = await founded();
+    await t.call("speak", { apprentice: "ada", verse: "Small fire, wake and warm this room" });
+    const spoken = await t.call<SpeakResult>("speak", { apprentice: "ada", verse: "Moths to the lantern, lil,\nand nothing more" });
+    await expect(t.callAs({ callerId: "do:someone:else:x", callerKind: "do" }, "hear", { spellId: spoken.spellId, intent: { subject: { kind: "cells", ref: "x" }, effect: "x", concepts: [], unsure: [], tier: "charm" } })).rejects.toThrow(/not yours/);
+  });
+
+  it("charms by hand for free and writes the news as days pass", async () => {
+    const t = await founded();
+    await t.call("speak", { apprentice: "ada", verse: "Small fire, wake and warm this room" });
+    const ok = await t.call<{ ok: boolean }>("adorn", { apprentice: "ada", cell: { region: "orchard", x: 5, y: 5 }, charm: { kind: "lantern", colour: "#ffd27a", label: "for whoever comes next" } });
+    expect(ok.ok).toBe(true);
+    await t.call("advance", { ticks: 48 });
+    const news = await t.call<{ pages: unknown[]; unread: number }>("news", { apprentice: "ada" });
+    expect(news.pages.length).toBeGreaterThanOrEqual(1);
+    const region = await t.call<RegionView>("region", { id: "orchard" });
+    expect(Object.values(region.region.adorns).some((a) => a.kind === "lantern")).toBe(true);
+  });
+});
