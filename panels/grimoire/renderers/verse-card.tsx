@@ -84,7 +84,7 @@ export default function VerseCard({
       const normalized = verse.replace(/\r\n?/g, "\n");
       const result = await chat.callMethodByHandle(
         "familiar",
-        "grimoire.command",
+        "grimoire_command",
         {
           commandId: commandId.current,
           kind: "speak",

@@ -32,6 +32,14 @@ describe("GrimoireAgentWorker", () => {
     w.seatChannel({ role: "familiar", estateKey: "main", apprentice: "ada", apprenticeName: "Ada", room: "circle" });
     expect(w.participant().handle).toBe("familiar-circle");
     expect(w.participant().name).toBe("The familiar");
+    expect(w.participant().methods?.map((method) => method.name)).toContain(
+      "grimoire_command",
+    );
+    expect(
+      w.participant().methods?.every((method) =>
+        /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(method.name),
+      ),
+    ).toBe(true);
     expect(w.prompt()).toContain("I carry. I do not compose.");
     expect(w.prompt()).toContain("This conversation is the circle");
     expect(buildPrompt({ role: "spirit:river", estateKey: "main" })).toContain("Velharan");

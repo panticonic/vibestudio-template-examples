@@ -122,6 +122,20 @@ body,
   opacity: 0.55;
   cursor: pointer;
 }
+.g-attention .g-attention-guide {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--season) 32%, transparent);
+  border-radius: 999px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--season) 14%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 1;
+}
+.g-attention .g-attention-dismiss {
+  padding: 5px;
+}
 
 @media (max-width: 760px) {
   .g-rail {

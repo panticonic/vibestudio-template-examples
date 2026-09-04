@@ -32,13 +32,11 @@ import type {
 } from "@workspace/grimoire-engine";
 import { EstateClient, errorText } from "./lib/client.js";
 import {
-  circleChannelKey,
   mintApprenticeId,
-  openConversation,
+  openFamiliarConversation,
+  openSpiritConversation,
   seatFamiliar,
   seatSpirit,
-  spiritChannelKey,
-  studyChannelKey,
 } from "./lib/estate.js";
 import { cellAt, drawRegion, type LayerToggle } from "./lib/draw.js";
 import { closeAudio, playCue } from "./lib/sound.js";
@@ -210,6 +208,7 @@ function FirstRun({
   const [letter, setLetter] = useState("");
   const [undone, setUndone] = useState<UndoneItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [enteredEstate, setEnteredEstate] = useState(false);
   const begin = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = name.trim();
@@ -218,19 +217,28 @@ function FirstRun({
     setStep("seating");
     setProgress([]);
     try {
-      if (hasEstate)
-        await client.call("joinEstate", {
-          apprentice,
-          apprenticeName: trimmed,
-        });
-      else
-        await client.call("newEstate", { apprentice, apprenticeName: trimmed });
+      if (!enteredEstate) {
+        if (hasEstate)
+          await client.call("joinEstate", {
+            apprentice,
+            apprenticeName: trimmed,
+          });
+        else
+          await client.call("newEstate", { apprentice, apprenticeName: trimmed });
+        setEnteredEstate(true);
+      }
       const got = await client.call("letter", {});
       setLetter(got.text);
       setUndone(got.undone);
-      await seatFamiliar(client, apprentice, trimmed, (line) =>
+      const familiar = await seatFamiliar(client, apprentice, trimmed, (line) =>
         setProgress((rows) => [...rows, line]),
       );
+      const seatingError = familiar.circle.error ?? familiar.study.error;
+      if (seatingError) {
+        throw new Error(
+          `The estate woke, but the familiar could not take its seat: ${seatingError}`,
+        );
+      }
       setStep("letter");
     } catch (cause) {
       setError(errorText(cause));
@@ -266,7 +274,11 @@ function FirstRun({
                 autoComplete="off"
               />
               <button className="g-primary" disabled={!name.trim()}>
-                {hasEstate ? "Come home" : "Take the key"}
+                {enteredEstate
+                  ? "Try the familiar again"
+                  : hasEstate
+                    ? "Come home"
+                    : "Take the key"}
                 <span>→</span>
               </button>
             </form>
@@ -580,9 +592,9 @@ function Circle({
         <button
           className="g-text-action"
           onClick={() =>
-            void openConversation(
-              circleChannelKey(client.estateKey, apprentice),
-            ).catch((cause) => onToast(errorText(cause)))
+            void openFamiliarConversation(client, apprentice, "circle").catch(
+              (cause) => onToast(errorText(cause)),
+            )
           }
         >
           Open the familiar’s conversation →
@@ -935,9 +947,14 @@ function StudyRoom({
         <button
           className="g-primary"
           onClick={() =>
-            void openConversation(
-              studyChannelKey(client.estateKey, apprentice),
-            ).catch((cause) => onToast(errorText(cause)))
+            void openFamiliarConversation(
+              client,
+              apprentice,
+              "study",
+              "What should I try next, and why does it matter?",
+            ).catch(
+              (cause) => onToast(errorText(cause)),
+            )
           }
         >
           Ask the familiar what to try next ↗
@@ -1774,7 +1791,8 @@ function Spirits({
     if (!verse) return;
     setBusy(true);
     try {
-      await seatSpirit(client, id, apprentice);
+      const spiritSeat = await seatSpirit(client, id, apprentice);
+      if (spiritSeat.error) throw new Error(spiritSeat.error);
       const result = await client.call("address", {
         apprentice,
         spirit: id,
@@ -1857,11 +1875,10 @@ function Spirits({
                     </button>
                     <button
                       onClick={() =>
-                        void openConversation(
-                          spiritChannelKey(
-                            client.estateKey,
-                            spirit.id as SpiritId,
-                          ),
+                        void openSpiritConversation(
+                          client,
+                          spirit.id as SpiritId,
+                          apprentice,
                         ).catch((cause) => onToast(errorText(cause)))
                       }
                     >
@@ -2046,9 +2063,10 @@ export default function GrimoirePanel() {
     };
   }, [client]);
   useEffect(() => {
+    if (firstRun !== "done") return;
     const timer = setInterval(() => void refresh(), 2500);
     return () => clearInterval(timer);
-  }, [refresh]);
+  }, [refresh, firstRun]);
   useEffect(() => {
     if (
       args.surface === "codex" &&
@@ -2178,9 +2196,7 @@ export default function GrimoirePanel() {
             setFirstRun("done");
             void refresh();
             navigate("valley");
-            void openConversation(
-              circleChannelKey(estateKey, apprentice),
-            ).catch((cause) => say(errorText(cause)));
+            say("The familiar is waiting in the circle whenever you want counsel.");
           }}
         />
       </main>
@@ -2257,9 +2273,14 @@ export default function GrimoirePanel() {
         <button
           className="g-conversation"
           onClick={() =>
-            void openConversation(
-              circleChannelKey(estateKey, apprentice),
-            ).catch((cause) => say(errorText(cause)))
+            void openFamiliarConversation(
+              client,
+              apprentice,
+              "circle",
+              "I am here. What deserves my attention next? Guide me through it.",
+            ).catch(
+              (cause) => say(errorText(cause)),
+            )
           }
         >
           <span>✦</span>
@@ -2324,6 +2345,20 @@ export default function GrimoirePanel() {
                 </small>
               </div>
               <button
+                className="g-attention-guide"
+                onClick={() =>
+                  void openFamiliarConversation(
+                    client,
+                    apprentice,
+                    "circle",
+                    `Help me with this: ${attention[0]!.title}. ${attention[0]!.nextAction}`,
+                  ).catch((cause) => say(errorText(cause)))
+                }
+              >
+                Guide me
+              </button>
+              <button
+                className="g-attention-dismiss"
                 aria-label="Dismiss guidance"
                 onClick={() =>
                   void client
@@ -2392,10 +2427,8 @@ export default function GrimoirePanel() {
               }}
               onEcho={(verse) => {
                 setDraftVerse(verse);
-                void openConversation(
-                  circleChannelKey(estateKey, apprentice),
-                ).catch((cause) => say(errorText(cause)));
-                say("The verse is ready to echo in the familiar's composer.");
+                navigate("circle");
+                say("The verse is waiting in the circle, ready to be spoken.");
               }}
               onToast={say}
             />

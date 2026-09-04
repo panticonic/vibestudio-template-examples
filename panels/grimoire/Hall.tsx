@@ -7,7 +7,7 @@ import { useState } from "react";
 import type { Overview, SpiritId } from "@workspace/grimoire-engine";
 import type { EstateClient } from "./lib/client.js";
 import { errorText } from "./lib/client.js";
-import { convene, openConversation } from "./lib/estate.js";
+import { convene, openHallConversation } from "./lib/estate.js";
 import { SPIRIT_INK } from "./lib/palette.js";
 import "./enhancements.css";
 
@@ -55,7 +55,13 @@ export function Hall({
           ? "They are convened. Open the hall and listen; you may speak there too."
           : (r.reason ?? "The hall stayed empty."),
       );
-      if (r.ok) await openConversation(r.channelId);
+      if (r.ok)
+        await openHallConversation(
+          client,
+          r.channelId,
+          [...pick] as SpiritId[],
+          apprentice,
+        );
     } catch (err) {
       onToast(errorText(err));
     } finally {
@@ -119,7 +125,14 @@ export function Hall({
             <li key={h.key}>
               <button
                 className="g-text-action"
-                onClick={() => void openConversation(h.key)}
+                onClick={() =>
+                  void openHallConversation(
+                    client,
+                    h.key,
+                    h.spirits,
+                    apprentice,
+                  ).catch((cause) => onToast(errorText(cause)))
+                }
               >
                 {h.spirits
                   .map(

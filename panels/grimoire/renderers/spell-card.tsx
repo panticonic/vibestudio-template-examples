@@ -71,7 +71,7 @@ export default function SpellCard({
       ids.current[kind] ??= `${messageId}:${kind}:${crypto.randomUUID()}`;
       const result = (await chat.callMethodByHandle(
         "familiar",
-        "grimoire.command",
+        "grimoire_command",
         {
           commandId: ids.current[kind],
           kind,

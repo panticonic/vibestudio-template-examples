@@ -55,7 +55,7 @@ describe("the Grimoire React panel", () => {
     ])
       expect(source).toContain(`\"${marker}\"`);
     expect(source).toContain("panel.stateArgs.set");
-    expect(source).toContain("openConversation");
+    expect(source).toContain("openFamiliarConversation");
     expect(source).toContain("drawRegion");
     expect(source).toContain("StudyRoom");
   });
@@ -95,6 +95,7 @@ describe("the Grimoire React panel", () => {
   });
 
   it("declares the complete authority ceiling used by the panel", () => {
+    const estate = readFileSync(join(here, "lib", "estate.ts"), "utf8");
     const manifest = JSON.parse(
       readFileSync(join(here, "package.json"), "utf8"),
     ) as {
@@ -116,11 +117,16 @@ describe("the Grimoire React panel", () => {
         .sort(),
     ).toEqual([
       "context.boundary",
+      "subagents.create",
       "workspace-service:channel",
       "workspace-service:grimoire",
       "workspace.runtime-state.inspect",
       "workspace.runtime-state.manage",
     ]);
+    expect(estate).toContain("waitForApprovalResolution");
+    expect(estate).toContain("installedAgents");
+    expect(estate).toContain("defaultRecipients");
+    expect(estate).toContain("initialPromptIdempotencyKey");
   });
 
   it("lays out every region of the valley", async () => {

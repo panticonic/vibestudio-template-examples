@@ -190,7 +190,7 @@ export class GrimoireAgentWorker extends AiChatWorker {
     const methods = [...(base.methods ?? [])];
     if (cfg.role === "familiar" && cfg.apprentice) {
       methods.push({
-        name: "grimoire.command",
+        name: "grimoire_command",
         description:
           "Carry one explicit, replay-protected apprentice command from a Grimoire card.",
         parameters: {
@@ -224,7 +224,7 @@ export class GrimoireAgentWorker extends AiChatWorker {
     args: unknown,
     signal?: AbortSignal,
   ): Promise<{ result: unknown; isError?: boolean } | null> {
-    if (methodName !== "grimoire.command")
+    if (methodName !== "grimoire_command")
       return super.handleStandardAgentMethodCall(
         channelId,
         methodName,
