@@ -7,8 +7,7 @@
   "vibestudio": {
     "title": "Regency",
     "icon": "./assets/icon.svg",
-    "entry": "index.ts",
-    "template": "svelte",
+    "entry": "index.tsx",
     "tests": [
       {
         "name": "native",
@@ -95,11 +94,11 @@
     "@radix-ui/react-icons": "^1.3.2",
     "@radix-ui/themes": "^3.3.0",
     "@workspace/runtime": "workspace:*",
-    "@workspace/svelte": "workspace:*",
+    "@workspace/react": "workspace:*",
     "@workspace/regency-engine": "workspace:*",
     "@workspace-skills/agents": "workspace:*",
     "react": "^19.0.0",
-    "svelte": "^5.56.9",
+    "react-dom": "^19.0.0",
     "@workspace/pubsub": "workspace:*"
   },
   "devDependencies": {

@@ -20,12 +20,12 @@ when the estates depose you, or when the moneylenders own the crown.
 
 ## Three units and a package
 
-| Unit | Kind | Role |
-| --- | --- | --- |
-| `packages/regency-engine` | package | Pure, deterministic rules: map generation, economy, population, war, diplomacy, laws-as-data, victory, the steward policy, and agent-facing reports. No runtime dependencies. |
-| `workers/regency-realm` | Durable Object | `RegencyGameDO`: one game per object key. World state, the order book, the Regent's seal, mandates, the season clock, participant identity, and outbound briefings. Declared as service `examples.regency.v1` in `meta/vibestudio.yml`. |
-| `workers/regency-agents` | agent worker | `RegencyAgentWorker`: a subclass of the default chat agent. One class, every seat; role and realm come from the channel subscription config. Adds the game tools and a per-seat persona; exposes `receiveBriefing` so the game can wake a seat. |
-| `panels/regency` | Svelte panel | The map, dashboards, seal queue, mandates, chronicle, diplomacy, and the buttons that open conversations with the council, each embassy, and each rival court. Seats the court (channels + agents) on a new game. |
+| Unit                      | Kind           | Role                                                                                                                                                                                                                                            |
+| ------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/regency-engine` | package        | Pure, deterministic rules: map generation, economy, population, war, diplomacy, laws-as-data, victory, the steward policy, and agent-facing reports. No runtime dependencies.                                                                   |
+| `workers/regency-realm`   | Durable Object | `RegencyGameDO`: one game per object key. World state, the order book, the Regent's seal, mandates, the season clock, participant identity, and outbound briefings. Declared as service `examples.regency.v1` in `meta/vibestudio.yml`.         |
+| `workers/regency-agents`  | agent worker   | `RegencyAgentWorker`: a subclass of the default chat agent. One class, every seat; role and realm come from the channel subscription config. Adds the game tools and a per-seat persona; exposes `receiveBriefing` so the game can wake a seat. |
+| `panels/regency`          | React panel    | The map, dashboards, seal queue, chronicle, diplomacy, and the buttons that open conversations with the council, each embassy, and each rival court. Seats the court (channels + agents) on a new game.                                         |
 
 ## How a season plays
 
@@ -35,7 +35,7 @@ when the estates depose you, or when the moneylenders own the crown.
    building and colonies; marshal: armies and war; envoy: treaties), the seat's
    mandate, and the caller's identity. Sensitive acts by ministers (war, laws,
    taxes, alliances, ceding land, accepting proposals) enter the book as
-   *awaiting the seal*.
+   _awaiting the seal_.
 2. **The seal.** The Regent seals or vetoes in the panel, or says so to the
    Herald, who calls `seal_order` only on the Regent's explicit word. Mandates
    let the Regent grant a minister `plenary` authority (no seal), `act`
@@ -43,7 +43,7 @@ when the estates depose you, or when the moneylenders own the crown.
 3. **Closing.** The Regent closes the season. If every agent sovereign has
    called `end_turn`, the season resolves at once; otherwise the game enters
    `closing`, nudges the absent courts, and the panel shows who is pending.
-   There is no timer: the Regent chooses to wait or to *proceed without them*,
+   There is no timer: the Regent chooses to wait or to _proceed without them_,
    in which case the steward policy plays the absent realm for one season.
 4. **Resolution.** One deterministic pass: laws and treaty responses; spending;
    war declarations; marches and battles; sieges and captures; harvest, taxes,
@@ -55,7 +55,7 @@ when the estates depose you, or when the moneylenders own the crown.
    Herald announces the season and addresses the ministers whose portfolios the
    news touches; each sovereign is prompted to play its turn; ambassadors are
    prompted when there is diplomatic news. Failed deliveries stay queued behind
-   a *Re-send briefings* button.
+   a _Re-send briefings_ button.
 
 ## What the agents demonstrate
 
@@ -111,8 +111,8 @@ when the estates depose you, or when the moneylenders own the crown.
   Regency at the end. The Regent has a personal reputation the heir inherits.
 - **Rivers and roads.** Rivers run from wet highlands to the sea and bless the
   provinces they cross; roads are drawn between provinces that built them.
-- **Scenarios.** *The Long Regency* (forty seasons from spring) and *Winter
-  Regency* (twelve seasons opening with empty granaries, a hungry capital, an
+- **Scenarios.** _The Long Regency_ (forty seasons from spring) and _Winter
+  Regency_ (twelve seasons opening with empty granaries, a hungry capital, an
   army on the border, a claimant and a wavering lord).
 
 The map is painted rather than tiled: merged province outlines, parchment
@@ -168,7 +168,7 @@ it becomes and disappears when that order is sealed, vetoed, withdrawn or
 carried out; everything staged is wiped when the season turns. The Marshal's
 prompt now says: stage, then argue, then submit.
 
-The Regent can point rather than describe. *Speak about &lt;province&gt;* on the
+The Regent can point rather than describe. _Speak about &lt;province&gt;_ on the
 province card (and on each of its armies) opens a short composer and publishes
 the message into the council conversation with `{ regency: { province } }` or
 `{ regency: { army } }` metadata; the Herald's persona says to take that as the
@@ -201,10 +201,10 @@ text, skippable by click or by <kbd>Space</kbd>, and then the season banner.
 The end is a scene rather than a line: a full-panel illuminated page with the
 heir grown up (the same procedural portrait, aged), the tutor beside them, the
 verdict, a timeline of turning points drawn from the events, the chronicler's
-years, and a *Secret history* tab.
+years, and a _Secret history_ tab.
 
 **The machinery, shown.** Legitimacy, the treasury, a province's bread and
-unrest and an army's position each carry a *why?* button; `explain(state,
+unrest and an army's position each carry a _why?_ button; `explain(state,
 events, subject)` in the engine walks the ledger, the province's own arithmetic
 and the recent chronicle and returns a short causal list, largest cause first,
 with the lines of chronicle that bear on it.
@@ -234,7 +234,7 @@ Council tab, and the ministers are told who asked. It shows
 both in the Matters tab and as a chat card. Rival courts remember —
 `write_relations_diary` keeps a per-realm book on the Regent that folds into
 the sovereign's and its ambassador's briefings — and at the end the game writes
-`projects/regency/legends/<gameKey>.md`, which the *next* Regency on that key
+`projects/regency/legends/<gameKey>.md`, which the _next_ Regency on that key
 reads and hands to every
 rival court as memory of the Regent who came before. A chronicler sits in the
 court, silent except once a year, when the Durable Object hands it the year's
@@ -300,17 +300,17 @@ game, which is the platform's rule for schema change.
 ## Trying it
 
 1. Install the Examples template into a workspace that has the Base template.
-2. Open **Regency**. Found the realm; leave *Seat the court* checked.
+2. Open **Regency**. Found the realm; leave _Seat the court_ checked.
 3. Press **Speak to the council**. Tell the Herald what you want ("Ask the
    Treasurer why the marches are hungry", "Marshal, put two companies on the
    northern border", "Envoy, offer Dulia a trade treaty").
-4. Seal or veto what appears under *The Regent's seal*, then **Close the
+4. Seal or veto what appears under _The Regent's seal_, then **Close the
    season**. Watch the map change; read the chronicle; receive the ambassadors.
 
 Tests: `packages/regency-engine` (rules, explanations, promises and a
 forty-season simulation),
 `workers/regency-realm` (order book, seal, identity, clock), `workers/regency-agents`
-(seats, tools, prompts), `panels/regency` (component compilation). Run them
+(seats, tools, prompts), `panels/regency` (React and runtime contracts). Run them
 through the workspace's ordinary `verify` flow or the host's userland Vitest
 configuration.
 
