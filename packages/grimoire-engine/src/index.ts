@@ -30,3 +30,4 @@ export * from "./binding/index.js";
 export * from "./content/index.js";
 export * from "./news/index.js";
 export * from "./scry/index.js";
+export * from "./presentation.js";

@@ -2,16 +2,72 @@ export * from "./types.js";
 export * from "./hex.js";
 export { createRng, hashSeed, type Rng } from "./rng.js";
 export { generateWorld, defaultLaws, type WorldOptions } from "./mapgen.js";
-export { validateEdict, provinceMatches, edictEffects, EXAMPLE_EDICT } from "./laws.js";
-export { validateOrder, orderCost, describeOrder, requiresSeal, allowedInPortfolio, PORTFOLIOS, ORDER_KINDS, colonizeCost, type OrderKind } from "./orders.js";
-export { resolveSeason, checkOutcome, adjustRelation, type ResolutionResult, type RejectedOrder } from "./tick.js";
-export { realmReport, provinceReport, mapOverview, chronicle, provinceLine, TREATY_GUIDE } from "./report.js";
+export {
+  validateEdict,
+  provinceMatches,
+  edictEffects,
+  EXAMPLE_EDICT,
+} from "./laws.js";
+export {
+  validateOrder,
+  orderCost,
+  describeOrder,
+  requiresSeal,
+  allowedInPortfolio,
+  PORTFOLIOS,
+  ORDER_KINDS,
+  colonizeCost,
+  type OrderKind,
+} from "./orders.js";
+export {
+  resolveSeason,
+  checkOutcome,
+  adjustRelation,
+  type ResolutionResult,
+  type RejectedOrder,
+} from "./tick.js";
+export {
+  realmReport,
+  provinceReport,
+  mapOverview,
+  chronicle,
+  provinceLine,
+  TREATY_GUIDE,
+} from "./report.js";
 export { autoOrders } from "./fallback.js";
-export { generateCourt, moodOf, bumpStanding, bumpTrait, dominantTraits, heirAge, heirVerdict } from "./court.js";
-export { generateCrises, resolvedOption, describeEffects, crisisSummary, CRISIS_KINDS } from "./crises.js";
-export { explain, marketRoutes, type ExplainSubject, type Explanation } from "./explain.js";
-export { applyPromiseVerdict, evaluatePromise, settlePromises, validatePromiseCheck, describePromiseCheck, BROKEN_PROMISE_INFAMY, BROKEN_PROMISE_REGARD } from "./promises.js";
+export {
+  generateCourt,
+  moodOf,
+  bumpStanding,
+  bumpTrait,
+  dominantTraits,
+  heirAge,
+  heirVerdict,
+} from "./court.js";
+export {
+  generateCrises,
+  resolvedOption,
+  describeEffects,
+  crisisSummary,
+  CRISIS_KINDS,
+} from "./crises.js";
+export {
+  explain,
+  marketRoutes,
+  type ExplainSubject,
+  type Explanation,
+} from "./explain.js";
+export {
+  applyPromiseVerdict,
+  evaluatePromise,
+  settlePromises,
+  validatePromiseCheck,
+  describePromiseCheck,
+  BROKEN_PROMISE_INFAMY,
+  BROKEN_PROMISE_REGARD,
+} from "./promises.js";
 export { consentOf, consent } from "./tick.js";
 export * from "./state.js";
 export * from "./cards.js";
+export * from "./presentation.js";
 export { RULES_SUMMARY } from "./rules.js";
