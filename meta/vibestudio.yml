@@ -2,10 +2,10 @@ systemEpoch: 0
 templates:
   use:
     - url: git+https://github.com/panticonic/vibestudio-workspace-base.git
-singletonObjects:
-  - source: workers/regency-realm
-    className: RegencyGameDO
-    key: main
+# No singletonObjects row: the service is a factory, and every caller names
+# the game it means (`workers.resolveService("examples.regency.v1", gameKey)`),
+# so two Regencies can live in one workspace. The panel's `gameKey` state arg
+# and each seat's config carry that key.
 services:
   - source: workers/regency-realm
     name: regency
@@ -22,5 +22,9 @@ services:
       principals:
         - user
         - code
+      binding:
+        declaredFor:
+          - panels/regency
+          - workers/regency-agents
     durableObject:
       className: RegencyGameDO

@@ -12,7 +12,9 @@ import { AiChatWorker } from "../agent-worker/ai-chat-worker.js";
 import type { AgentToolExecutionContext } from "@workspace/agentic-do";
 import type { ParticipantDescriptor } from "@workspace/harness";
 import type { AgentTool } from "@workspace/pi-core";
+import { installMessageTypes } from "@workspace/agentic-do";
 import { createDurableObjectServiceClient, rpc } from "@workspace/runtime/worker/kernel";
+import { CARD_IMPORTS, CARD_KEY_PREFIX, CARD_SPECS, CARD_UI_VERSION, type CardOp } from "@workspace/regency-engine";
 import { buildPrompt, defaultHandle, defaultName, type RegencyAgentConfig } from "./prompts.js";
 
 export const REGENCY_PROTOCOL = "examples.regency.v1";
@@ -132,6 +134,48 @@ export class RegencyAgentWorker extends AiChatWorker {
     if (!this.subscriptions.getParticipantId(input.channelId)) throw new Error(`Not seated in channel ${input.channelId}`);
     await this.submitAgentInitiatedTurn(input.channelId, { content: input.content }, { steeringId: input.steeringId });
     return { ok: true };
+  }
+
+  private installedCardTypes = new Set<string>();
+
+  /**
+   * The game object decides what every card says; this seat publishes them,
+   * so the cards carry the Herald's name and exist whether or not the
+   * Regent's panel is open. Card identity is the game's key, kept by the
+   * platform's card registry, so a card is updated and never duplicated.
+   */
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  async publishCards(input: { channelId: string; cards: CardOp[] }): Promise<{ published: number }> {
+    if (!this.subscriptions.getParticipantId(input.channelId)) throw new Error(`Not seated in channel ${input.channelId}`);
+    if (!this.installedCardTypes.has(input.channelId)) {
+      await installMessageTypes({
+        channel: this.createChannelClient(input.channelId),
+        actor: { kind: "agent", id: this.participantId(), participantId: this.participantId() },
+        specs: CARD_SPECS,
+        imports: CARD_IMPORTS,
+        version: CARD_UI_VERSION,
+        keyPrefix: CARD_KEY_PREFIX,
+        cards: this.cards,
+        channelId: input.channelId,
+        readFile: async (path) => {
+          try {
+            const raw = await this.rpc.call<unknown>("main", "fs.readFile", [path, "utf8"]);
+            return typeof raw === "string" ? raw : null;
+          } catch {
+            return null;
+          }
+        },
+      });
+      this.installedCardTypes.add(input.channelId);
+    }
+    let published = 0;
+    for (const card of input.cards) {
+      const existing = this.cards.find(input.channelId, card.key);
+      if (existing) await existing.update(card.state);
+      else await this.cards.getOrCreate(input.channelId, card.typeId, card.key, card.state, { displayMode: card.displayMode });
+      published += 1;
+    }
+    return { published };
   }
 
   createGameTools(cfg: RegencyAgentConfig, client: Caller): AgentTool[] {

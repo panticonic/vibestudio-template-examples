@@ -18,7 +18,6 @@ interface MatterState {
   defaultOption: string;
   chosen: string | null;
   decidedBy: string | null;
-  heraldParticipantId: string;
   season?: string;
 }
 
@@ -42,7 +41,7 @@ export default function MatterCard({ state, chat, messageId }: { state: Partial<
     setBusy(optionId);
     setError(null);
     try {
-      const result = await chat.callMethod(state.heraldParticipantId, "regency.decide", { kind: "crisis", crisisId: state.crisisId, optionId });
+      const result = await chat.callMethodByHandle("herald", "regency.decide", { kind: "crisis", crisisId: state.crisisId, optionId });
       if (result && typeof result === "object" && "ok" in result && !(result as { ok: boolean }).ok) {
         setError(String((result as { reason?: string }).reason ?? "refused"));
         return;

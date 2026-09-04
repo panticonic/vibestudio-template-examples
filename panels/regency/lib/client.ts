@@ -42,6 +42,7 @@ export interface Briefing {
   content: string;
   status: "pending" | "delivered" | "failed";
   error: string | null;
+  attempts: number;
 }
 
 export interface EventRow {
@@ -79,14 +80,6 @@ export interface Bribe {
   note: string;
   status: "pending" | "accepted" | "reported" | "expired";
   untilSeason: number | null;
-}
-
-export interface CardRef {
-  key: string;
-  channelId: string;
-  messageId: string;
-  kind: string;
-  updatedAt: string;
 }
 
 export interface Debate {
@@ -131,7 +124,6 @@ export interface GameView {
   snapshots: number[];
   protectorate: Protectorate | null;
   bribes: Bribe[];
-  cards: CardRef[];
   dossiers: Array<{ role: string; text: string }>;
   doctrines: Array<{ realm: RealmId; text: string; season: number }>;
   intents: StagedIntent[];
@@ -233,10 +225,6 @@ export class GameClient {
 
   dismissProtector(): Promise<Protectorate | null> {
     return this.call("dismissProtector");
-  }
-
-  setCard(ref: { key: string; channelId: string; messageId: string; kind: string }): Promise<CardRef[]> {
-    return this.call("setCard", ref);
   }
 
   /** The Regent puts a question to the whole council; every seated minister answers on the record. */

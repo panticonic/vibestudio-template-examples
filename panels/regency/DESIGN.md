@@ -313,3 +313,40 @@ forty-season simulation),
 (seats, tools, prompts), `panels/regency` (component compilation). Run them
 through the workspace's ordinary `verify` flow or the host's userland Vitest
 configuration.
+
+## How it sits on the platform
+
+A review against the base template's own workers and skills (2026-09-04)
+settled these points; they are the reasons the code is shaped as it is.
+
+- **No scheduler.** Seasons advance on `closeSeason` / `endTurn` /
+  `proceedWithoutPending`; the game object never sets a clock of its own for
+  play. `vibestudio.missions.v1` is the only schedule owner in a workspace,
+  so "auto-advance every N minutes" would have to be a mission, not an alarm.
+- **Delivery is persisted, then admitted as its own execution.** Briefings
+  and card changes are written to tables inside the request that caused them
+  and delivered from the object's alarm, never from a floating promise. A
+  briefing that fails is retried three times, then waits for the Regent's
+  "re-send" button — a bounded retry, not an endless clock.
+- **The Herald publishes the cards.** The game object decides what every card
+  says (`pendingCards` shows what has changed); the Herald's own agent object
+  publishes and updates them through the platform's card registry, with the
+  state schemas in `packages/regency-engine/src/cards.ts` enforced at both
+  ends. Cards therefore carry the Herald's name and exist whether or not the
+  panel is open. Card buttons reach the Herald by handle
+  (`chat.callMethodByHandle("herald", "regency.decide", …)`).
+- **The panel speaks as the Regent.** A panel carrying the host-verified user
+  id joins a channel as that person, so "Speak about" sends the Regent's own
+  words, with the province or army as metadata and in a closing line.
+- **A factory service.** There is no `singletonObjects` row: every caller
+  names its game (`workers.resolveService("examples.regency.v1", gameKey)`),
+  so two Regencies can live in one workspace; the service is `declaredFor`
+  the panel and the agent worker so neither needs a consent prompt.
+- **Identity, not authority.** Roles are bound to agent objects with the
+  server-stamped `rpcCallerId`; the Regent's own seat is whatever is not an
+  agent. The seal, the Lord Protector's mandate and matters of state are
+  game rules, deliberately not the platform's approval or delegation stack,
+  which governs capability use by agents and is host-owned.
+- **Schema.** `schemaVersion` bumps wipe the object (the platform has no
+  migration callbacks); the per-game legend under `projects/regency/legends/`
+  survives because it is a file, not a table.

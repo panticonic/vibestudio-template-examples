@@ -18,6 +18,7 @@ import {
   bumpStanding,
   chronicle,
   crisisSummary,
+  describeEffects,
   describeOrder,
   generateWorld,
   mapOverview,
@@ -33,7 +34,13 @@ import {
   validateOrder,
   validatePromiseCheck,
   describePromiseCheck,
-  TREATY_GUIDE,
+  RULES_SUMMARY,
+  DEBATE_CARD,
+  HANDOVER_CARD,
+  MATTER_CARD,
+  SEAL_CARD,
+  SEASON_CARD,
+  type CardOp,
   type Crisis,
   type GameEvent,
   type GameState,
@@ -87,6 +94,7 @@ export interface Briefing {
   content: string;
   status: "pending" | "delivered" | "failed";
   error: string | null;
+  attempts: number;
 }
 
 export interface ProtectorLimits {
@@ -117,13 +125,6 @@ export interface Bribe {
   untilSeason: number | null;
 }
 
-export interface CardRef {
-  key: string;
-  channelId: string;
-  messageId: string;
-  kind: string;
-  updatedAt: string;
-}
 
 export interface Debate {
   id: string;
@@ -171,7 +172,6 @@ export interface GameView {
   protectorate: Protectorate | null;
   /** Bribes the Regent is allowed to know about: reported ones, and all once the game ends. */
   bribes: Bribe[];
-  cards: CardRef[];
   dossiers: Array<{ role: string; text: string }>;
   doctrines: Array<{ realm: RealmId; text: string; season: number }>;
   /** What the council means to do, drawn on the map before it is ordered. */
@@ -211,6 +211,9 @@ export type SubmitOrderResult =
 
 const EVENT_LIMIT = 80;
 const LEGEND_DIR = "projects/regency/legends";
+/** A briefing that fails to reach its agent is retried this many times from the alarm, then waits for the Regent's "re-send". */
+const BRIEFING_ATTEMPTS = 3;
+const BRIEFING_RETRY_MS = 10_000;
 /** One legend per game object, so two Regencies in one workspace do not overwrite each other's memory. */
 const legendPath = (gameKey: string) => `${LEGEND_DIR}/${gameKey.replace(/[^A-Za-z0-9_-]+/g, "_") || "main"}.md`;
 
@@ -232,10 +235,10 @@ export function portfolioOf(role: string): string {
 /** Rules text is in the engine; this adds the court's own conventions. */
 
 export class RegencyGameDO extends DurableObjectBase {
-  static override schemaVersion = 2;
+  static override schemaVersion = 3;
 
   protected override requiredTables(): readonly string[] {
-    return ["game", "orders", "events", "participants", "mandates", "briefings", "snapshots", "cards", "bribes", "dossiers", "doctrines", "protectorate", "intents", "promises", "debates", "counsel", "chronicles", "handovers", "diaries"];
+    return ["game", "meta", "orders", "events", "participants", "mandates", "briefings", "snapshots", "cards", "bribes", "dossiers", "doctrines", "protectorate", "intents", "promises", "debates", "counsel", "chronicles", "handovers", "diaries"];
   }
 
   protected createTables(): void {
@@ -244,9 +247,10 @@ export class RegencyGameDO extends DurableObjectBase {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, season INTEGER NOT NULL, kind TEXT NOT NULL, event_json TEXT NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS participants (role TEXT NOT NULL, channel_id TEXT NOT NULL, realm TEXT NOT NULL, participant_id TEXT NOT NULL, target_id TEXT NOT NULL, handle TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'court', PRIMARY KEY (role, channel_id))`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS mandates (role TEXT PRIMARY KEY, level TEXT NOT NULL)`);
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS briefings (id TEXT PRIMARY KEY, season INTEGER NOT NULL, role TEXT NOT NULL, target_id TEXT NOT NULL, channel_id TEXT NOT NULL, content TEXT NOT NULL, status TEXT NOT NULL, error TEXT)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS briefings (id TEXT PRIMARY KEY, season INTEGER NOT NULL, role TEXT NOT NULL, target_id TEXT NOT NULL, channel_id TEXT NOT NULL, content TEXT NOT NULL, status TEXT NOT NULL, error TEXT, attempts INTEGER NOT NULL DEFAULT 0)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS snapshots (season INTEGER PRIMARY KEY, state_json TEXT NOT NULL)`);
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS cards (key TEXT PRIMARY KEY, channel_id TEXT NOT NULL, message_id TEXT NOT NULL, kind TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS cards (key TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS bribes (id TEXT PRIMARY KEY, season INTEGER NOT NULL, from_realm TEXT NOT NULL, target_role TEXT NOT NULL, gold REAL NOT NULL, note TEXT NOT NULL, status TEXT NOT NULL, until_season INTEGER)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS dossiers (role TEXT PRIMARY KEY, text TEXT NOT NULL, updated_at TEXT NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS doctrines (realm TEXT PRIMARY KEY, text TEXT NOT NULL, season INTEGER NOT NULL)`);
@@ -340,8 +344,9 @@ export class RegencyGameDO extends DurableObjectBase {
     return this.sql.exec<{ id: string; season: number; mandate: string; text: string }>(`SELECT id, season, mandate, text FROM handovers ORDER BY season`).toArray();
   }
 
-  private readCards(): CardRef[] {
-    return this.sql.exec<Record<string, string>>(`SELECT * FROM cards`).toArray().map((r) => ({ key: r["key"]!, channelId: r["channel_id"]!, messageId: r["message_id"]!, kind: r["kind"]!, updatedAt: r["updated_at"]! }));
+  /** What each card said the last time the Herald published it. */
+  private publishedCards(): Map<string, string> {
+    return new Map(this.sql.exec<{ key: string; fingerprint: string }>(`SELECT key, fingerprint FROM cards`).toArray().map((r) => [r.key, r.fingerprint]));
   }
 
   /** Who is calling: the Regent's own hand (not an agent), the Herald, the Lord Protector, or another agent. */
@@ -429,7 +434,7 @@ export class RegencyGameDO extends DurableObjectBase {
     const rows = status
       ? this.sql.exec<Record<string, unknown>>(`SELECT * FROM briefings WHERE status = ? ORDER BY season, role`, status).toArray()
       : this.sql.exec<Record<string, unknown>>(`SELECT * FROM briefings ORDER BY season DESC, role LIMIT 40`).toArray();
-    return rows.map((r) => ({ id: r["id"] as string, season: r["season"] as number, role: r["role"] as string, targetId: r["target_id"] as string, channelId: r["channel_id"] as string, content: r["content"] as string, status: r["status"] as Briefing["status"], error: (r["error"] as string | null) ?? null }));
+    return rows.map((r) => ({ id: r["id"] as string, season: r["season"] as number, role: r["role"] as string, targetId: r["target_id"] as string, channelId: r["channel_id"] as string, content: r["content"] as string, status: r["status"] as Briefing["status"], error: (r["error"] as string | null) ?? null, attempts: (r["attempts"] as number | null) ?? 0 }));
   }
 
   private waitingFor(state: GameState): RealmId[] {
@@ -461,10 +466,11 @@ export class RegencyGameDO extends DurableObjectBase {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   async newGame(input: WorldOptions & { keepParticipants?: boolean }): Promise<{ title: string; season: string; realms: Array<{ id: string; name: string; sovereign: string }>; legend: boolean }> {
     this.ensureReady();
-    const seed = (input.seed ?? "").trim() || `regency-${Date.now().toString(36)}`;
+    if (this.rpcCallerKind === "do") throw new Error("A new Regency is founded from the Regent's panel, not by an agent.");
+    const seed = (input.seed ?? "").trim() || `regency-${crypto.randomUUID().slice(0, 8)}`;
     const state = generateWorld({ ...input, seed });
     const legend = await this.readLegend();
     if (legend) state.legend = legend;
@@ -514,12 +520,14 @@ export class RegencyGameDO extends DurableObjectBase {
     }
     try {
       await this.fs.writeFile(legendPath(this.objectKey), body);
-    } catch {
-      // a workspace without a writable project folder simply keeps no legend
+      this.appendEvents([{ season: state.season, kind: "council", text: `The Regency passes into legend: ${legendPath(this.objectKey)} will be read by the next court on this key.`, realms: [state.playerRealm] }]);
+    } catch (err) {
+      // A workspace without a writable project folder keeps no legend; say so rather than pretend.
+      this.appendEvents([{ season: state.season, kind: "council", text: `No legend could be written (${err instanceof Error ? err.message : String(err)}); the next Regency will not remember this one.`, realms: [state.playerRealm] }]);
     }
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   getGame(): GameView {
     this.ensureReady();
     const state = this.loadState();
@@ -534,7 +542,6 @@ export class RegencyGameDO extends DurableObjectBase {
       snapshots: this.sql.exec<{ season: number }>(`SELECT season FROM snapshots ORDER BY season`).toArray().map((r) => r.season),
       protectorate: this.readProtectorate(),
       bribes: this.readBribes().filter((b) => b.status === "reported" || state?.phase === "finished"),
-      cards: this.readCards(),
       dossiers: state?.phase === "finished" ? this.sql.exec<{ role: string; text: string }>(`SELECT role, text FROM dossiers`).toArray() : [],
       doctrines: this.sql.exec<{ realm: string; text: string; season: number }>(`SELECT realm, text, season FROM doctrines`).toArray(),
       intents: state ? this.readIntents() : [],
@@ -558,7 +565,7 @@ export class RegencyGameDO extends DurableObjectBase {
     };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   getSnapshot(input: { season: number }): GameState | null {
     this.ensureReady();
     const row = this.sql.exec<{ state_json: string }>(`SELECT state_json FROM snapshots WHERE season = ?`, input.season).toArray()[0];
@@ -570,7 +577,7 @@ export class RegencyGameDO extends DurableObjectBase {
    * optionally some orders still awaiting the seal, and hypothetical extras.
    * Rival courts are assumed to play the steward policy.
    */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   forecast(input: { orders?: Order[]; includeOrderIds?: string[]; realm?: RealmId } = {}): Forecast {
     this.ensureReady();
     const state = this.requireState();
@@ -602,19 +609,19 @@ export class RegencyGameDO extends DurableObjectBase {
     };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   getWorld(): GameState | null {
     this.ensureReady();
     return this.loadState();
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   events(input?: { sinceSeq?: number; limit?: number }): Array<GameEvent & { seq: number }> {
     this.ensureReady();
     return this.readEvents(Math.min(500, input?.limit ?? EVENT_LIMIT), input?.sinceSeq ?? 0);
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   report(input: { kind: "realm" | "province" | "map" | "chronicle" | "rules"; realm?: RealmId; province?: string; limit?: number }): string {
     this.ensureReady();
     const state = this.requireState();
@@ -634,7 +641,7 @@ export class RegencyGameDO extends DurableObjectBase {
 
   // ── Orders ────────────────────────────────────────────────────────────────
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   submitOrder(input: SubmitOrderInput): SubmitOrderResult {
     this.ensureReady();
     const state = this.requireState();
@@ -657,16 +664,17 @@ export class RegencyGameDO extends DurableObjectBase {
     const problem = validateOrder(state, input.realm, input.order);
     if (problem) return { ok: false, reason: problem };
     const needsSeal = isMinister && mandates[portfolio] !== "plenary" && requiresSeal(input.order);
-    const id = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const id = `o${crypto.randomUUID().slice(0, 8)}`;
     const status: OrderStatus = needsSeal ? "awaiting_seal" : "pending";
     this.sql.exec(`INSERT INTO orders (id, season, realm, actor, order_json, rationale, status, reason, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?)`, id, state.season, input.realm, role, JSON.stringify(input.order), input.rationale ?? "", status, nowIso());
     this.linkIntent(role, id, input.order);
+    this.requestDrain();
     const summary = describeOrder(state, input.order);
     this.appendEvents([{ season: state.season, kind: "council", text: `${state.realms[input.realm]!.name}'s ${role} ${needsSeal ? "asks the Regent's seal to" : "ordered:"} ${summary}${input.rationale ? ` — “${input.rationale}”` : ""}`, realms: [input.realm], data: { orderId: id, status } }]);
     return { ok: true, orderId: id, status, summary, needsSeal };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   withdrawOrder(input: { orderId: string; actor: string }): { ok: boolean; reason?: string } {
     this.ensureReady();
     const row = this.readOrders().find((o) => o.id === input.orderId);
@@ -678,6 +686,7 @@ export class RegencyGameDO extends DurableObjectBase {
       return { ok: false, reason: err instanceof Error ? err.message : String(err) };
     }
     if (row.status !== "pending" && row.status !== "awaiting_seal") return { ok: false, reason: `order is ${row.status}` };
+    this.requestDrain();
     this.sql.exec(`UPDATE orders SET status = 'withdrawn' WHERE id = ?`, input.orderId);
     this.sql.exec(`DELETE FROM intents WHERE order_id = ?`, input.orderId);
     return { ok: true };
@@ -687,7 +696,7 @@ export class RegencyGameDO extends DurableObjectBase {
    * The Regent's seal. The panel calls this as the user; the Herald may call
    * it only to carry out an explicit spoken decision of the Regent.
    */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   sealOrder(input: { orderId: string; decision: "seal" | "veto"; note?: string }): { ok: boolean; reason?: string } {
     this.ensureReady();
     const state = this.requireState();
@@ -711,7 +720,7 @@ export class RegencyGameDO extends DurableObjectBase {
     return { ok: true };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   listOrders(input?: { season?: number; realm?: RealmId }): OrderRow[] {
     this.ensureReady();
     const state = this.loadState();
@@ -719,7 +728,7 @@ export class RegencyGameDO extends DurableObjectBase {
     return input?.realm ? rows.filter((r) => r.realm === input.realm) : rows;
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   setMandate(input: { role: MinisterRole; level: MandateLevel }): Record<string, MandateLevel> {
     this.ensureReady();
     if (this.rpcCallerKind === "do") throw new Error("Only the Regent may change a minister's mandate.");
@@ -733,7 +742,7 @@ export class RegencyGameDO extends DurableObjectBase {
 
   // ── Turn clock ────────────────────────────────────────────────────────────
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   endTurn(input: { realm: RealmId; actor: string }): { ok: boolean; reason?: string; waitingFor: RealmId[]; resolved: boolean } {
     this.ensureReady();
     const state = this.requireState();
@@ -755,7 +764,7 @@ export class RegencyGameDO extends DurableObjectBase {
   }
 
   /** The Regent closes the season. It resolves once every sovereign has ended its turn. */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   closeSeason(): { resolved: boolean; waitingFor: RealmId[]; season: string } {
     this.ensureReady();
     const state = this.requireState();
@@ -786,7 +795,7 @@ export class RegencyGameDO extends DurableObjectBase {
   }
 
   /** The Regent's explicit choice to proceed; absent sovereigns are played by the steward policy. */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   proceedWithoutPending(): { resolved: boolean; stewarded: RealmId[]; season: string } {
     this.ensureReady();
     if (this.rpcCallerKind === "do") throw new Error("Only the Regent may proceed without the other courts.");
@@ -797,7 +806,7 @@ export class RegencyGameDO extends DurableObjectBase {
       const existing = this.readOrders(state.season).some((o) => o.realm === realm && o.status === "pending");
       if (!existing) {
         for (const order of autoOrders(state, realm)) {
-          const id = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+          const id = `o${crypto.randomUUID().slice(0, 8)}`;
           this.sql.exec(`INSERT INTO orders (id, season, realm, actor, order_json, rationale, status, reason, submitted_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL, ?)`, id, state.season, realm, "steward", JSON.stringify(order), "steward policy (sovereign absent)", nowIso());
         }
       }
@@ -856,7 +865,7 @@ export class RegencyGameDO extends DurableObjectBase {
     this.appendEvents(result.events);
     for (const r of result.rejected) this.appendEvents([{ season: state.season, kind: "council", text: `Order by ${r.order.actor} could not be carried out: ${r.reason}`, realms: [r.order.realm], data: { orderId: r.order.id } }]);
     this.queueBriefings(result.state, result.events, result.rejected.map((r) => `${r.order.actor}: ${r.reason}`));
-    void this.deliverBriefings();
+    this.requestDrain();
     if (result.state.outcome && !state.outcome) void this.writeLegend(result.state);
     return result.state;
   }
@@ -901,7 +910,7 @@ export class RegencyGameDO extends DurableObjectBase {
     if (best) this.sql.exec(`UPDATE intents SET order_id = ? WHERE id = ?`, orderId, best.id);
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   stageIntent(input: { actor: string; kind: IntentKind; label: string; payload?: StagedIntent["payload"] }): { ok: boolean; reason?: string; intent?: StagedIntent } {
     this.ensureReady();
     const state = this.requireState();
@@ -929,12 +938,12 @@ export class RegencyGameDO extends DurableObjectBase {
     if (payload.target !== undefined && !(payload.target in state.realms)) return { ok: false, reason: `unknown realm ${payload.target}` };
     const mine = this.readIntents().filter((i) => i.role === input.actor);
     if (mine.length >= 8) this.sql.exec(`DELETE FROM intents WHERE id = ?`, mine[0]!.id);
-    const id = `i${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const id = `i${crypto.randomUUID().slice(0, 8)}`;
     this.sql.exec(`INSERT INTO intents (id, role, realm, kind, label, season, payload_json, order_id) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`, id, input.actor, realm, input.kind, label, state.season, JSON.stringify(payload));
     return { ok: true, intent: this.readIntents().find((i) => i.id === id)! };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   clearIntent(input: { actor: string; intentId?: string }): { ok: boolean; cleared: number; reason?: string } {
     this.ensureReady();
     try {
@@ -947,7 +956,7 @@ export class RegencyGameDO extends DurableObjectBase {
     return { ok: true, cleared: mine.length };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   listIntents(input?: { realm?: RealmId }): StagedIntent[] {
     this.ensureReady();
     return this.readIntents(input?.realm);
@@ -956,7 +965,7 @@ export class RegencyGameDO extends DurableObjectBase {
   // ── Named armies ─────────────────────────────────────────────────────────
 
   /** The Marshal names the companies he raises; a banner the Regent can follow. */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   renameArmy(input: { actor: string; army: string; name: string }): { ok: boolean; reason?: string; name?: string } {
     this.ensureReady();
     const state = this.requireState();
@@ -983,7 +992,7 @@ export class RegencyGameDO extends DurableObjectBase {
 
   // ── The Regent's word ────────────────────────────────────────────────────
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   recordPromise(input: { actor: string; to: RealmId; text: string; check?: PromiseCheck }): { ok: boolean; reason?: string; promise?: RegentPromise } {
     this.ensureReady();
     const state = this.requireState();
@@ -1000,20 +1009,20 @@ export class RegencyGameDO extends DurableObjectBase {
     const check: PromiseCheck = input.check ?? { kind: "free_text" };
     const problem = validatePromiseCheck(state, check);
     if (problem) return { ok: false, reason: problem };
-    const promise: RegentPromise = { id: `pr${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, to: input.to, text, check, season: state.season, status: "pending", settled: null, recordedBy: input.actor };
+    const promise: RegentPromise = { id: `pr${crypto.randomUUID().slice(0, 8)}`, to: input.to, text, check, season: state.season, status: "pending", settled: null, recordedBy: input.actor };
     this.savePromise(promise);
     this.appendEvents([{ season: state.season, kind: "council", text: `The Regent's word to ${state.realms[input.to]!.name} was written down: “${text}” (${describePromiseCheck(state, check)}).`, realms: [state.playerRealm, input.to], data: { promiseId: promise.id } }]);
     return { ok: true, promise };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   listPromises(): RegentPromise[] {
     this.ensureReady();
     return this.readPromises();
   }
 
   /** The Regent (or the Herald on their word) settles a promise the engine cannot judge. */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   settlePromise(input: { promiseId: string; status: "kept" | "broken" }): { ok: boolean; reason?: string } {
     this.ensureReady();
     const state = this.requireState();
@@ -1031,7 +1040,7 @@ export class RegencyGameDO extends DurableObjectBase {
   // ── Council debates ──────────────────────────────────────────────────────
 
   /** The Herald puts one question to the whole council and records what each says. */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   convene(input: { actor: string; question: string }): { ok: boolean; reason?: string; debateId?: string; asked?: string[] } {
     this.ensureReady();
     const state = this.requireState();
@@ -1046,7 +1055,7 @@ export class RegencyGameDO extends DurableObjectBase {
     if (question.length < 8) return { ok: false, reason: "a debate needs a question the council can answer" };
     const open = this.sql.exec<{ id: string }>(`SELECT id FROM debates WHERE status = 'open'`).toArray();
     if (open.length >= 2) return { ok: false, reason: "two debates are already before the council; close one first" };
-    const id = `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const id = `d${crypto.randomUUID().slice(0, 8)}`;
     this.sql.exec(`INSERT INTO debates (id, season, question, opened_by, status) VALUES (?, ?, ?, ?, 'open')`, id, state.season, question, input.actor);
     this.appendEvents([{ season: state.season, kind: "council", text: `The council is convened: “${question}”`, realms: [state.playerRealm], data: { debateId: id } }]);
     const asked: string[] = [];
@@ -1065,11 +1074,11 @@ export class RegencyGameDO extends DurableObjectBase {
       ].join("\n");
       this.sql.exec(`INSERT INTO briefings (id, season, role, target_id, channel_id, content, status, error) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL) ON CONFLICT(id) DO UPDATE SET content = excluded.content, status = 'pending', error = NULL`, `${id}-${p.role}`, state.season, p.role, p.targetId, p.channelId, content);
     }
-    void this.deliverBriefings();
+    this.requestDrain();
     return { ok: true, debateId: id, asked };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   giveCounsel(input: { actor: string; debateId: string; text: string }): { ok: boolean; reason?: string; closed?: boolean } {
     this.ensureReady();
     const state = this.requireState();
@@ -1085,6 +1094,7 @@ export class RegencyGameDO extends DurableObjectBase {
     const text = String(input.text ?? "").trim().slice(0, 600);
     if (text.length < 4) return { ok: false, reason: "say something" };
     this.sql.exec(`INSERT INTO counsel (debate_id, role, text, at) VALUES (?, ?, ?, ?) ON CONFLICT(debate_id, role) DO UPDATE SET text = excluded.text, at = excluded.at`, input.debateId, input.actor, text, nowIso());
+    this.requestDrain();
     const answered = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM counsel WHERE debate_id = ?`, input.debateId).toArray()[0]?.n ?? 0;
     // Every minister who holds a seat has spoken (an unseated portfolio cannot answer).
     const seated = this.readParticipants("court").filter((p) => MINISTER_ROLES.includes(p.role as MinisterRole)).length;
@@ -1093,20 +1103,21 @@ export class RegencyGameDO extends DurableObjectBase {
       this.sql.exec(`UPDATE debates SET status = 'closed' WHERE id = ?`, input.debateId);
       this.appendEvents([{ season: state.season, kind: "council", text: `The council has answered “${String(debate["question"]).slice(0, 80)}”; ${answered} voice${answered === 1 ? " is" : "s are"} on the record.`, realms: [state.playerRealm], data: { debateId: input.debateId } }]);
       this.queueVerdict(state, input.debateId, String(debate["question"]));
-      void this.deliverBriefings();
+      this.requestDrain();
     }
     return { ok: true, closed };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   closeDebate(input: { debateId: string }): { ok: boolean; reason?: string } {
     this.ensureReady();
     if (this.callerSeat() === "other") return { ok: false, reason: "Only the Regent, or the Herald on the Regent's word, closes a debate." };
     this.sql.exec(`UPDATE debates SET status = 'closed' WHERE id = ?`, input.debateId);
+    this.requestDrain();
     return { ok: true };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   listDebates(): Debate[] {
     this.ensureReady();
     return this.readDebates(this.loadState());
@@ -1114,7 +1125,7 @@ export class RegencyGameDO extends DurableObjectBase {
 
   // ── The chronicler and the hand-over ─────────────────────────────────────
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   writeChronicle(input: { actor: string; text: string; year?: number }): { ok: boolean; reason?: string; year?: number } {
     this.ensureReady();
     const state = this.requireState();
@@ -1131,13 +1142,13 @@ export class RegencyGameDO extends DurableObjectBase {
     return { ok: true, year };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   listChronicles(): ChronicleEntry[] {
     this.ensureReady();
     return this.readChronicles();
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   writeHandover(input: { actor: string; text: string }): { ok: boolean; reason?: string; id?: string } {
     this.ensureReady();
     const state = this.requireState();
@@ -1153,10 +1164,11 @@ export class RegencyGameDO extends DurableObjectBase {
     const mandate = this.readProtectorate()?.mandate ?? "";
     this.sql.exec(`INSERT INTO handovers (id, season, mandate, text) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET text = excluded.text`, id, state.season, mandate, text);
     this.appendEvents([{ season: state.season, kind: "council", text: `The Lord Protector laid an account of the protectorate before the Regent.`, realms: [state.playerRealm], data: { handoverId: id } }]);
+    this.requestDrain();
     return { ok: true, id };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   listHandovers(): Handover[] {
     this.ensureReady();
     return this.readHandovers();
@@ -1165,7 +1177,7 @@ export class RegencyGameDO extends DurableObjectBase {
   // ── Courts that remember ─────────────────────────────────────────────────
 
   /** A rival court's private book on the Regent, kept by its sovereign. */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   writeRelationsDiary(input: { actor: string; text: string }): { ok: boolean; reason?: string } {
     this.ensureReady();
     const state = this.requireState();
@@ -1180,7 +1192,7 @@ export class RegencyGameDO extends DurableObjectBase {
     return { ok: true };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   readRelationsDiary(input: { actor: string }): string {
     this.ensureReady();
     const state = this.requireState();
@@ -1190,7 +1202,7 @@ export class RegencyGameDO extends DurableObjectBase {
 
   // ── Crises, intrigue, dossiers, doctrines, protectorate ──────────────────
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   decideCrisis(input: { crisisId: string; optionId: string; note?: string }): { ok: boolean; reason?: string; crisis?: Crisis } {
     this.ensureReady();
     const state = this.requireState();
@@ -1206,10 +1218,11 @@ export class RegencyGameDO extends DurableObjectBase {
     c.decidedBy = seat;
     this.saveState(state);
     this.appendEvents([{ season: state.season, kind: "council", text: `${seat === "protector" ? "The Lord Protector" : "The Regent"} decided “${c.title}”: ${option.label}${input.note ? ` — “${input.note}”` : "."}`, realms: [c.realm], data: { crisisId: c.id, option: option.id, by: seat } }]);
+    this.requestDrain();
     return { ok: true, crisis: c };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   offerBribe(input: { actor: string; targetRole: MinisterRole; gold: number; note: string }): { ok: boolean; reason?: string; bribeId?: string } {
     this.ensureReady();
     const state = this.requireState();
@@ -1225,26 +1238,26 @@ export class RegencyGameDO extends DurableObjectBase {
     if (!(typeof input.gold === "number" && input.gold >= 10 && input.gold <= 200)) return { ok: false, reason: "gold must be 10..200" };
     if (realm.treasury < input.gold) return { ok: false, reason: `your treasury holds ${Math.floor(realm.treasury)} gold` };
     if (this.readBribes().some((b) => b.status === "pending" && b.fromRealm === realm.id && b.targetRole === input.targetRole)) return { ok: false, reason: "you already have an offer before that minister" };
-    const id = `br${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const id = `br${crypto.randomUUID().slice(0, 8)}`;
     this.sql.exec(`INSERT INTO bribes (id, season, from_realm, target_role, gold, note, status, until_season) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL)`, id, state.season, realm.id, input.targetRole, input.gold, (input.note ?? "").slice(0, 400));
     // A private word reaches the minister at once: in their chambers if they have them, else at court.
     const seat = this.readParticipants("chambers").find((p) => p.role === input.targetRole) ?? this.readParticipants("court").find((p) => p.role === input.targetRole);
     if (seat) {
       const content = `<private-word season="${state.season}">\nA discreet messenger from ${realm.name} has found you alone. Use \`my_temptations\` to read the offer, then \`respond_bribe\` to accept or to report it to the Regent. Nobody else has seen this.\n</private-word>`;
       this.sql.exec(`INSERT INTO briefings (id, season, role, target_id, channel_id, content, status, error) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL) ON CONFLICT(id) DO NOTHING`, `t${id}`, state.season, seat.role, seat.targetId, seat.channelId, content);
-      void this.deliverBriefings();
+      this.requestDrain();
     }
     return { ok: true, bribeId: id };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   myTemptations(input: { actor: string }): Bribe[] {
     this.ensureReady();
     this.assertActor(input.actor);
     return this.readBribes().filter((b) => b.targetRole === input.actor && b.status === "pending");
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   respondBribe(input: { actor: string; bribeId: string; decision: "accept" | "report"; note?: string }): { ok: boolean; reason?: string } {
     this.ensureReady();
     const state = this.requireState();
@@ -1280,7 +1293,7 @@ export class RegencyGameDO extends DurableObjectBase {
     return { ok: true };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   writeDossier(input: { actor: string; text: string }): { ok: boolean; reason?: string } {
     this.ensureReady();
     if (!input.actor.startsWith("ambassador:")) return { ok: false, reason: "Only ambassadors keep a dossier." };
@@ -1293,14 +1306,14 @@ export class RegencyGameDO extends DurableObjectBase {
     return { ok: true };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   readDossier(input: { actor: string }): string {
     this.ensureReady();
     this.assertActor(input.actor);
     return this.sql.exec<{ text: string }>(`SELECT text FROM dossiers WHERE role = ?`, input.actor).toArray()[0]?.text ?? "";
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   writeDoctrine(input: { actor: string; text: string }): { ok: boolean; reason?: string } {
     this.ensureReady();
     const state = this.requireState();
@@ -1316,7 +1329,7 @@ export class RegencyGameDO extends DurableObjectBase {
     return { ok: true };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   readDoctrine(input: { actor: string }): string {
     this.ensureReady();
     const state = this.requireState();
@@ -1324,7 +1337,7 @@ export class RegencyGameDO extends DurableObjectBase {
     return this.sql.exec<{ text: string }>(`SELECT text FROM doctrines WHERE realm = ?`, roleRealm(input.actor, state.playerRealm)).toArray()[0]?.text ?? "";
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   appointProtector(input: { mandate: string; seasons: number; limits: Partial<ProtectorLimits> }): Protectorate {
     this.ensureReady();
     if (this.rpcCallerKind === "do") throw new Error("Only the Regent appoints a Lord Protector.");
@@ -1337,12 +1350,12 @@ export class RegencyGameDO extends DurableObjectBase {
     if (seat) {
       const content = `<season-briefing season="${state.season}">\nThe Regent has appointed you Lord Protector for ${seasons} season(s) with this mandate:\n\n${input.mandate}\n\nYour powers: ${Object.entries(limits).filter(([, v]) => v).map(([k]) => k).join(", ")}. Read \`realm_report\` and \`list_orders\`, then govern this season within the mandate. Refer anything outside it to the Regent.\n</season-briefing>`;
       this.sql.exec(`INSERT INTO briefings (id, season, role, target_id, channel_id, content, status, error) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL) ON CONFLICT(id) DO UPDATE SET content = excluded.content, status = 'pending'`, `pr${state.season}`, state.season, seat.role, seat.targetId, seat.channelId, content);
-      void this.deliverBriefings();
+      this.requestDrain();
     }
     return this.readProtectorate()!;
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   dismissProtector(): Protectorate | null {
     this.ensureReady();
     if (this.rpcCallerKind === "do") throw new Error("Only the Regent dismisses a Lord Protector.");
@@ -1353,15 +1366,140 @@ export class RegencyGameDO extends DurableObjectBase {
   }
 
   /** Card bookkeeping for the panel: which chat message renders which order or matter. */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
-  setCard(input: CardRef | { key: string; channelId: string; messageId: string; kind: string }): CardRef[] {
+  // ── Chat cards: decided here, published by the Herald ────────────────────
+
+  /**
+   * Every card the council conversation should show, in the state it should
+   * show now. The Herald's own Durable Object publishes them (so they carry
+   * the Herald's name and exist whether or not the Regent's panel is open);
+   * this object only remembers what it last handed over, to send changes and
+   * nothing else.
+   */
+  private cardOps(state: GameState): CardOp[] {
+    const ops: CardOp[] = [];
+    const published = this.publishedCards();
+    const season = seasonLabel(state);
+    for (const o of this.readOrders()) {
+      const key = `seal:${o.id}`;
+      // A card exists for every act that ever awaited the seal; later states update it.
+      if (o.status !== "awaiting_seal" && !published.has(key)) continue;
+      ops.push({
+        key,
+        typeId: SEAL_CARD,
+        displayMode: "inline",
+        state: { orderId: o.id, actor: o.actor, actorName: state.court[o.actor]?.name ?? o.actor, summary: describeOrder(state, o.order), rationale: o.rationale, status: o.status, reason: o.reason, season: seasonLabel({ season: o.season, startYear: state.startYear }), forecast: o.status === "awaiting_seal" ? this.forecastLine(o.id) : null },
+      });
+    }
+    for (const c of state.crises) {
+      const key = `matter:${c.id}`;
+      if (c.chosen !== null && !published.has(key)) continue;
+      ops.push({
+        key,
+        typeId: MATTER_CARD,
+        displayMode: "inline",
+        state: { crisisId: c.id, title: c.title, text: c.text, options: c.options.map((o) => ({ id: o.id, label: o.label, text: o.text, effects: describeEffects(state, o.effects), adviser: o.adviser ?? null })), defaultOption: c.defaultOption, chosen: c.chosen, decidedBy: c.decidedBy, season: seasonLabel({ season: c.season, startYear: state.startYear }) },
+      });
+    }
+    if (state.season > 0 && state.digest.length > 0) {
+      const player = state.realms[state.playerRealm]!;
+      const highlights = this.readEvents().filter((e) => e.season === state.season - 1 && ["battle", "capture", "treaty", "war", "famine", "revolt", "crisis"].includes(e.kind)).slice(-8).map((e) => ({ kind: e.kind, text: e.text }));
+      ops.push({
+        key: `season:${state.season}`,
+        typeId: SEASON_CARD,
+        displayMode: "row",
+        state: { season, digest: state.digest[state.digest.length - 1]!, highlights, treasury: player.treasury, legitimacy: player.legitimacy, estates: player.estates, outcome: state.outcome ? { kind: state.outcome.kind, title: state.outcome.title, reason: state.outcome.reason, verdict: state.outcome.verdict ?? null } : null },
+      });
+    }
+    for (const d of this.readDebates(state)) {
+      ops.push({
+        key: `debate:${d.id}`,
+        typeId: DEBATE_CARD,
+        displayMode: "inline",
+        state: { debateId: d.id, question: d.question, status: d.status, season: seasonLabel({ season: d.season, startYear: state.startYear }), lines: d.lines, waiting: MINISTER_ROLES.filter((r) => !d.lines.some((l) => l.role === r)) },
+      });
+    }
+    for (const h of this.readHandovers()) {
+      ops.push({ key: `handover:${h.id}`, typeId: HANDOVER_CARD, displayMode: "inline", state: { season: seasonLabel({ season: h.season, startYear: state.startYear }), mandate: h.mandate, text: h.text } });
+    }
+    return ops.filter((op) => published.get(op.key) !== JSON.stringify(op.state));
+  }
+
+  /** One line on what sealing an act would do, from a resolved copy of the season. */
+  private forecastLine(orderId: string): string | null {
+    try {
+      const fc = this.forecast({ includeOrderIds: [orderId] });
+      const arrow = (a: number, b: number) => (Math.round(a) === Math.round(b) ? `${Math.round(a)} (unchanged)` : `${Math.round(a)} → ${Math.round(b)}`);
+      const parts = [`treasury ${arrow(fc.treasury.before, fc.treasury.after)}`, `legitimacy ${arrow(fc.legitimacy.before, fc.legitimacy.after)}`];
+      if (fc.provinces.before !== fc.provinces.after) parts.push(`provinces ${arrow(fc.provinces.before, fc.provinces.after)}`);
+      if (fc.wars.length) parts.push(`at war with ${fc.wars.join(", ")}`);
+      const notable = fc.events.slice(0, 2);
+      return `If sealed, the season would close with ${parts.join(", ")}.${notable.length ? ` ${notable.join(" ")}` : ""}`;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Cards that differ from what the Herald last published. Read-only; the drain publishes them. */
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  pendingCards(): CardOp[] {
     this.ensureReady();
-    this.sql.exec(`INSERT INTO cards (key, channel_id, message_id, kind, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET channel_id = excluded.channel_id, message_id = excluded.message_id, kind = excluded.kind, updated_at = excluded.updated_at`, input.key, input.channelId, input.messageId, input.kind, nowIso());
-    return this.readCards();
+    const state = this.loadState();
+    return state ? this.cardOps(state) : [];
+  }
+
+  /** Hand changed cards to the Herald's object; remember what was handed over only once it succeeds. */
+  private async syncCards(): Promise<{ published: number; error: string | null }> {
+    const state = this.loadState();
+    const herald = this.readParticipants("court").find((p) => p.role === "herald");
+    if (!state || !herald) return { published: 0, error: null };
+    const ops = this.cardOps(state);
+    if (ops.length === 0) return { published: 0, error: null };
+    try {
+      await this.rpc.call(herald.targetId, "publishCards", [{ channelId: herald.channelId, cards: ops }]);
+    } catch (err) {
+      return { published: 0, error: err instanceof Error ? err.message : String(err) };
+    }
+    const at = nowIso();
+    for (const op of ops) this.sql.exec(`INSERT INTO cards (key, fingerprint, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET fingerprint = excluded.fingerprint, updated_at = excluded.updated_at`, op.key, JSON.stringify(op.state), at);
+    return { published: ops.length, error: null };
+  }
+
+  // ── The drain: persisted work, admitted as its own execution ─────────────
+
+  /**
+   * Briefings and cards are written to tables inside the request that caused
+   * them and delivered from the alarm, never from a floating promise: the
+   * request returns, the wake is durable, and a Durable Object that hibernates
+   * in between still delivers. Failed briefings are retried a bounded number
+   * of times, then wait for the Regent's "re-send" — no endless clock.
+   */
+  private requestDrain(): void {
+    this.sql.exec(`INSERT INTO meta (key, value) VALUES ('drain', '1') ON CONFLICT(key) DO UPDATE SET value = '1'`);
+  }
+
+  private drainRequested(): boolean {
+    return (this.sql.exec<{ value: string }>(`SELECT value FROM meta WHERE key = 'drain'`).toArray()[0]?.value ?? "0") === "1";
+  }
+
+  /** The schedule is a projection of durable facts, re-derived after every request: a drain is owed, or a retry is. */
+  protected override nextAlarmAfterRequest(): { wakeAt: number } | null {
+    if (this.drainRequested()) return { wakeAt: Date.now() };
+    const pending = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM briefings WHERE status = 'pending' OR (status = 'failed' AND attempts < ?)`, BRIEFING_ATTEMPTS).toArray()[0]?.n ?? 0;
+    return pending > 0 ? { wakeAt: Date.now() + BRIEFING_RETRY_MS } : null;
+  }
+
+  override async alarm(): Promise<{ wakeAt: number } | null> {
+    this.ensureReady();
+    this.sql.exec(`INSERT INTO meta (key, value) VALUES ('drain', '0') ON CONFLICT(key) DO UPDATE SET value = '0'`);
+    this.sql.exec(`UPDATE briefings SET status = 'pending' WHERE status = 'failed' AND attempts < ?`, BRIEFING_ATTEMPTS);
+    await this.deliverBriefings();
+    await this.syncCards();
+    const retry = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM briefings WHERE status = 'failed' AND attempts < ?`, BRIEFING_ATTEMPTS).toArray()[0]?.n ?? 0;
+    return retry > 0 ? { wakeAt: Date.now() + BRIEFING_RETRY_MS } : null;
   }
 
   /** After the court is seated: the Herald introduces the council, the ambassadors present their credentials. */
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   async openCourt(): Promise<{ delivered: number; failed: number }> {
     this.ensureReady();
     const state = this.requireState();
@@ -1396,20 +1534,23 @@ export class RegencyGameDO extends DurableObjectBase {
       if (!content) continue;
       this.sql.exec(`INSERT INTO briefings (id, season, role, target_id, channel_id, content, status, error) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL) ON CONFLICT(id) DO NOTHING`, `open-${p.role}`, state.season, p.role, p.targetId, p.channelId, content);
     }
-    return this.deliverBriefings();
+    const result = await this.deliverBriefings();
+    await this.syncCards();
+    return result;
   }
 
   // ── Participants & briefings ──────────────────────────────────────────────
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   registerParticipant(input: Participant): Participant[] {
     this.ensureReady();
     if (this.rpcCallerKind === "do") throw new Error("Seats at court are assigned by the Regent's panel, not by agents.");
     this.sql.exec(`INSERT INTO participants (role, channel_id, realm, participant_id, target_id, handle, name, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(role, channel_id) DO UPDATE SET realm = excluded.realm, participant_id = excluded.participant_id, target_id = excluded.target_id, handle = excluded.handle, name = excluded.name, kind = excluded.kind`, input.role, input.channelId, input.realm, input.participantId, input.targetId, input.handle, input.name, input.kind ?? "court");
+    this.requestDrain();
     return this.readParticipants();
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   unregisterParticipant(input: { role: string; channelId?: string }): Participant[] {
     this.ensureReady();
     if (this.rpcCallerKind === "do") throw new Error("Seats at court are removed by the Regent's panel, not by agents.");
@@ -1418,7 +1559,7 @@ export class RegencyGameDO extends DurableObjectBase {
     return this.readParticipants();
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
   listParticipants(): Participant[] {
     this.ensureReady();
     return this.readParticipants();
@@ -1647,48 +1788,26 @@ export class RegencyGameDO extends DurableObjectBase {
     for (const b of this.readBriefings("pending")) {
       try {
         await this.rpc.call(b.targetId, "receiveBriefing", [{ channelId: b.channelId, content: b.content, steeringId: `regency:${this.objectKey}:${b.id}` }]);
-        this.sql.exec(`UPDATE briefings SET status = 'delivered', error = NULL WHERE id = ?`, b.id);
+        this.sql.exec(`UPDATE briefings SET status = 'delivered', error = NULL, attempts = attempts + 1 WHERE id = ?`, b.id);
         delivered += 1;
       } catch (err) {
-        this.sql.exec(`UPDATE briefings SET status = 'failed', error = ? WHERE id = ?`, err instanceof Error ? err.message : String(err), b.id);
+        this.sql.exec(`UPDATE briefings SET status = 'failed', error = ?, attempts = attempts + 1 WHERE id = ?`, err instanceof Error ? err.message : String(err), b.id);
         failed += 1;
       }
     }
     return { delivered, failed };
   }
 
-  @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  @rpc({ principals: ["user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   async redeliverBriefings(): Promise<{ delivered: number; failed: number }> {
     this.ensureReady();
-    this.sql.exec(`UPDATE briefings SET status = 'pending' WHERE status = 'failed'`);
-    return this.deliverBriefings();
+    this.sql.exec(`UPDATE briefings SET status = 'pending', attempts = 0 WHERE status = 'failed'`);
+    const result = await this.deliverBriefings();
+    await this.syncCards();
+    return result;
   }
 }
 
-export const RULES_SUMMARY = `# How Regency is played
-
-Seasons are turns. During a season every court issues orders; the Regent closes the season; once every sovereign has ended its turn the world resolves in one deterministic pass: laws and treaties, then spending, then war declarations, then marches and battles, then sieges, then harvest, taxes and unrest.
-
-## Orders (submit_order)
-- build {province, building}: farm (food), market (gold, needs dev ≥ 2), fort (walls), road, mine (iron/gold/salt), granary, shrine (calm), barracks (regulars).
-- muster {province, unit, companies}: levy (cheap), regular (barracks or capital), cavalry (needs horses), siege (needs timber and iron).
-- move {army, to}: one adjacent province per season. You may only enter your own, neutral, enemy (at war) or allied provinces.
-- merge {army, into}, disband {army}.
-- set_tax {taxRate 0.1–0.6}, set_conscription {level 0–1}, set_granary_reserve {share 0–1}.
-- enact_edict {edict}: a law as data — conditions over provinces (unrest, population, food_ratio, development, garrison, fort, granary, is_border, coastal, terrain, resource, famine_streak) and actions (tax_relief, grain_dole, garrison_levy, public_works, curfew). repeal_edict {edictId}.
-- declare_war {target}; propose {proposal: {to, kind, terms, message}}; respond {proposalId, accept, message}; withdraw {proposalId}; cede_province {province, to}; colonize {province, from} (a neutral neighbour, for gold).
-
-## Treaties
-${TREATY_GUIDE}
-
-## Money and bread
-Taxes scale with population, development and the tax rate; high taxes raise unrest. Food is pooled across the realm; shortfalls draw on granaries, then the grain dole (if an edict allows), then people starve. Unrest above 80 becomes a revolt.
-
-## Winning and losing (the Regency only)
-Win: reach the heir's majority with legitimacy ≥ 40; or hold 55% of all provinces; or ally with every surviving realm. Lose: the capital falls, legitimacy reaches 0, or three seasons of deep debt.
-
-## The court
-Ministers hold portfolios: chancellor (laws, taxes), treasurer (building, colonies), marshal (armies, war), envoy (treaties). Sensitive acts (war, laws, alliances, taxes, ceding land) await the Regent's seal unless the minister holds a plenary mandate. The Herald interprets the Regent's words and carries them to the right minister.`;
 
 export default {
   async fetch(_request: Request) {

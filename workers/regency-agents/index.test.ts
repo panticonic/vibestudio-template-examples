@@ -120,8 +120,8 @@ describe("RegencyAgentWorker", () => {
 
   it("tells the Herald how speech from the map arrives and to end the welcome with a first move", () => {
     const prompt = buildPrompt({ role: "herald", realm: "regency", gameKey: "main", realmName: "Aster" });
-    expect(prompt).toContain("said pointing at");
-    expect(prompt).toContain("sender is the panel");
+    expect(prompt).toContain("pointing at");
+    expect(prompt).toContain("metadata under `regency`");
     expect(prompt).toContain("convene");
     expect(prompt).toContain("something for the Regent to do");
   });

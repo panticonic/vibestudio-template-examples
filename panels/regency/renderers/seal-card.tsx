@@ -10,7 +10,6 @@ interface SealState {
   rationale?: string;
   status: string;
   reason?: string | null;
-  heraldParticipantId: string;
   season?: string;
   /** What a resolved copy of the season says this act would do, if sealed. */
   forecast?: string | null;
@@ -55,7 +54,7 @@ export default function SealCard({ state, chat, messageId }: { state: Partial<Se
     setBusy(decision);
     setError(null);
     try {
-      const result = await chat.callMethod(state.heraldParticipantId, "regency.decide", { kind: "seal", orderId: state.orderId, decision });
+      const result = await chat.callMethodByHandle("herald", "regency.decide", { kind: "seal", orderId: state.orderId, decision });
       if (result && typeof result === "object" && "ok" in result && !(result as { ok: boolean }).ok) {
         setError(String((result as { reason?: string }).reason ?? "refused"));
         return;

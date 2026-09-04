@@ -3,7 +3,7 @@
   import { theme, stateArgs, setStateArgs } from "@workspace/svelte";
   import { seasonLabel, type EdictCondition, type GameState } from "@workspace/regency-engine";
   import { GameClient, type EventRow, type GameView } from "./lib/client.js";
-  import { CourtCards } from "./lib/cards.js";
+  import { CourtVoice } from "./lib/voice.js";
   import { courtChannel } from "./lib/court.js";
   import { playCue, closeAudio } from "./lib/sound.js";
   import Map from "./Map.svelte";
@@ -32,7 +32,7 @@
   let notices = $state<Array<{ id: number; text: string; kind: "info" | "error" }>>([]);
   let lastSeason = -1;
   let noticeSeq = 0;
-  let cards: CourtCards | null = null;
+  let voice: CourtVoice | null = null;
 
   // The cinematic: marches → clashes → captures → harvest, then the banner.
   let beat = $state<"marches" | "clashes" | "captures" | "harvest" | null>(null);
@@ -125,10 +125,6 @@
       previous = view;
       view = next;
       error = null;
-      if (next.state && next.participants.length > 0) {
-        cards ??= new CourtCards(client, courtChannel(gameKey));
-        void cards.sync(next, previous).catch(() => undefined);
-      }
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     }
@@ -137,11 +133,10 @@
   /**
    * The Regent points at the map and speaks. The subject rides along twice:
    * as metadata for anything that reads it, and as a closing line in words,
-   * because the message reaches the Herald through the panel's own seat and
-   * the Herald must be able to tell who spoke and about what from the text alone.
+   * so the Herald can see it in the message itself.
    */
   async function speak(text: string, about: { province?: string; army?: string }) {
-    cards ??= new CourtCards(client, courtChannel(gameKey));
+    voice ??= new CourtVoice(courtChannel(gameKey));
     const world = view?.state;
     const province = about.province && world?.provinces[about.province];
     const army = about.army && world?.armies[about.army];
@@ -151,7 +146,7 @@
         ? `${province.name} (${province.id})`
         : (about.army ?? about.province ?? "the map");
     try {
-      await cards.speak(`${text.trim()}\n\n— said pointing at ${subject} on the map`, about);
+      await voice.speak(`${text.trim()}\n\n(pointing at ${subject} on the map)`, about);
       notice("The court has heard you.");
     } catch (err) {
       notice(err instanceof Error ? err.message : String(err), "error");
@@ -283,7 +278,7 @@
       clearCinema();
       closeAudio();
       window.removeEventListener("keydown", onKeydown);
-      void cards?.close();
+      void voice?.close();
     };
   });
 </script>

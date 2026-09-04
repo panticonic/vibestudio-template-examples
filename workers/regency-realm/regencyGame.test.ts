@@ -1,9 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { createTestDO } from "@workspace/runtime/worker/test-utils";
+import type { CardOp } from "@workspace/regency-engine";
 import { RegencyGameDO, type Debate, type Forecast, type GameView, type SubmitOrderResult } from "./index.js";
 
-async function founded() {
+/** The Regent's panel is the default caller: a person at a client, which is how the game is played. */
+const REGENT = { callerId: "panel:regency", callerKind: "panel" as const, userId: "regent" };
+
+/**
+ * Boot the game object with a stand-in for the workspace RPC client: the host
+ * acknowledges alarm and title writes, and every other target (agent objects,
+ * the workspace fs) is unreachable, so delivery paths are exercised as failures.
+ */
+async function boot() {
   const t = await createTestDO(RegencyGameDO);
+  const rpcCalls: Array<{ target: string; method: string }> = [];
+  // The real connectionless client stays (inbound dispatch needs it); only outbound calls are stubbed.
+  const client = (t.instance as unknown as { rpc: { call: (target: string, method: string, ...rest: unknown[]) => Promise<unknown> } }).rpc;
+  client.call = async (target: string, method: string) => {
+    rpcCalls.push({ target, method });
+    if (target === "main" && (method === "workspace-state.alarmSet" || method === "workspace-state.alarmClear" || method === "runtime.setTitle")) return undefined;
+    throw new Error(`unreachable in the test harness: ${target}.${method}`);
+  };
+  const call = <R,>(method: string, args?: unknown): Promise<R> => t.callAs<R>(REGENT, method, args);
+  return { ...t, call, rpcCalls };
+}
+
+async function founded() {
+  const t = await boot();
   await t.call("newGame", { seed: "do-test", rivals: 2, realmName: "Aster" });
   return t;
 }
@@ -87,11 +110,46 @@ describe("RegencyGameDO", () => {
     // Agents can never sit in the Regent's chair.
     const usurper = await callAs<SubmitOrderResult>({ callerId: "do:workers/regency-agents:RegencyAgentWorker:marshal-court", callerKind: "do" }, "submitOrder", { realm: "regency", actor: "regent", order: { kind: "set_tax", taxRate: 0.5 } });
     expect(usurper.ok).toBe(false);
-    // Resolution queues a briefing for the herald; delivery fails in the test harness and stays retryable.
+    // Resolution queues a briefing for the herald and asks for a durable wake; nothing is delivered
+    // from the request itself. The alarm drains the queue; delivery fails in the test harness and
+    // is retried a bounded number of times before it waits for the Regent's "re-send".
+    // The opening matter of state is a card before the season turns (it resolves to its default at the turn).
+    expect((await call<CardOp[]>("pendingCards")).some((c) => c.typeId === "regency.matter")).toBe(true);
     await call("proceedWithoutPending");
-    const after = await call<GameView>("getGame");
-    expect(after.briefings.some((b) => b.role === "herald" && b.status === "failed")).toBe(true);
-    expect(after.briefings.find((b) => b.role === "herald")?.content).toContain("You are the Herald");
+    const projection = (t.instance as unknown as { nextAlarmAfterRequest(): { wakeAt: number } | null }).nextAlarmAfterRequest();
+    expect(projection?.wakeAt).toBeLessThanOrEqual(Date.now());
+    let view2 = await call<GameView>("getGame");
+    expect(view2.briefings.find((b) => b.role === "herald")?.status).toBe("pending");
+    expect(await t.instance.alarm()).toEqual({ wakeAt: expect.any(Number) });
+    view2 = await call<GameView>("getGame");
+    const herald = view2.briefings.find((b) => b.role === "herald")!;
+    expect(herald.status).toBe("failed");
+    expect(herald.attempts).toBe(1);
+    expect(herald.content).toContain("You are the Herald");
+    await t.instance.alarm();
+    await t.instance.alarm();
+    expect(await t.instance.alarm()).toBeNull(); // three attempts made; no further clock
+    expect((await call<GameView>("getGame")).briefings.find((b) => b.role === "herald")?.attempts).toBe(3);
+    expect(t.rpcCalls.some((c) => c.target === "do:workers/regency-agents:RegencyAgentWorker:herald-court" && c.method === "receiveBriefing")).toBe(true);
+    expect(t.rpcCalls.some((c) => c.target === "do:workers/regency-agents:RegencyAgentWorker:herald-court" && c.method === "publishCards")).toBe(true);
+    // Cards are decided here and handed to the Herald's object; until that succeeds they stay pending.
+    const pending = await call<CardOp[]>("pendingCards");
+    expect(pending.some((c) => c.typeId === "regency.season")).toBe(true);
+  });
+
+  it("publishes a seal card with a forecast for every act awaiting the seal, and keeps it after the decision", async () => {
+    const { call } = await founded();
+    await call("registerParticipant", { role: "herald", realm: "regency", channelId: "court", participantId: "p0", targetId: "do:workers/regency-agents:RegencyAgentWorker:herald-court", handle: "herald", name: "The Herald" });
+    const state = (await call<GameView>("getGame")).state!;
+    const rival = Object.keys(state.realms).find((r) => r !== "regency")!;
+    const war = await call<SubmitOrderResult>("submitOrder", { realm: "regency", actor: "marshal", order: { kind: "declare_war", target: rival } });
+    if (!war.ok) throw new Error(war.reason);
+    const seal = (await call<CardOp[]>("pendingCards")).find((c) => c.typeId === "regency.seal" && c.key === `seal:${war.orderId}`);
+    expect(seal).toBeDefined();
+    expect((seal!.state as { forecast: string | null }).forecast).toMatch(/If sealed/);
+    await call("sealOrder", { orderId: war.orderId, decision: "veto" });
+    // Never published, so a vetoed act needs no card; had it been published, its card would be updated.
+    expect((await call<CardOp[]>("pendingCards")).some((c) => c.key === `seal:${war.orderId}`)).toBe(false);
   });
 
   it("forecasts a season, decides matters of state, and keeps snapshots", async () => {
@@ -314,7 +372,7 @@ describe("RegencyGameDO", () => {
   });
 
   it("opens the secret history only once the game is over", async () => {
-    const { call, callAs } = await createTestDO(RegencyGameDO);
+    const { call, callAs } = await boot();
     await call("newGame", { seed: "secrets", rivals: 2, realmName: "Aster", regencySeasons: 1 });
     const view = await call<GameView>("getGame");
     const rival = Object.keys(view.state!.realms).find((r) => r !== "regency")!;
