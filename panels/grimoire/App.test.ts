@@ -38,6 +38,13 @@ describe("the Grimoire panel", () => {
     expect(estate).not.toContain('"runtime.createEntity"');
   });
 
+  it("gives shell-level states the full panel grid", () => {
+    const app = readFileSync(join(here, "App.svelte"), "utf8");
+    expect(app).toContain('<section class="shell-view">');
+    expect(app).toContain('<div class="shell-view loading">');
+    expect(app).toMatch(/\.shell-view\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/);
+  });
+
   it("declares the complete authority ceiling used by the panel", () => {
     const manifest = JSON.parse(readFileSync(join(here, "package.json"), "utf8")) as {
       vibestudio: {

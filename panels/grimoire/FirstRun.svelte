@@ -74,15 +74,15 @@
 </div>
 
 <style>
-  .first-run { display: grid; place-items: center; height: 100%; padding: 2rem; overflow: auto; }
-  .card { max-width: 40rem; width: 100%; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 2.2rem 2.5rem; box-shadow: 0 20px 50px rgba(0,0,0,0.08); }
+  .first-run { display: grid; place-items: center; width: 100%; height: 100%; min-width: 0; min-height: 0; box-sizing: border-box; padding: 2rem; overflow: auto; }
+  .card { max-width: 40rem; width: 100%; min-width: 0; box-sizing: border-box; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 2.2rem 2.5rem; box-shadow: 0 20px 50px rgba(0,0,0,0.08); }
   h1 { font-size: 2.4rem; letter-spacing: 0.04em; margin: 0.6rem 0 0.2rem; font-weight: 500; }
   h2 { margin: 0.6rem 0 0.4rem; font-weight: 500; }
   h3 { margin: 1.2rem 0 0.4rem; font-weight: 500; }
   .lede { font-size: 1.1rem; margin: 0.4rem 0; }
   .quiet { color: var(--muted); }
-  form { display: flex; gap: 0.6rem; margin-top: 1rem; }
-  input { flex: 1; font: inherit; font-size: 1.05rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg); }
+  form { display: flex; min-width: 0; gap: 0.6rem; margin-top: 1rem; }
+  input { flex: 1; min-width: 0; box-sizing: border-box; font: inherit; font-size: 1.05rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg); }
   button { font: inherit; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   .progress { list-style: none; padding: 0; margin: 0; color: var(--muted); }
@@ -94,4 +94,9 @@
   .go { margin-top: 1.4rem; }
   .error { color: #b3261e; }
   @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 560px) {
+    .first-run { place-items: start stretch; padding: 1rem; }
+    .card { padding: 1.4rem; }
+    form { flex-direction: column; }
+  }
 </style>

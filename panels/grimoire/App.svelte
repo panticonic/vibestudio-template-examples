@@ -169,9 +169,11 @@
 
 <div class="app" class:dark={$theme === "dark"} style={`--paper:${palette.paper};--ink:${palette.ink};--faint:${palette.faint};--wash:${palette.wash};--season:${palette.accent};--night:${palette.night}`}>
   {#if firstRun === "needed" && apprentice}
-    <FirstRun {client} {apprentice} hasEstate={!!overview} onDone={() => { firstRun = "done"; void refresh(); goto("valley"); }} />
+    <section class="shell-view">
+      <FirstRun {client} {apprentice} hasEstate={!!overview} onDone={() => { firstRun = "done"; void refresh(); goto("valley"); }} />
+    </section>
   {:else if !overview}
-    <div class="loading"><span class="ornament">✦</span> the valley is waking…{#if error}<p class="error">{error}</p>{/if}</div>
+    <div class="shell-view loading"><span class="ornament">✦</span> the valley is waking…{#if error}<p class="error">{error}</p>{/if}</div>
   {:else}
     <nav class="rail" aria-label="rooms">
       {#each ROOMS as r}
@@ -239,11 +241,13 @@
     --hand: "Apple Chancery", "Segoe Script", "URW Chancery L", cursive;
     --mono: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
     font-family: var(--serif); color: var(--fg); background: var(--bg);
-    height: 100%; display: grid; grid-template-columns: 11.5rem 1fr; transition: background 1.5s ease, color 1.5s ease;
+    width: 100%; height: 100%; min-width: 0; min-height: 0; box-sizing: border-box;
+    display: grid; grid-template-columns: 11.5rem minmax(0, 1fr); transition: background 1.5s ease, color 1.5s ease;
     position: relative;
   }
   .app.dark { --card-bg: color-mix(in srgb, var(--paper) 88%, black); --border: color-mix(in srgb, var(--ink) 22%, var(--paper)); }
-  .loading { grid-column: 1 / -1; display: grid; place-items: center; font-style: italic; color: var(--muted); }
+  .shell-view { grid-column: 1 / -1; min-width: 0; min-height: 0; overflow: hidden; }
+  .loading { display: grid; place-items: center; font-style: italic; color: var(--muted); }
   .ornament { color: var(--accent); margin-right: 0.4rem; }
   .rail { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.8rem 0.5rem; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--paper) 94%, var(--ink)); }
   .room { display: flex; align-items: center; gap: 0.55rem; padding: 0.42rem 0.6rem; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; position: relative; }
