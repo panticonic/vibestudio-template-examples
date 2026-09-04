@@ -16,7 +16,7 @@ import {
   tradeRoutes,
   upkeepOf,
 } from "./state.js";
-import { consentOf } from "./tick.js";
+import { consentOf, ESTATE_WEIGHTS } from "./tick.js";
 import { ESTATES, totalCompanies, type GameEvent, type GameState } from "./types.js";
 
 export type ExplainSubject =
@@ -61,10 +61,9 @@ export function explain(state: GameState, events: GameEvent[], subject: ExplainS
 function explainLegitimacy(state: GameState, events: GameEvent[]): Explanation {
   const realm = state.realms[state.playerRealm]!;
   const causes: Array<{ text: string; weight?: number }> = [];
-  const weights: Record<string, number> = { peasants: 0.35, burghers: 0.25, clergy: 0.2, nobles: 0.2 };
   for (const estate of ESTATES) {
     const v = realm.estates[estate];
-    causes.push({ text: `${estate} at ${Math.round(v)} contribute ${round1(v * weights[estate]!)} of the ${consentOf(realm.estates)}`, weight: Math.abs(55 - v) });
+    causes.push({ text: `${estate} at ${Math.round(v)} contribute ${round1(v * ESTATE_WEIGHTS[estate])} of the ${consentOf(realm.estates)}`, weight: Math.abs(55 - v) });
   }
   const tax = realm.laws.taxRate;
   if (tax > 0.3) causes.push({ text: `the tax of ${Math.round(tax * 100)}% costs the peasants ${sign((0.3 - tax) * 25)} and the burghers ${sign((0.3 - tax) * 15)} a season`, weight: (tax - 0.3) * 100 });
@@ -80,7 +79,7 @@ function explainLegitimacy(state: GameState, events: GameEvent[]): Explanation {
   causes.sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
   return {
     title: `Legitimacy ${Math.round(realm.legitimacy)}`,
-    headline: `Legitimacy is the estates' weighted consent: peasants ×0.35, burghers ×0.25, clergy ×0.2, nobles ×0.2. Below 15 the estates depose the Regent; the majority needs 40.`,
+    headline: `Legitimacy is the estates' weighted consent: ${ESTATES.map((e) => `${e} ×${ESTATE_WEIGHTS[e]}`).join(", ")}. Below 15 the estates depose the Regent; the majority needs 40.`,
     causes,
     chronicle: recent(events, state, (e) => ["legitimacy", "crisis", "revolt", "law", "court"].includes(e.kind) && e.realms.includes(realm.id)),
   };

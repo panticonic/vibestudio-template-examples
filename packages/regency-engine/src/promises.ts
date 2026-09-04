@@ -70,29 +70,38 @@ export function evaluatePromise(state: GameState, promise: RegentPromise): Promi
 }
 
 /**
- * Settle every pending promise. Broken promises raise the Regency's infamy and
- * cost the wronged realm's regard; kept ones win a little of both back.
- * Mutates `state` and returns the promises that changed.
+ * Mark a promise kept or broken and charge the world for it: a broken word
+ * raises the Regency's infamy and costs the wronged realm's regard; a kept one
+ * wins a little of both back. Used by the engine's own settlement and by the
+ * Regent's judgement on free-text promises, so both cost the same.
+ */
+export function applyPromiseVerdict(state: GameState, promise: RegentPromise, verdict: "kept" | "broken"): void {
+  const player = state.realms[state.playerRealm];
+  promise.status = verdict;
+  promise.settled = state.season;
+  const other = state.realms[promise.to];
+  if (verdict === "broken") {
+    if (player) player.infamy = Math.min(100, player.infamy + BROKEN_PROMISE_INFAMY);
+    if (other) other.relations[state.playerRealm] = Math.max(-100, (other.relations[state.playerRealm] ?? 0) - BROKEN_PROMISE_REGARD);
+    state.regent.reputation = Math.max(0, state.regent.reputation - 3);
+  } else {
+    if (other) other.relations[state.playerRealm] = Math.min(100, (other.relations[state.playerRealm] ?? 0) + 8);
+    state.regent.reputation = Math.min(100, state.regent.reputation + 2);
+  }
+}
+
+/**
+ * Settle every pending promise the engine can judge. Mutates `state` and
+ * returns the promises that changed.
  */
 export function settlePromises(state: GameState, promises: RegentPromise[]): RegentPromise[] {
   const changed: RegentPromise[] = [];
-  const player = state.realms[state.playerRealm];
-  if (!player) return changed;
+  if (!state.realms[state.playerRealm]) return changed;
   for (const promise of promises) {
     if (promise.status !== "pending") continue;
     const next = evaluatePromise(state, promise);
     if (next === "pending") continue;
-    promise.status = next;
-    promise.settled = state.season;
-    const other = state.realms[promise.to];
-    if (next === "broken") {
-      player.infamy = Math.min(100, player.infamy + BROKEN_PROMISE_INFAMY);
-      if (other) other.relations[state.playerRealm] = Math.max(-100, (other.relations[state.playerRealm] ?? 0) - BROKEN_PROMISE_REGARD);
-      state.regent.reputation = Math.max(0, state.regent.reputation - 3);
-    } else {
-      if (other) other.relations[state.playerRealm] = Math.min(100, (other.relations[state.playerRealm] ?? 0) + 8);
-      state.regent.reputation = Math.min(100, state.regent.reputation + 2);
-    }
+    applyPromiseVerdict(state, promise, next);
     changed.push(promise);
   }
   return changed;

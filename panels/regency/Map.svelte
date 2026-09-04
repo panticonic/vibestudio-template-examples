@@ -54,18 +54,17 @@
 
   // Staged intents: what the council means to do, before it is an order.
   const intentMarches = $derived(intents.filter((i) => i.kind === "march" && i.payload.from && i.payload.to && layout.centres[i.payload.from] && layout.centres[i.payload.to]));
-  const intentOffers = $derived(intents.filter((i) => i.kind === "offer" && i.payload.target && world.realms[i.payload.target] && layout.centres[world.realms[i.payload.target]!.capital]));
+  const intentOffers = $derived(intents.filter((i) => i.kind === "offer" && i.payload.target && world.realms[i.payload.target] && world.realms[i.realm] && layout.centres[world.realms[i.payload.target]!.capital] && layout.centres[world.realms[i.realm]!.capital]));
   const intentWorks = $derived(intents.filter((i) => (i.kind === "build" || i.kind === "muster") && i.payload.province && layout.centres[i.payload.province]));
   const intentEdictProvinces = $derived.by(() => {
     const out = new Map<string, string>();
     for (const i of intents) {
       if (i.kind !== "edict" || !i.payload.when?.length) continue;
-      for (const id of matchingProvinces(world, { when: i.payload.when })) out.set(id, i.label);
+      for (const id of matchingProvinces(world, { when: i.payload.when }, i.realm)) out.set(id, i.label);
     }
     return out;
   });
   const edictLit = $derived(new Set(highlightEdict?.when?.length ? matchingProvinces(world, { when: highlightEdict.when }) : []));
-  const playerCapital = $derived(layout.centres[world.realms[world.playerRealm]!.capital] ?? { x: 0, y: 0 });
 
   let hover = $state<string | null>(null);
   let hoverArmy = $state<string | null>(null);
@@ -78,6 +77,8 @@
   let panY = $state(0);
   let dragging = $state(false);
   let dragFrom = { x: 0, y: 0, panX: 0, panY: 0 };
+  /** Set once a press has travelled far enough to be a pan; the click that ends it must not select a province. */
+  let panned = false;
   let easing = $state(false);
   let svgEl = $state<SVGSVGElement | null>(null);
 
@@ -110,6 +111,7 @@
   function onPointerDown(event: PointerEvent) {
     if (event.button !== 0) return;
     dragging = true;
+    panned = false;
     easing = false;
     dragFrom = { x: event.clientX, y: event.clientY, panX, panY };
     (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
@@ -117,6 +119,8 @@
 
   function onPointerMove(event: PointerEvent) {
     if (!dragging) return;
+    if (!panned && Math.hypot(event.clientX - dragFrom.x, event.clientY - dragFrom.y) < 5) return;
+    panned = true;
     const rect = svgEl?.getBoundingClientRect();
     const scale = rect && rect.width ? Math.min(rect.width / layout.width, rect.height / layout.height) : 1;
     panX = dragFrom.panX + (event.clientX - dragFrom.x) / scale;
@@ -229,7 +233,10 @@
           role="button"
           tabindex="0"
           aria-label={`${province.name}, ${province.owner}`}
-          onclick={() => (selected = selected === shape.id ? null : shape.id)}
+          onclick={() => {
+            if (panned) return;
+            selected = selected === shape.id ? null : shape.id;
+          }}
           onkeydown={(e) => e.key === "Enter" && (selected = shape.id)}
           onmouseenter={() => (hover = shape.id)}
           onmouseleave={() => (hover = null)}
@@ -291,10 +298,11 @@
           </g>
         {/each}
         {#each intentOffers as i (i.id)}
+          {@const from = layout.centres[world.realms[i.realm]!.capital]!}
           {@const to = layout.centres[world.realms[i.payload.target!]!.capital]!}
           <g class="ghost offer">
-            <path d={`M${playerCapital.x} ${playerCapital.y} L${to.x} ${to.y}`} fill="none" stroke={realmColor(i.payload.target!) ?? ink} stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" />
-            <text x={(playerCapital.x + to.x) / 2} y={(playerCapital.y + to.y) / 2 - 6} text-anchor="middle" class="intent-label">✉ {i.label}</text>
+            <path d={`M${from.x} ${from.y} L${to.x} ${to.y}`} fill="none" stroke={realmColor(i.payload.target!) ?? ink} stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" />
+            <text x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 6} text-anchor="middle" class="intent-label">✉ {i.label}</text>
           </g>
         {/each}
         {#each intentWorks as i (i.id)}

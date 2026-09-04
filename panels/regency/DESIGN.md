@@ -172,14 +172,19 @@ The Regent can point rather than describe. *Speak about &lt;province&gt;* on the
 province card (and on each of its armies) opens a short composer and publishes
 the message into the council conversation with `{ regency: { province } }` or
 `{ regency: { army } }` metadata; the Herald's persona says to take that as the
-subject and never to ask which one was meant.
+subject and never to ask which one was meant. Because the panel joins the
+council as its own participant, the message also ends with a line in words —
+“— said pointing at Northmarch (p7) on the map” — so the Herald knows who spoke
+and about what without reading metadata.
 
 Ministers also interrupt. After a resolution the Durable Object asks itself, per
 seat, whether the season touched that minister's cause — the Marshal after
 battles and sieges, the Treasurer when the ledger says the vault empties within
 two seasons or provinces went hungry, the Chancellor on a revolt or an estate
 below 30, the Envoy on treaties and on the Regent's word being judged — and
-wakes them for one or two unprompted lines. A minister of middling standing
+wakes them for one or two unprompted lines, never more than two ministers in
+one season (the two with the most nerve, by how far their standing sits from
+the middle). A minister of middling standing
 whose ambition the news does not touch stays quiet; character, not noise.
 
 **A second layer of beauty.** The season paints the map: spring green, summer
@@ -221,11 +226,13 @@ shows a diff of what it would become.
 and reuse them instead of redoing arithmetic, and the Council tab lists what
 they have actually written through the panel's `fs`. The Herald can `convene`
 the council: one question fans out to all four ministers, each answers once
-with `give_counsel`, the debate closes when all four have spoken, and it shows
+with `give_counsel`, the debate closes when every seated minister has spoken,
+and it shows
 both in the Matters tab and as a chat card. Rival courts remember —
 `write_relations_diary` keeps a per-realm book on the Regent that folds into
 the sovereign's and its ambassador's briefings — and at the end the game writes
-`projects/regency/legend.md`, which the *next* Regency reads and hands to every
+`projects/regency/legends/<gameKey>.md`, which the *next* Regency on that key
+reads and hands to every
 rival court as memory of the Regent who came before. A chronicler sits in the
 court, silent except once a year, when the Durable Object hands it the year's
 events and asks for a page of prose; the Chronicle tab shows it above the
@@ -234,7 +241,9 @@ ledger for that year.
 **Small things.** Sound cues are generated with WebAudio and no audio files (a
 horn for the season, struck steel for a battle, a low stamp for the seal), off
 by default and remembered in `stateArgs`. Keys: <kbd>Space</kbd> closes the
-season, <kbd>S</kbd> seals the topmost act, the arrows walk the provinces and
+season and <kbd>S</kbd> seals the topmost act — each struck twice, the first
+press saying what the second will do, since neither can be undone — the
+arrows walk the provinces and
 ease the camera onto each, <kbd>Esc</kbd> clears the selection — and none of
 them fire while you are typing. Both scenarios now open with something to
 decide: the long Regency forces a guild petition at season 0, the winter one

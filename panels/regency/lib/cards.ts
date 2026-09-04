@@ -7,7 +7,7 @@
  * renders which order, so a reopened panel updates cards instead of
  * duplicating them.
  */
-import { contextId as runtimeContextId, panelId, rpc } from "@workspace/runtime";
+import { contextId as runtimeContextId, panel, rpc } from "@workspace/runtime";
 import { connectViaRpc, type PubSubClient } from "@workspace/pubsub";
 import { describeEffects, describeOrder, seasonLabel, type GameState } from "@workspace/regency-engine";
 import type { GameClient, GameView } from "./client.js";
@@ -36,7 +36,7 @@ export class CourtCards {
       rpc,
       channel: this.channelId,
       contextId,
-      clientId: `${panelId}:regency-cards`,
+      clientId: `${panel.slotId}:regency-cards`,
       name: "Regency",
       type: "panel",
       handle: "regency",

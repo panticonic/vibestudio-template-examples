@@ -28,7 +28,7 @@
       const roots = await fs.readdir("projects/regency");
       const rows: Array<{ role: string; files: string[] }> = [];
       for (const entry of roots) {
-        if (entry.includes(".")) continue; // legend.md and other loose files
+        if (entry.includes(".") || entry === "legends") continue; // loose files and the legends of past games
         try {
           const files = await fs.readdir(`projects/regency/${entry}`);
           rows.push({ role: entry, files: files.slice(0, 12) });

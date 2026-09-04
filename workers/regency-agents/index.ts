@@ -130,7 +130,7 @@ export class RegencyAgentWorker extends AiChatWorker {
   @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
   async receiveBriefing(input: { channelId: string; content: string; steeringId: string }): Promise<{ ok: true }> {
     if (!this.subscriptions.getParticipantId(input.channelId)) throw new Error(`Not seated in channel ${input.channelId}`);
-    await this.submitAgentInitiatedTurn(input.channelId, { content: input.content }, { steeringId: input.steeringId, origin: "regency-briefing" });
+    await this.submitAgentInitiatedTurn(input.channelId, { content: input.content }, { steeringId: input.steeringId });
     return { ok: true };
   }
 
@@ -182,7 +182,7 @@ export class RegencyAgentWorker extends AiChatWorker {
         },
       }, (p) => client.call("stageIntent", { actor: cfg.role, kind: String(p["kind"] ?? "other"), label: String(p["label"] ?? ""), payload: (p["payload"] as Record<string, unknown>) ?? {} })));
       tools.push(read("clear_intent", "Take one of your staged intents off the map, or all of them if you name none.", { intentId: { type: "string" } }, (p) => client.call("clearIntent", { actor: cfg.role, ...(typeof p["intentId"] === "string" ? { intentId: p["intentId"] } : {}) })));
-      tools.push(read("list_intents", "Everything the Regent's council has staged on the map this season.", {}, () => client.call("listIntents")));
+      tools.push(read("list_intents", "Everything staged on the map this season, by the Regent's council and by any rival court that chose to show its hand.", {}, () => client.call("listIntents")));
     }
     if (kind === "marshal" || kind === "sovereign" || kind === "protector") {
       tools.push(read("rename_army", "Give one of your armies a name and a banner (2–40 characters). The Regent sees it on the map; the chronicle remembers it.", {

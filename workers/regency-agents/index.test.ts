@@ -118,9 +118,10 @@ describe("RegencyAgentWorker", () => {
     expect(buildPrompt({ role: "sovereign:r1", realm: "r1", gameKey: "main", realmName: "Dulia" })).not.toContain("What the courts remember");
   });
 
-  it("tells the Herald to expect the map's metadata and to end the welcome with a first move", () => {
+  it("tells the Herald how speech from the map arrives and to end the welcome with a first move", () => {
     const prompt = buildPrompt({ role: "herald", realm: "regency", gameKey: "main", realmName: "Aster" });
-    expect(prompt).toContain("regency: { province:");
+    expect(prompt).toContain("said pointing at");
+    expect(prompt).toContain("sender is the panel");
     expect(prompt).toContain("convene");
     expect(prompt).toContain("something for the Regent to do");
   });

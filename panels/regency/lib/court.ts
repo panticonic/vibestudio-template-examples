@@ -139,6 +139,7 @@ export async function seatTheCourt(client: GameClient, state: GameState, onProgr
         },
       });
       if (!result.ok) throw new Error(`the agent could not join ${seat.channelId}`);
+      if (!result.targetId || !result.participantId) throw new Error(`the agent joined ${seat.channelId} without a target or participant id, so the game cannot bind the seat to it`);
       participants = await client.registerParticipant({ role: seat.role, realm: seat.realm, channelId: seat.channelId, participantId: result.participantId, targetId: result.targetId, handle: seat.handle, name: seat.name, kind: seat.kind });
       row.status = "seated";
     } catch (err) {

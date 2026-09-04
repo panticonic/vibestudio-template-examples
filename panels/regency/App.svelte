@@ -134,11 +134,24 @@
     }
   }
 
-  /** The Regent points at the map and speaks; the Herald gets the subject attached. */
+  /**
+   * The Regent points at the map and speaks. The subject rides along twice:
+   * as metadata for anything that reads it, and as a closing line in words,
+   * because the message reaches the Herald through the panel's own seat and
+   * the Herald must be able to tell who spoke and about what from the text alone.
+   */
   async function speak(text: string, about: { province?: string; army?: string }) {
     cards ??= new CourtCards(client, courtChannel(gameKey));
+    const world = view?.state;
+    const province = about.province && world?.provinces[about.province];
+    const army = about.army && world?.armies[about.army];
+    const subject = army && province
+      ? `the ${army.name} (${army.id}) in ${province.name} (${province.id})`
+      : province
+        ? `${province.name} (${province.id})`
+        : (about.army ?? about.province ?? "the map");
     try {
-      await cards.speak(text, about);
+      await cards.speak(`${text.trim()}\n\n— said pointing at ${subject} on the map`, about);
       notice("The court has heard you.");
     } catch (err) {
       notice(err instanceof Error ? err.message : String(err), "error");
@@ -194,6 +207,21 @@
     return tag === "input" || tag === "textarea" || tag === "select" || el.isContentEditable === true;
   }
 
+  // Closing the season and sealing an act cannot be undone, so their keys
+  // must be struck twice in a row: the first press says what the second will do.
+  let armed: { key: string; timer: ReturnType<typeof setTimeout> } | null = null;
+  function armed_or_run(key: string, what: string, run: () => void) {
+    if (armed?.key === key) {
+      clearTimeout(armed.timer);
+      armed = null;
+      run();
+      return;
+    }
+    if (armed) clearTimeout(armed.timer);
+    armed = { key, timer: setTimeout(() => (armed = null), 2500) };
+    notice(`Press ${key === " " ? "Space" : key.toUpperCase()} again to ${what}.`);
+  }
+
   function onKeydown(event: KeyboardEvent) {
     if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
     if (!view?.state) return;
@@ -202,15 +230,18 @@
       skipCinema();
       return;
     }
+    // A focused button takes Space and Enter for itself.
+    const tag = (event.target as HTMLElement | null)?.tagName?.toLowerCase();
+    if (tag === "button" || tag === "a") return;
     switch (event.key) {
       case " ":
         event.preventDefault();
-        void closeSeason();
+        armed_or_run(" ", "close the season", () => void closeSeason());
         break;
       case "s":
       case "S":
         event.preventDefault();
-        void sealTop();
+        armed_or_run("s", "seal the first act awaiting the seal", () => void sealTop());
         break;
       case "ArrowRight":
       case "ArrowDown":
@@ -248,6 +279,7 @@
     window.addEventListener("keydown", onKeydown);
     return () => {
       clearInterval(timer);
+      if (armed) clearTimeout(armed.timer);
       clearCinema();
       closeAudio();
       window.removeEventListener("keydown", onKeydown);

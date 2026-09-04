@@ -76,8 +76,11 @@ export interface ResolutionExtras {
 const PROPOSAL_TTL_SEASONS = 4;
 
 /** Legitimacy is the weighted consent of the estates. */
+/** How much each estate's consent weighs in the Regent's legitimacy. */
+export const ESTATE_WEIGHTS: Record<Estate, number> = { peasants: 0.35, burghers: 0.25, clergy: 0.2, nobles: 0.2 };
+
 export function consentOf(estates: Realm["estates"]): number {
-  return Math.round(estates.peasants * 0.35 + estates.burghers * 0.25 + estates.clergy * 0.2 + estates.nobles * 0.2);
+  return Math.round(ESTATES.reduce((sum, e) => sum + estates[e] * ESTATE_WEIGHTS[e], 0));
 }
 
 /** Adjust estate satisfaction for a realm; the player's legitimacy follows. */
@@ -480,8 +483,8 @@ export function resolveSeason(input: GameState, orders: SubmittedOrder[], extras
       deltas.burghers -= 3;
       deltas.nobles -= 2;
     }
-    const curfews = owned.filter((p) => realm.laws.edicts.some((e) => e.then.some((a) => a.kind === "curfew"))).length;
-    if (curfews) deltas.burghers -= 1;
+    const curfews = realm.laws.edicts.some((e) => e.then.some((a) => a.kind === "curfew"));
+    if (curfews && owned.length) deltas.burghers -= 1;
     if (realm.id === state.playerRealm && realm.ledger.doleSpend > 0) deltas.peasants += 1.5;
     // Drift toward an indifferent 55.
     for (const estate of ESTATES) {

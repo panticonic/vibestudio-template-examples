@@ -10,6 +10,6 @@ export { autoOrders } from "./fallback.js";
 export { generateCourt, moodOf, bumpStanding, bumpTrait, dominantTraits, heirAge, heirVerdict } from "./court.js";
 export { generateCrises, resolvedOption, describeEffects, crisisSummary, CRISIS_KINDS } from "./crises.js";
 export { explain, marketRoutes, type ExplainSubject, type Explanation } from "./explain.js";
-export { evaluatePromise, settlePromises, validatePromiseCheck, describePromiseCheck, BROKEN_PROMISE_INFAMY, BROKEN_PROMISE_REGARD } from "./promises.js";
+export { applyPromiseVerdict, evaluatePromise, settlePromises, validatePromiseCheck, describePromiseCheck, BROKEN_PROMISE_INFAMY, BROKEN_PROMISE_REGARD } from "./promises.js";
 export { consentOf, consent } from "./tick.js";
 export * from "./state.js";

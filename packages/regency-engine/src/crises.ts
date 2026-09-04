@@ -5,15 +5,11 @@
  */
 import type { Rng } from "./rng.js";
 import { armiesIn, realmProvinces, realmStrength, atWar, hasClaim, livingRealms } from "./state.js";
-import { NEUTRAL, REBELS, type Crisis, type CrisisOption, type GameState, type Province, type RealmId } from "./types.js";
+import { NEUTRAL, REBELS, type Crisis, type CrisisOption, type GameState, type RealmId } from "./types.js";
 
 type Maker = (state: GameState, rng: Rng) => Omit<Crisis, "id" | "season" | "chosen" | "decidedBy"> | null;
 
 const pick = <T,>(rng: Rng, items: T[]): T | undefined => (items.length ? items[rng.int(items.length)] : undefined);
-
-function poorest(state: GameState, realm: RealmId): Province | undefined {
-  return realmProvinces(state, realm).sort((a, b) => b.unrest - a.unrest)[0];
-}
 
 const MAKERS: Record<string, Maker> = {
   plague: (state, rng) => {

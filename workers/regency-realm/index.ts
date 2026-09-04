@@ -28,6 +28,7 @@ import {
   requiresSeal,
   resolveSeason,
   seasonLabel,
+  applyPromiseVerdict,
   settlePromises,
   validateOrder,
   validatePromiseCheck,
@@ -209,7 +210,9 @@ export type SubmitOrderResult =
   | { ok: false; reason: string };
 
 const EVENT_LIMIT = 80;
-const LEGEND_PATH = "projects/regency/legend.md";
+const LEGEND_DIR = "projects/regency/legends";
+/** One legend per game object, so two Regencies in one workspace do not overwrite each other's memory. */
+const legendPath = (gameKey: string) => `${LEGEND_DIR}/${gameKey.replace(/[^A-Za-z0-9_-]+/g, "_") || "main"}.md`;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -476,7 +479,7 @@ export class RegencyGameDO extends DurableObjectBase {
   /** The legend of a previous Regency, if one was left in the workspace. */
   private async readLegend(): Promise<string | null> {
     try {
-      const text = await this.fs.readFile(LEGEND_PATH, "utf8");
+      const text = await this.fs.readFile(legendPath(this.objectKey), "utf8");
       const body = String(text).trim();
       return body ? body.slice(0, 2000) : null;
     } catch {
@@ -505,12 +508,12 @@ export class RegencyGameDO extends DurableObjectBase {
       "_Written by the Regency game at the close of play. A new Regency reads this file as the memory of the courts that remember._",
     ].filter(Boolean).join("\n");
     try {
-      await this.fs.mkdir("projects/regency", { recursive: true });
+      await this.fs.mkdir(LEGEND_DIR, { recursive: true });
     } catch {
-      // the folder may already exist, or the panel may have no writable project root
+      // the folder may already exist, or the workspace may have no writable project root
     }
     try {
-      await this.fs.writeFile(LEGEND_PATH, body);
+      await this.fs.writeFile(legendPath(this.objectKey), body);
     } catch {
       // a workspace without a writable project folder simply keeps no legend
     }
@@ -534,7 +537,7 @@ export class RegencyGameDO extends DurableObjectBase {
       cards: this.readCards(),
       dossiers: state?.phase === "finished" ? this.sql.exec<{ role: string; text: string }>(`SELECT role, text FROM dossiers`).toArray() : [],
       doctrines: this.sql.exec<{ realm: string; text: string; season: number }>(`SELECT realm, text, season FROM doctrines`).toArray(),
-      intents: state ? this.readIntents(state.playerRealm) : [],
+      intents: state ? this.readIntents() : [],
       promises: this.readPromises(),
       debates: this.readDebates(state),
       chronicles: this.readChronicles(),
@@ -945,10 +948,9 @@ export class RegencyGameDO extends DurableObjectBase {
   }
 
   @rpc({ principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "read" })
-  listIntents(): StagedIntent[] {
+  listIntents(input?: { realm?: RealmId }): StagedIntent[] {
     this.ensureReady();
-    const state = this.loadState();
-    return this.readIntents(state?.playerRealm);
+    return this.readIntents(input?.realm);
   }
 
   // ── Named armies ─────────────────────────────────────────────────────────
@@ -1019,16 +1021,9 @@ export class RegencyGameDO extends DurableObjectBase {
     const promise = this.readPromises().find((p) => p.id === input.promiseId);
     if (!promise) return { ok: false, reason: `no promise ${input.promiseId}` };
     if (promise.status !== "pending") return { ok: false, reason: `already ${promise.status}` };
-    promise.status = input.status;
-    promise.settled = state.season;
+    applyPromiseVerdict(state, promise, input.status);
     this.savePromise(promise);
-    if (input.status === "broken") {
-      const player = state.realms[state.playerRealm]!;
-      player.infamy = Math.min(100, player.infamy + 5);
-      const other = state.realms[promise.to];
-      if (other) other.relations[state.playerRealm] = Math.max(-100, (other.relations[state.playerRealm] ?? 0) - 20);
-      this.saveState(state);
-    }
+    this.saveState(state);
     this.appendEvents([{ season: state.season, kind: "council", text: `The word given to ${state.realms[promise.to]?.name ?? promise.to} — “${promise.text}” — is judged ${input.status}.`, realms: [state.playerRealm, promise.to], data: { promiseId: promise.id } }]);
     return { ok: true };
   }
@@ -1090,10 +1085,12 @@ export class RegencyGameDO extends DurableObjectBase {
     if (text.length < 4) return { ok: false, reason: "say something" };
     this.sql.exec(`INSERT INTO counsel (debate_id, role, text, at) VALUES (?, ?, ?, ?) ON CONFLICT(debate_id, role) DO UPDATE SET text = excluded.text, at = excluded.at`, input.debateId, input.actor, text, nowIso());
     const answered = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM counsel WHERE debate_id = ?`, input.debateId).toArray()[0]?.n ?? 0;
-    const closed = answered >= MINISTER_ROLES.length;
+    // Every minister who holds a seat has spoken (an unseated portfolio cannot answer).
+    const seated = this.readParticipants("court").filter((p) => MINISTER_ROLES.includes(p.role as MinisterRole)).length;
+    const closed = answered >= Math.max(1, Math.min(MINISTER_ROLES.length, seated || MINISTER_ROLES.length));
     if (closed) {
       this.sql.exec(`UPDATE debates SET status = 'closed' WHERE id = ?`, input.debateId);
-      this.appendEvents([{ season: state.season, kind: "council", text: `The council has answered “${String(debate["question"]).slice(0, 80)}”; four voices are on the record.`, realms: [state.playerRealm], data: { debateId: input.debateId } }]);
+      this.appendEvents([{ season: state.season, kind: "council", text: `The council has answered “${String(debate["question"]).slice(0, 80)}”; ${answered} voice${answered === 1 ? " is" : "s are"} on the record.`, realms: [state.playerRealm], data: { debateId: input.debateId } }]);
     }
     return { ok: true, closed };
   }
@@ -1488,6 +1485,18 @@ export class RegencyGameDO extends DurableObjectBase {
     const orderBook = this.readOrders(state.season - 1).map((o) => `- ${o.actor}: ${describeOrder(state, o.order)} (${o.status})`).join("\n");
     const leaks = this.readBribes().filter((b) => b.status === "accepted" && (b.untilSeason === null || b.untilSeason > state.season));
     const yearEnd = state.season % 4 === 0 && state.season > 0;
+    // Ministers who have cause to interrupt this season, at most two of them:
+    // the court should hear a voice, not a chorus, and every interruption is
+    // a model turn the Regent did not ask for.
+    const interrupters = new Map<string, string>();
+    for (const role of MINISTER_ROLES) {
+      const cause = this.notableFor(role, state, events);
+      if (cause) interrupters.set(role, cause);
+    }
+    if (interrupters.size > 2) {
+      const nerve = (role: string) => Math.abs((state.court[role]?.standing ?? 50) - 50);
+      for (const role of [...interrupters.keys()].sort((a, b) => nerve(a) - nerve(b)).slice(0, interrupters.size - 2)) interrupters.delete(role);
+    }
     for (const p of participants) {
       const kind = p.role.split(":")[0]!;
       let content: string | null = null;
@@ -1550,7 +1559,12 @@ export class RegencyGameDO extends DurableObjectBase {
         // The chronicler writes once a year, when the fourth season has turned.
         if (!yearEnd) continue;
         const year = state.startYear + Math.floor((state.season - 1) / 4);
-        const yearEvents = events.filter((e) => e.season >= state.season - 4).map((e) => `- [${seasonLabel({ season: e.season, startYear: state.startYear })}] ${e.text}`).join("\n");
+        // `events` is only the resolution that just ran; the year is the four seasons behind it, from the ledger.
+        const yearEvents = this.allEvents()
+          .filter((e) => e.season >= state.season - 4 && e.season < state.season && (e.realms.length === 0 || e.realms.includes(state.playerRealm) || ["war", "treaty", "capture", "elimination"].includes(e.kind)))
+          .slice(-80)
+          .map((e) => `- [${seasonLabel({ season: e.season, startYear: state.startYear })}] ${e.text}`)
+          .join("\n");
         content = [
           `<year-briefing season="${season}" year="${year}">`,
           `# The year ${year} is over`,
@@ -1573,7 +1587,7 @@ export class RegencyGameDO extends DurableObjectBase {
             `</private-word>`,
           ].join("\n");
         } else if (!isChambers) {
-          const outcome = this.notableFor(kind, state, events);
+          const outcome = interrupters.get(kind);
           if (!outcome) continue;
           content = [
             `<notable-outcome season="${season}" role="${kind}">`,
