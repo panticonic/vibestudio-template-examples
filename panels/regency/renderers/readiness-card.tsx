@@ -63,7 +63,7 @@ export default function ReadinessCard({
     setBusy(true);
     setError(null);
     try {
-      const result = await chat.callMethodByHandle("herald", "regency.decide", {
+      const result = await chat.callMethodByHandle("herald", "regency_decide", {
         commandId: `${messageId}:close`,
         kind: "season",
       });

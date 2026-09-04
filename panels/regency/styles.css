@@ -166,6 +166,26 @@ textarea {
   font-weight: 650;
   cursor: pointer;
 }
+.r-errorbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  color: #f5ddd1;
+  border-bottom: 1px solid rgba(206, 111, 73, .38);
+  background: rgba(92, 37, 25, .88);
+  font-size: 12px;
+}
+.r-errorbar button {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid rgba(245, 221, 209, .3);
+  border-radius: 999px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
 .r-workspace {
   height: calc(100% - 4.35rem);
   display: grid;
@@ -1279,21 +1299,15 @@ button:disabled {
   border-color: var(--gold);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 13%, transparent);
 }
-.r-check {
-  display: flex;
-  gap: 0.6rem;
-  align-items: flex-start;
+.r-setup-promise {
+  margin: 0;
   padding: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--gold) 16%, transparent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--gold) 7%, transparent);
-  cursor: pointer;
-}
-.r-check span {
-  display: grid;
-}
-.r-check small {
   color: var(--muted);
-  font-size: 0.7rem;
+  background: color-mix(in srgb, var(--gold) 7%, transparent);
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 .r-found {
   justify-self: start;
@@ -1857,6 +1871,19 @@ button:disabled {
   background: transparent;
   color: var(--r-muted);
   cursor: pointer;
+}
+.r-attention .r-attention-guide {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--r-gold) 34%, transparent);
+  border-radius: 999px;
+  color: var(--r-fg);
+  background: color-mix(in srgb, var(--r-gold) 12%, transparent);
+  font-size: 10px;
+  font-weight: 750;
+}
+.r-attention .r-attention-dismiss {
+  padding: 5px;
 }
 .r-archive-button {
   border: 1px solid color-mix(in srgb, var(--r-gold) 25%, var(--r-border));

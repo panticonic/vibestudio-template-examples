@@ -67,7 +67,7 @@ export default function MatterCard({
     setBusy(optionId);
     setError(null);
     try {
-      const result = await chat.callMethodByHandle("herald", "regency.decide", {
+      const result = await chat.callMethodByHandle("herald", "regency_decide", {
         commandId: `${messageId}:${optionId}`,
         kind: "crisis",
         crisisId: state.crisisId,

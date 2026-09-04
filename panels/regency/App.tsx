@@ -102,30 +102,31 @@ function Setup({
   const [seed, setSeed] = useState("");
   const [rivals, setRivals] = useState(3);
   const [scenario, setScenario] = useState<"long" | "winter">("long");
-  const [seatCourt, setSeatCourt] = useState(true);
   const [busy, setBusy] = useState<null | "founding" | "seating">(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<SeatProgress[]>([]);
+  const [realmFounded, setRealmFounded] = useState(false);
   const found = async (event: FormEvent) => {
     event.preventDefault();
     setBusy("founding");
     setError(null);
     setProgress([]);
     try {
-      await client.newGame({
-        seed:
-          seed.trim() || `regency-${Math.random().toString(36).slice(2, 8)}`,
-        realmName,
-        rivals,
-        scenario,
-        regentName: regentName.trim() || undefined,
-      });
-      if (seatCourt) {
-        setBusy("seating");
-        const view = await client.getGame();
-        if (view.state) await seatTheCourt(client, view.state, setProgress);
-        await openCourt(courtChannel(client.gameKey));
+      if (!realmFounded) {
+        await client.newGame({
+          seed:
+            seed.trim() || `regency-${Math.random().toString(36).slice(2, 8)}`,
+          realmName,
+          rivals,
+          scenario,
+          regentName: regentName.trim() || undefined,
+        });
+        setRealmFounded(true);
       }
+      setBusy("seating");
+      const view = await client.getGame();
+      if (!view.state) throw new Error("The realm was founded without a world state.");
+      await seatTheCourt(client, view.state, setProgress);
       onFounded();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -213,26 +214,19 @@ function Setup({
               />
             </label>
           </div>
-          <label className="r-check">
-            <input
-              type="checkbox"
-              checked={seatCourt}
-              onChange={(e) => setSeatCourt(e.target.checked)}
-            />
-            <span>
-              <strong>Seat the court now</strong>
-              <small>
-                Create ministers, private chambers, rival sovereigns,
-                ambassadors, and the Lord Protector.
-              </small>
-            </span>
-          </label>
+          <p className="r-setup-promise">
+            Your Herald, ministers, private chambers, and foreign courts will
+            be prepared before you enter, so counsel is available from the
+            first decision.
+          </p>
           <button className="r-primary r-found" disabled={busy !== null}>
             {busy === "founding"
               ? "Founding the realm…"
               : busy === "seating"
                 ? "Seating the court…"
-                : "Take up the seal →"}
+                : realmFounded
+                  ? "Try seating the court again →"
+                  : "Take up the seal →"}
           </button>
         </form>
         {progress.length > 0 && (
@@ -533,7 +527,7 @@ function RealmDashboard({
             <button
               className="r-primary"
               onClick={() =>
-                void openCourt(courtChannel(client.gameKey)).catch((cause) =>
+                void openCourt(client, world, courtChannel(client.gameKey)).catch((cause) =>
                   notify(String(cause), "error"),
                 )
               }
@@ -552,7 +546,7 @@ function RealmDashboard({
           )}
           <button
             onClick={() =>
-              void openCourt(courtChannel(client.gameKey)).catch((cause) =>
+              void openCourt(client, world, courtChannel(client.gameKey)).catch((cause) =>
                 notify(String(cause), "error"),
               )
             }
@@ -1094,6 +1088,8 @@ function Council({
                       disabled={!seated(role)}
                       onClick={() =>
                         void openCourt(
+                          client,
+                          world,
                           chambersChannel(client.gameKey, role),
                         ).catch((cause) => notify(String(cause), "error"))
                       }
@@ -1115,7 +1111,7 @@ function Council({
           </div>
           <button
             onClick={() =>
-              void openCourt(courtChannel(client.gameKey)).catch((cause) =>
+              void openCourt(client, world, courtChannel(client.gameKey)).catch((cause) =>
                 notify(String(cause), "error"),
               )
             }
@@ -1377,6 +1373,8 @@ function Diplomacy({
                   className="r-primary"
                   onClick={() =>
                     void openCourt(
+                      client,
+                      world,
                       embassyChannel(client.gameKey, realm.id),
                     ).catch((cause) =>
                       notify(
@@ -1391,6 +1389,8 @@ function Diplomacy({
                 <button
                   onClick={() =>
                     void openCourt(
+                      client,
+                      world,
                       rivalCourtChannel(client.gameKey, realm.id),
                     ).catch((cause) =>
                       notify(
@@ -1641,8 +1641,13 @@ export default function RegencyPanel() {
   }, []);
   const refresh = useCallback(async () => {
     try {
-      await client.attention();
-      setView(await client.getGame());
+      const next = await client.getGame();
+      if (!next.state) {
+        setView(next);
+      } else {
+        await client.attention();
+        setView(await client.getGame());
+      }
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -1650,12 +1655,13 @@ export default function RegencyPanel() {
   }, [client]);
   useEffect(() => {
     void refresh();
+    if (!view?.state) return;
     const timer = setInterval(() => void refresh(), 3000);
     return () => {
       clearInterval(timer);
       closeAudio();
     };
-  }, [refresh]);
+  }, [refresh, Boolean(view?.state)]);
   useEffect(() => {
     setArchiveOpen(args.surface === "archive");
     if (args.subjectKind === "province" && args.subjectId) {
@@ -1744,6 +1750,20 @@ export default function RegencyPanel() {
               </small>
             </div>
             <button
+              className="r-attention-guide"
+              onClick={() =>
+                void openCourt(
+                  client,
+                  world,
+                  courtChannel(gameKey),
+                  `Herald, guide me through this: ${view.attention[0]!.title}. ${view.attention[0]!.nextAction}`,
+                ).catch((cause) => notify(String(cause), "error"))
+              }
+            >
+              Guide me
+            </button>
+            <button
+              className="r-attention-dismiss"
               aria-label="Dismiss guidance"
               onClick={() =>
                 void client
@@ -1772,7 +1792,7 @@ export default function RegencyPanel() {
         <button
           className="r-court-button"
           onClick={() =>
-            void openCourt(courtChannel(gameKey)).catch((cause) =>
+            void openCourt(client, world, courtChannel(gameKey)).catch((cause) =>
               notify(String(cause), "error"),
             )
           }
@@ -1780,6 +1800,12 @@ export default function RegencyPanel() {
           Return to court <span>↗</span>
         </button>
       </header>
+      {error && (
+        <div className="r-errorbar" role="status">
+          <span>Communication with the realm faltered: {error}</span>
+          <button onClick={() => void refresh()}>Try again</button>
+        </div>
+      )}
       <div className="r-workspace">
         <div className="r-map-pane">
           <StrategyMap
@@ -1844,9 +1870,12 @@ export default function RegencyPanel() {
               <button
                 className="r-primary"
                 onClick={() =>
-                  void openCourt(courtChannel(gameKey)).catch((cause) =>
-                    notify(String(cause), "error"),
-                  )
+                  void openCourt(
+                    client,
+                    world,
+                    courtChannel(gameKey),
+                    "Herald, tell me what requires my attention next and guide me through the decision.",
+                  ).catch((cause) => notify(String(cause), "error"))
                 }
               >
                 Ask the council what to do next <span>↗</span>

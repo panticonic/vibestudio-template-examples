@@ -80,7 +80,12 @@ describe("RegencyAgentWorker", () => {
     const { instance } = await createTestDO(TestWorker);
     const w = instance as TestWorker;
     w.seatChannel("herald", "regency");
-    expect(w.participant().methods?.some((m) => m.name === "regency.decide")).toBe(true);
+    expect(w.participant().methods?.some((m) => m.name === "regency_decide")).toBe(true);
+    expect(
+      w.participant().methods?.every((method) =>
+        /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(method.name),
+      ),
+    ).toBe(true);
   });
 
   it("gives the new seats the tools the third slate added", async () => {

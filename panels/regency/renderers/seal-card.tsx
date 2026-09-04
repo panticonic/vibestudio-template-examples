@@ -74,7 +74,7 @@ export default function SealCard({
     setBusy(decision);
     setError(null);
     try {
-      const result = await chat.callMethodByHandle("herald", "regency.decide", {
+      const result = await chat.callMethodByHandle("herald", "regency_decide", {
         commandId: `${messageId}:${decision}`,
         kind: "seal",
         orderId: state.orderId,

@@ -126,7 +126,7 @@ and a "what changed, and why" digest at the top.
 
 Inside the council conversation the panel publishes inline cards: an act
 awaiting the seal (Seal / Veto buttons), a matter of state (one button per
-option), and a season digest row. Buttons call the Herald's `regency.decide`
+option), and a season digest row. Buttons call the Herald's `regency_decide`
 participant method, so a decision made in chat passes through the same
 identity checks as one made in the panel, and the panel reconciles card
 state on every poll.
@@ -334,7 +334,7 @@ settled these points; they are the reasons the code is shaped as it is.
   state schemas in `packages/regency-engine/src/cards.ts` enforced at both
   ends. Cards therefore carry the Herald's name and exist whether or not the
   panel is open. Card buttons reach the Herald by handle
-  (`chat.callMethodByHandle("herald", "regency.decide", …)`).
+  (`chat.callMethodByHandle("herald", "regency_decide", …)`).
 - **The panel speaks as the Regent.** A panel carrying the host-verified user
   id joins a channel as that person, so "Speak about" sends the Regent's own
   words, with the province or army as metadata and in a closing line.

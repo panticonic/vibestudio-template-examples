@@ -119,11 +119,17 @@ describe("the Regency React panel", () => {
         .sort(),
     ).toEqual([
       "context.boundary",
+      "subagents.create",
       "workspace-service:channel",
       "workspace-service:regency",
       "workspace.runtime-state.inspect",
       "workspace.runtime-state.manage",
     ]);
+    expect(court).toContain("waitForApprovalResolution");
+    expect(court).toContain("installedAgents");
+    expect(court).toContain("defaultRecipients");
+    expect(court).toContain("initialPromptIdempotencyKey");
+    expect(app()).toContain("if (!next.state)");
   });
 });
 

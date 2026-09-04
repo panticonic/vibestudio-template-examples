@@ -32,7 +32,7 @@ import {
 } from "./prompts.js";
 
 const REGENCY_PROTOCOL = "examples.regency.v1";
-const REGENCY_DECIDE_METHOD = "regency.decide";
+const REGENCY_DECIDE_METHOD = "regency_decide";
 
 function asConfig(config: unknown): RegencyAgentConfig | null {
   if (!config || typeof config !== "object") return null;
