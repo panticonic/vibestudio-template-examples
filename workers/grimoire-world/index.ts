@@ -116,6 +116,8 @@ export class GrimoireWorldDO extends DurableObjectBase {
   private nextId(prefix: string): string {
     const s = this.requireWorld();
     s.seq += 1;
+    // Ids must survive hibernation even when the caller does not save the whole estate (wakes, trails, utterances).
+    this.sql.exec(`UPDATE estate SET state_json = json_set(state_json, '$.seq', ?) WHERE id = 1`, s.seq);
     return `${prefix}-${s.seq.toString(36)}`;
   }
 

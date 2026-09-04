@@ -152,4 +152,52 @@ describe("GrimoireWorldDO", () => {
     const region = await t.call<RegionView>("region", { id: "orchard" });
     expect(Object.values(region.region.adorns).some((a) => a.kind === "lantern")).toBe(true);
   });
+
+  it("keeps a trail of the craft, scripts the first misfire into moths, and suggests a scry once", async () => {
+    const t = await founded();
+    await t.call("speak", { apprentice: "ada", verse: "Small fire, wake and warm this room" });
+    const first = await t.call<SpeakResult>("speak", { apprentice: "ada", verse: "Light for the green things, a little more\nand water where the earth is dry", focusCell: { region: "garden", x: 8, y: 4 } });
+    const src = `const beds = read.places("garden")["herb-beds"]; for (const c of read.neighbours({ region: "garden", x: beds.x, y: beds.y }, 1)) effect.transmute(c, { light: 1 });`;
+    await t.callAs(FAMILIAR, "hear", { spellId: first.spellId, intent: { subject: { kind: "cells", ref: "the beds", region: "garden" }, effect: "light on the beds", concepts: [{ concept: "light", confidence: 0.9, fromWord: "Light" }], unsure: ["more"], tier: "cantrip" } });
+    const r1 = await familiarRun(t, first.spellId!, src, false);
+    const c1 = await t.callAs<{ ok: boolean }>(FAMILIAR, "commit", { spellId: first.spellId, source: src, result: r1, name: "a little light" });
+    expect(c1.ok).toBe(true);
+    const rec1 = await t.call<SpellRecord>("spell", { id: first.spellId! });
+    expect(rec1.trail.map((x) => x.stage)).toEqual(["spoken", "heard", "looked", "written", "cast"]);
+    // The second cantrip in the garden misfires into moths, whatever was written.
+    const second = await t.call<SpeakResult>("speak", { apprentice: "ada", verse: "Warm the beds a little, hama,\nand keep the frost from the rows", focusCell: { region: "garden", x: 8, y: 4 } });
+    expect(second.kind).toBe("deliberating");
+    const r2 = await familiarRun(t, second.spellId!, src, false);
+    const c2 = await t.callAs<{ ok: boolean; misfire?: { kind: string } }>(FAMILIAR, "commit", { spellId: second.spellId, source: src, result: r2, name: "warm beds" });
+    expect(c2.ok).toBe(false);
+    expect(c2.misfire?.kind).toBe("moths");
+    const rec2 = await t.call<SpellRecord>("spell", { id: second.spellId! });
+    expect(rec2.receipts.some((r) => r.effect.kind === "spawn")).toBe(true);
+    expect(rec2.margin.some((m) => m.text === "Well.")).toBe(true);
+    expect(rec2.margin.some((m) => /Scry it/.test(m.text))).toBe(true);
+    const ov = await t.call<Overview>("overview", { apprentice: "ada" });
+    expect(ov.firstHour.firstMisfire).toBe(true);
+    expect(ov.firstHour.scrySuggested).toBe(true);
+    expect(ov.regions.find((r) => r.id === "garden")?.thumb.w).toBeGreaterThan(0);
+    expect(ov.golems.some((g) => g.name === "Toll" && g.mode === "stale")).toBe(true);
+  });
+
+  it("convenes awake spirits in a hall and wakes each with the others' refs", async () => {
+    const t = await founded();
+    await t.call("speak", { apprentice: "ada", verse: "Small fire, wake and warm this room" });
+    t.sql.exec(`UPDATE estate SET state_json = json_set(state_json, '$.spirits.river.awake', json('true'))`);
+    const fresh = await createTestDO(TestWorld, undefined, { db: t.db });
+    await fresh.call("registerParticipant", { role: "spirit:hearth", channelId: "hall-1", participantId: "p3", targetId: "do:x:y:hearth", handle: "hearth", name: "the Hearth", apprentice: null, room: null });
+    await fresh.call("registerParticipant", { role: "spirit:river", channelId: "hall-1", participantId: "p4", targetId: "do:x:y:river", handle: "river", name: "the River", apprentice: null, room: null });
+    const asleep = await fresh.call<{ ok: boolean; reason?: string }>("convene", { apprentice: "ada", spirits: ["hearth", "library"], topic: "the books", channelId: "hall-2" });
+    expect(asleep.ok).toBe(false);
+    const ok = await fresh.call<{ ok: boolean; key: string }>("convene", { apprentice: "ada", spirits: ["hearth", "river"], topic: "the wheel", channelId: "hall-1" });
+    expect(ok.ok).toBe(true);
+    const wakes = fresh.sql.exec(`SELECT wake_json FROM wakes WHERE channel_id = 'hall-1'`).toArray() as Array<{ wake_json: string }>;
+    expect(wakes.length).toBe(2);
+    const w = JSON.parse(wakes[0]!.wake_json) as { hall?: { with: Array<{ ref: string }> } };
+    expect(w.hall?.with[0]?.ref).toMatch(/^agent:(hearth|river)@hall-1$/);
+    const ov = await fresh.call<Overview>("overview", { apprentice: "ada" });
+    expect(ov.halls[0]?.topic).toBe("the wheel");
+  });
 });

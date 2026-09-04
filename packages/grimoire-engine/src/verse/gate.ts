@@ -171,6 +171,7 @@ export function formGate(verse: string): GateResult {
     const sentences = (l.match(/[.!?]+/g) ?? []).length;
     const hasInnerStop = /[.!?]\s+\S/.test(l);
     if (wc > 18 && (sentences > 1 || hasInnerStop)) return { ok: false, reason: "prose", line: l };
+    if (wc > 24) return { ok: false, reason: "prose", line: l };   // one unbroken run of that length is a paragraph, not a line
   }
   for (const l of lines) if (words(l).length > MAX_LINE_WORDS) return { ok: false, reason: "line-too-long", line: l };
 

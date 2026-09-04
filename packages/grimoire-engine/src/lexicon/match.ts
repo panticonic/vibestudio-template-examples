@@ -19,6 +19,8 @@ export function foldText(s: string): string {
 
 export function tokenizeWords(s: string): string[] {
   return foldText(s)
+    // French, Italian and Catalan elisions: l'eau, d'or, qu'il, dell'acqua → the noun stands alone.
+    .replace(/\b(?:l|d|j|m|t|s|n|c|qu|dell|dall|nell|all|un)['’]/giu, " ")
     .replace(/[^\p{L}\p{N}'\-]+/gu, " ")
     .split(/\s+/)
     .map((t) => t.replace(/^['-]+|['-]+$/g, ""))
