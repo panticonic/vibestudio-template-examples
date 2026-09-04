@@ -62,6 +62,29 @@ describe("Regency panel", () => {
     expect(court).toContain("workers.createDurableObject(CHANNEL_SOURCE, CHANNEL_CLASS");
     expect(court).not.toContain('"runtime.createEntity"');
   });
+
+  it("declares the complete authority ceiling used by the panel", () => {
+    const manifest = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as {
+      vibestudio: {
+        authority: {
+          serviceRequests: Array<{ protocol: string }>;
+          requests: Array<{ capability: string }>;
+        };
+      };
+    };
+
+    expect(manifest.vibestudio.authority.serviceRequests.map(({ protocol }) => protocol).sort()).toEqual([
+      "examples.regency.v1",
+      "vibestudio.channel.v1",
+    ]);
+    expect(manifest.vibestudio.authority.requests.map(({ capability }) => capability).sort()).toEqual([
+      "context.boundary",
+      "workspace-service:channel",
+      "workspace-service:regency",
+      "workspace.runtime-state.inspect",
+      "workspace.runtime-state.manage",
+    ]);
+  });
 });
 
 describe("reading the law and the numbers", () => {

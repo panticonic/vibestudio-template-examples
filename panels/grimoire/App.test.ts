@@ -38,6 +38,29 @@ describe("the Grimoire panel", () => {
     expect(estate).not.toContain('"runtime.createEntity"');
   });
 
+  it("declares the complete authority ceiling used by the panel", () => {
+    const manifest = JSON.parse(readFileSync(join(here, "package.json"), "utf8")) as {
+      vibestudio: {
+        authority: {
+          serviceRequests: Array<{ protocol: string }>;
+          requests: Array<{ capability: string }>;
+        };
+      };
+    };
+
+    expect(manifest.vibestudio.authority.serviceRequests.map(({ protocol }) => protocol).sort()).toEqual([
+      "examples.grimoire.v1",
+      "vibestudio.channel.v1",
+    ]);
+    expect(manifest.vibestudio.authority.requests.map(({ capability }) => capability).sort()).toEqual([
+      "context.boundary",
+      "workspace-service:channel",
+      "workspace-service:grimoire",
+      "workspace.runtime-state.inspect",
+      "workspace.runtime-state.manage",
+    ]);
+  });
+
   it("lays out every region of the valley", async () => {
     const { VALLEY_LAYOUT } = await import("./lib/layout.js");
     const { REGION_ORDER } = await import("@workspace/grimoire-engine");
