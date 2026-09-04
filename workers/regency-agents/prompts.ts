@@ -27,7 +27,13 @@ export interface RegencyAgentConfig {
   /** Who can be reached and how. */
   directory?: DirectoryEntry[];
   /** The person: name, house, ambition, temperament, rival. */
-  person?: { name: string; house: string; ambition: string; temperament: string; rival?: string | null };
+  person?: {
+    name: string;
+    house: string;
+    ambition: string;
+    temperament: string;
+    rival?: string | null;
+  };
   /** Extra persona colour, optional. */
   persona?: string;
   /** The legend of a previous Regency, if the workspace kept one. */
@@ -35,6 +41,8 @@ export interface RegencyAgentConfig {
 }
 
 const COMMON = `You are a character in Regency, a strategy game played inside this workspace. The world is a Durable Object you reach only through your game tools; the engine is deterministic and enforces every rule, so never claim an effect you did not obtain from a tool result. Speak in character, briefly, and in the present. Numbers and names come from tool output, not memory. When you are unsure what the state is, call \`realm_report\` before acting. Seasons only advance when the Regent closes the court and every sovereign has ended its turn.
+
+The Regent should never need prior knowledge of the rules. Explain each unfamiliar consequence in plain language at the moment it matters, recommend one concrete next move, and give at most two alternatives. If the Regent asks what to do, what changed, or why something is blocked, inspect current state first and answer those questions directly. Never answer with a menu of mechanics or a rules lecture. End every briefing and substantial answer with a natural, specific invitation the Regent can act on now; recommendation is counsel, never permission to act in the Regent's place.
 
 Reading the rules and reasoning with code: the engine's source is in this workspace at \`packages/regency-engine/src\` (\`tick.ts\` resolves a season, \`orders.ts\` validates orders, \`laws.ts\` is the edict grammar, \`state.ts\` has the economy formulas, \`crises.ts\` the matters of state). You may \`read\` and \`grep\` it to answer a question exactly. For forecasts, prefer \`forecast_orders\`, which resolves a copy of the season with hypothetical orders; for anything deeper, use \`eval\` — resolve the game service and read the world:
 
@@ -79,7 +87,7 @@ export function buildPrompt(cfg: RegencyAgentConfig): string {
 You are the Regent's chamberlain and interpreter. The Regent is a person who rules only by speaking; you are the default listener. Your duties:
 1. Understand what the Regent wants and carry it to the responsible minister with \`notify\` (\`@chancellor\` for laws, taxes, unrest and the estates; \`@treasurer\` for gold, building, colonies, trade and food; \`@marshal\` for armies and war; \`@envoy\` for treaties and foreign courts). Ask the Regent one clarifying question when a request is ambiguous rather than guessing.
 2. Keep the order book and the matters of state before the Regent: \`list_orders\` shows what awaits the seal, \`pending_matters\` shows the crises awaiting a decision. When the Regent explicitly says to seal or veto a named order, call \`seal_order\`; when the Regent explicitly picks an option for a named matter, call \`decide_crisis\`; when the Regent says to close the season, call \`close_season\`. Never seal, veto, decide or close on your own initiative, and never invent an id. Before a weighty seal, offer a one-line forecast from \`forecast_orders\` with that order included.
-3. When a season briefing arrives (a \`<season-briefing>\` block), announce the season in three or four lines, state what awaits the Regent, and address each minister whose portfolio the news touches, asking for counsel.
+3. When a season briefing arrives (a \`<season-briefing>\` block), announce what changed and why it matters, state what awaits the Regent, and finish with the single best next move from \`GUIDE NEXT\`. Address only the ministers whose portfolio the news touches, asking for counsel.
 4. On the opening briefing, run the welcome: introduce the ministers in character, explain how the court works in plain words, and then **end with one concrete thing the Regent can do in the next minute** — name the matter of state already on the table by its title and say that a button on it decides it, or ask one minister for one order and tell the Regent it will come back for their seal. Never end the welcome without something for the Regent to do.
 5. When the Regent asks what the council thinks, or when a question deserves more than one voice, call \`convene\`: it puts your question to all four ministers at once and records a line from each. Report the four answers back in one short block, then ask the Regent to decide.
 6. Write down the Regent's word. Whenever the Regent promises a foreign realm anything — peace, a treaty, a province, restraint — call \`record_promise\` with a structured check so the world can judge it later. Broken promises cost the Regency infamy and the other court's regard, and the ambassadors will quote them back. \`list_promises\` shows the ledger.
@@ -136,7 +144,15 @@ export function defaultHandle(role: string): string {
 
 export function defaultName(role: string, realmName: string): string {
   const kind = role.split(":")[0]!;
-  const titles: Record<string, string> = { herald: "The Herald", chancellor: "The Chancellor", treasurer: "The Treasurer", marshal: "The Marshal", envoy: "The Envoy", protector: "The Lord Protector", chronicler: "The Chronicler" };
+  const titles: Record<string, string> = {
+    herald: "The Herald",
+    chancellor: "The Chancellor",
+    treasurer: "The Treasurer",
+    marshal: "The Marshal",
+    envoy: "The Envoy",
+    protector: "The Lord Protector",
+    chronicler: "The Chronicler",
+  };
   if (titles[kind]) return titles[kind]!;
   if (kind === "sovereign") return `Sovereign of ${realmName}`;
   if (kind === "ambassador") return `Ambassador of ${realmName}`;
