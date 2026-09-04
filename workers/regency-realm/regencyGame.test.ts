@@ -268,6 +268,15 @@ describe("RegencyGameDO", () => {
     const debates = await call<Debate[]>("listDebates");
     expect(debates[0]?.status).toBe("closed");
     expect(debates[0]?.lines).toHaveLength(4);
+    // The Herald is handed the whole debate and asked to put the choice before the Regent.
+    const verdict = (await call<GameView>("getGame")).briefings.find((b) => b.id === `v${debateId}`);
+    expect(verdict?.role).toBe("herald");
+    expect(verdict?.content).toContain("Trade them; the marches are not worth a decade.");
+    expect(verdict?.content).toContain("ask the Regent to choose");
+    // The Regent may convene by their own hand, and the ministers are told who asked.
+    const own = await call<{ ok: boolean; debateId?: string }>("convene", { actor: "regent", question: "Is the treasury sound enough for a second army?" });
+    expect(own.ok).toBe(true);
+    expect((await call<GameView>("getGame")).briefings.some((b) => b.id === `${own.debateId}-marshal` && b.content.includes("The Regent puts a question"))).toBe(true);
   });
 
   it("wakes the ministers who have cause to interrupt and the chronicler at the year's end", async () => {

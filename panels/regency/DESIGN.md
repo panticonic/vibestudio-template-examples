@@ -227,7 +227,10 @@ and reuse them instead of redoing arithmetic, and the Council tab lists what
 they have actually written through the panel's `fs`. The Herald can `convene`
 the council: one question fans out to all four ministers, each answers once
 with `give_counsel`, the debate closes when every seated minister has spoken,
-and it shows
+and the Herald is then handed the whole debate (`<council-verdict>`) and asked
+to lay the split before the Regent as two or three courses to choose from —
+never a recommendation. The Regent can convene by their own hand from the
+Council tab, and the ministers are told who asked. It shows
 both in the Matters tab and as a chat card. Rival courts remember —
 `write_relations_diary` keeps a per-realm book on the Regent that folds into
 the sovereign's and its ambassador's briefings — and at the end the game writes
@@ -237,6 +240,15 @@ rival court as memory of the Regent who came before. A chronicler sits in the
 court, silent except once a year, when the Durable Object hands it the year's
 events and asks for a page of prose; the Chronicle tab shows it above the
 ledger for that year.
+
+**At the point of decision.** A seal card carries one line from a resolved
+copy of the season with that act included — treasury and legitimacy before and
+after, provinces won or lost, wars it would start — so the Regent decides with
+the forecast in front of them and not on the next tab. The map draws the
+Regent's trade as threads between markets, gold by road and blue by sea, that
+move while the route is open and stop in a replay; the legend marks each rival
+as at war (⚔) or allied (✦), so the state of the world is readable without a
+tab.
 
 **Small things.** Sound cues are generated with WebAudio and no audio files (a
 horn for the season, struck steel for a battle, a low stamp for the seal), off

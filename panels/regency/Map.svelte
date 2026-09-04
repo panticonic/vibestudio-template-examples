@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { seasonLabel, totalCompanies, type GameState, type StagedIntent } from "@workspace/regency-engine";
+  import { atWar, seasonLabel, totalCompanies, tradeRoutes, treatyBetween, type GameState, type StagedIntent } from "@workspace/regency-engine";
   import { layoutMap, decorationPath, snowPath, HEX } from "./lib/geometry.js";
   import { matchingProvinces } from "./lib/laws.js";
   import type { EventRow } from "./lib/client.js";
@@ -63,6 +63,19 @@
       for (const id of matchingProvinces(world, { when: i.payload.when }, i.realm)) out.set(id, i.label);
     }
     return out;
+  });
+  // Trade: every route the Regent's markets reach, drawn as a thread that moves.
+  const trade = $derived.by(() => {
+    if (!world.realms[world.playerRealm]) return [];
+    return tradeRoutes(world, world.playerRealm)
+      .filter((r) => layout.centres[r.from] && layout.centres[r.to])
+      .map((r) => {
+        const a = layout.centres[r.from]!;
+        const b = layout.centres[r.to]!;
+        const bend = r.kind === "sea" ? 0.28 : 0.1;
+        const mid = { x: (a.x + b.x) / 2 + (b.y - a.y) * bend, y: (a.y + b.y) / 2 - (b.x - a.x) * bend };
+        return { key: `${r.from}>${r.to}`, kind: r.kind, d: `M${a.x} ${a.y} Q${mid.x} ${mid.y} ${b.x} ${b.y}` };
+      });
   });
   const edictLit = $derived(new Set(highlightEdict?.when?.length ? matchingProvinces(world, { when: highlightEdict.when }) : []));
 
@@ -286,6 +299,14 @@
         <path d={layout.coast} fill="none" stroke={dark ? "#dfe9ef" : "#2b4a63"} stroke-width="1.6" stroke-opacity="0.8" stroke-linejoin="round" />
       </g>
 
+      <!-- trade: gold threads between markets, moving while the routes are open -->
+      <g class="trade" pointer-events="none">
+        {#each trade as t (t.key)}
+          <path d={t.d} fill="none" stroke={dark ? "#0b0a06" : "#fff8e6"} stroke-width="3" stroke-opacity="0.5" stroke-linecap="round" />
+          <path d={t.d} class="thread" class:sea={t.kind === "sea"} fill="none" stroke={t.kind === "sea" ? (dark ? "#8fd0f0" : "#2f7fb0") : (dark ? "#f0c35a" : "#b8862d")} stroke-width="1.4" stroke-dasharray="3 9" stroke-linecap="round" />
+        {/each}
+      </g>
+
       <!-- what the council means to do, before it is an order -->
       <g class="intents" pointer-events="none">
         {#each intentMarches as i (i.id)}
@@ -429,7 +450,11 @@
 
   <div class="legend">
     {#each Object.values(world.realms) as realm (realm.id)}
-      <span class="swatch" style={`--c:${realm.color}`} class:dead={realm.eliminated}>{realm.name}</span>
+      {@const war = realm.id !== world.playerRealm && !realm.eliminated && atWar(world, world.playerRealm, realm.id)}
+      {@const allied = realm.id !== world.playerRealm && !realm.eliminated && Boolean(treatyBetween(world, world.playerRealm, realm.id, "alliance"))}
+      <span class="swatch" style={`--c:${realm.color}`} class:dead={realm.eliminated} class:war class:allied title={war ? `at war with ${realm.name}` : allied ? `allied with ${realm.name}` : realm.eliminated ? `${realm.name} is no more` : realm.name}>
+        {realm.name}{#if war}<em>⚔</em>{:else if allied}<em>✦</em>{/if}
+      </span>
     {/each}
     <span class="swatch" style="--c:#d9d3c1">free folk</span>
     <span class="swatch season-swatch">{["Spring", "Summer", "Autumn", "Winter"][season]}</span>
@@ -482,6 +507,9 @@
   .intent-label { font-size: 9.5px; fill: #2b1d12; paint-order: stroke; stroke: rgba(255,250,235,0.9); stroke-width: 3px; font-family: system-ui, sans-serif; }
   .dark .intent-label { fill: #f6efdc; stroke: rgba(20,18,12,0.9); }
   .work-glyph { font-size: 12px; fill: #3a2c16; }
+  .trade .thread { animation: flow 5s linear infinite; }
+  .replay .trade .thread { animation: none; }
+  @keyframes flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -120; } }
   .ghost { animation: breathe 2.6s ease-in-out infinite; }
   @keyframes breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.95; } }
   .title { font-size: 20px; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,0.55); stroke-width: 3.5px; letter-spacing: 0.5px; }
@@ -510,6 +538,10 @@
   .dark .camera-controls button { background: rgba(0,0,0,0.65); color: #eee; }
   .legend { position: absolute; left: 12px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; font-family: system-ui, sans-serif; font-size: 11px; max-width: 70%; }
   .swatch { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 4px; border-radius: 999px; background: rgba(255,255,255,0.88); color: #222; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+  .swatch em { font-style: normal; font-size: 10px; margin-left: 2px; }
+  .swatch.war { box-shadow: 0 0 0 1.5px #b3261e, 0 1px 3px rgba(0,0,0,0.25); }
+  .swatch.war em { color: #b3261e; }
+  .swatch.allied em { color: #2b7a3b; }
   .dark .swatch { background: rgba(0,0,0,0.6); color: #eee; }
   .swatch::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); border: 1px solid rgba(0,0,0,0.3); }
   .swatch.season-swatch::before { background: currentColor; opacity: 0.5; }

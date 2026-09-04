@@ -239,6 +239,11 @@ export class GameClient {
     return this.call("setCard", ref);
   }
 
+  /** The Regent puts a question to the whole council; every seated minister answers on the record. */
+  convene(question: string): Promise<{ ok: boolean; reason?: string; debateId?: string; asked?: string[] }> {
+    return this.call("convene", { actor: "regent", question });
+  }
+
   closeDebate(debateId: string): Promise<{ ok: boolean; reason?: string }> {
     return this.call("closeDebate", { debateId });
   }

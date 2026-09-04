@@ -1050,12 +1050,13 @@ export class RegencyGameDO extends DurableObjectBase {
     this.sql.exec(`INSERT INTO debates (id, season, question, opened_by, status) VALUES (?, ?, ?, ?, 'open')`, id, state.season, question, input.actor);
     this.appendEvents([{ season: state.season, kind: "council", text: `The council is convened: “${question}”`, realms: [state.playerRealm], data: { debateId: id } }]);
     const asked: string[] = [];
+    const opener = portfolio === "regent" ? "The Regent" : portfolio === "protector" ? "The Lord Protector" : "The Herald";
     for (const p of this.readParticipants("court")) {
       if (!MINISTER_ROLES.includes(p.role as MinisterRole)) continue;
       asked.push(p.role);
       const content = [
         `<council-debate id="${id}" season="${state.season}">`,
-        `The Herald puts a question to the whole council. Answer it once, in one or two sentences, from your own portfolio and your own interest — this is a debate, not a report.`,
+        `${opener} puts a question to the whole council. Answer it once, in one or two sentences, from your own portfolio and your own interest — this is a debate, not a report.`,
         ``,
         `**${question}**`,
         ``,
@@ -1091,6 +1092,8 @@ export class RegencyGameDO extends DurableObjectBase {
     if (closed) {
       this.sql.exec(`UPDATE debates SET status = 'closed' WHERE id = ?`, input.debateId);
       this.appendEvents([{ season: state.season, kind: "council", text: `The council has answered “${String(debate["question"]).slice(0, 80)}”; ${answered} voice${answered === 1 ? " is" : "s are"} on the record.`, realms: [state.playerRealm], data: { debateId: input.debateId } }]);
+      this.queueVerdict(state, input.debateId, String(debate["question"]));
+      void this.deliverBriefings();
     }
     return { ok: true, closed };
   }
@@ -1459,6 +1462,29 @@ export class RegencyGameDO extends DurableObjectBase {
     const standing = courtier?.standing ?? 50;
     if (!ambitious && standing > 40 && standing < 60) return null; // a middling minister waits to be asked
     return reason;
+  }
+
+  /**
+   * When the last minister has spoken, the Herald (or the Lord Protector in
+   * the Regent's stead) is handed the whole debate and asked to put the
+   * disagreement before the Regent as one decision. Without this the four
+   * answers would sit on a card with nobody drawing the conclusion.
+   */
+  private queueVerdict(state: GameState, debateId: string, question: string): void {
+    const seat = this.readParticipants("court").find((p) => p.role === "herald") ?? this.readParticipants("court").find((p) => p.role === "protector");
+    if (!seat) return;
+    const lines = this.readDebates(state).find((d) => d.id === debateId)?.lines ?? [];
+    const content = [
+      `<council-verdict debate="${debateId}" season="${state.season}">`,
+      `The council has answered “${question}”:`,
+      ...lines.map((l) => `- ${l.name} (${l.role}): ${l.text}`),
+      ``,
+      seat.role === "herald"
+        ? `Put it before the Regent in one short block: where the ministers agree, where they split and why, and the two or three courses that are actually open — each as one line the Regent could say back to you. Do not recommend; ask the Regent to choose. Do not issue orders or seal anything.`
+        : `You rule in the Regent's stead. Weigh the counsel, decide within your mandate, say in two lines what you chose and why, and refer to the Regent anything the mandate does not cover.`,
+      `</council-verdict>`,
+    ].join("\n");
+    this.sql.exec(`INSERT INTO briefings (id, season, role, target_id, channel_id, content, status, error) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL) ON CONFLICT(id) DO UPDATE SET content = excluded.content, status = 'pending', error = NULL`, `v${debateId}`, state.season, seat.role, seat.targetId, seat.channelId, content);
   }
 
   /** When the protectorate ends, the Protector is asked for an account of it. */

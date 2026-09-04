@@ -96,7 +96,8 @@ export class CourtCards {
         if (!existing) {
           if (o.status !== "awaiting_seal") continue;
           const client = await this.connect();
-          const { messageId } = await client.publishCustomMessage({ typeId: SEAL_TYPE, initialState: cardState, displayMode: "inline" }, { idempotencyKey: `regency:${key}` });
+          const forecast = await this.forecastLine(o.id).catch(() => null);
+          const { messageId } = await client.publishCustomMessage({ typeId: SEAL_TYPE, initialState: { ...cardState, forecast }, displayMode: "inline" }, { idempotencyKey: `regency:${key}` });
           await this.game.setCard({ key, channelId: this.channelId, messageId, kind: "seal" });
         } else if (previous && previous.orders.find((p) => p.id === o.id)?.status !== o.status) {
           const client = await this.connect();
@@ -188,6 +189,17 @@ export class CourtCards {
     } finally {
       this.busy = false;
     }
+  }
+
+  /** One line on what sealing this act would do, from a resolved copy of the season. */
+  private async forecastLine(orderId: string): Promise<string | null> {
+    const fc = await this.game.forecast({ includeOrderIds: [orderId] });
+    const arrow = (a: number, b: number) => (Math.round(a) === Math.round(b) ? `${Math.round(a)} (unchanged)` : `${Math.round(a)} → ${Math.round(b)}`);
+    const parts = [`treasury ${arrow(fc.treasury.before, fc.treasury.after)}`, `legitimacy ${arrow(fc.legitimacy.before, fc.legitimacy.after)}`];
+    if (fc.provinces.before !== fc.provinces.after) parts.push(`provinces ${arrow(fc.provinces.before, fc.provinces.after)}`);
+    if (fc.wars.length) parts.push(`at war with ${fc.wars.join(", ")}`);
+    const notable = fc.events.slice(0, 2);
+    return `If sealed, the season would close with ${parts.join(", ")}.${notable.length ? ` ${notable.join(" ")}` : ""}`;
   }
 
   /**

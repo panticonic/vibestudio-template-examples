@@ -15,6 +15,21 @@
   let busy = $state<string | null>(null);
   let seatProgress = $state<SeatProgress[]>([]);
   let mandate = $state("Keep the peace, feed the provinces, and refer any war to me.");
+  let question = $state("");
+  const openDebates = $derived(view.debates.filter((d) => d.status === "open").length);
+  async function convene() {
+    const q = question.trim();
+    if (q.length < 8) {
+      notice("Ask the council a real question.", "error");
+      return;
+    }
+    await run("convene", async () => {
+      const res = await client.convene(q);
+      if (!res.ok) throw new Error(res.reason ?? "the council could not be convened");
+      question = "";
+      notice(res.asked?.length ? `Put to ${res.asked.length} minister${res.asked.length === 1 ? "" : "s"}; their answers gather on the Seal tab and in the council conversation.` : "Nobody is seated to answer; seat the court first.");
+    });
+  }
   let seasons = $state(2);
   let limits = $state({ maySealWar: false, maySealLaws: true, maySealTreaties: true, mayDecideCrises: true, mayCloseSeason: true });
   const MANDATES: MandateLevel[] = ["advise", "act", "plenary"];
@@ -103,6 +118,18 @@
     {/each}
   </section>
   <p class="muted small">Mandates: <em>advise</em> may only counsel; <em>act</em> issues orders but sensitive acts need your seal; <em>plenary</em> acts without the seal. Standing rises and falls with each minister's cause and colours how they speak.</p>
+
+  {#if council.length}
+    <section class="convene">
+      <h3>Put it to the council</h3>
+      <p class="muted small">One question, every seated minister answers once on the record, and the Herald lays the disagreement before you as a choice.</p>
+      <textarea bind:value={question} rows="2" placeholder="Should we make peace with the north before the harvest?" disabled={busy !== null || openDebates >= 2}></textarea>
+      <div class="row">
+        <button class="primary" disabled={busy !== null || openDebates >= 2 || question.trim().length < 8} onclick={() => void convene()}>{busy === "convene" ? "Convening…" : "Convene the council"}</button>
+        {#if openDebates >= 2}<small class="muted">Two debates are already open; close one on the Seal tab first.</small>{/if}
+      </div>
+    </section>
+  {/if}
 
   <section class="workshop">
     <h3>The workshop</h3>

@@ -12,6 +12,8 @@ interface SealState {
   reason?: string | null;
   heraldParticipantId: string;
   season?: string;
+  /** What a resolved copy of the season says this act would do, if sealed. */
+  forecast?: string | null;
 }
 
 const STATUS_COLOR: Record<string, "amber" | "green" | "red" | "gray" | "blue"> = {
@@ -88,6 +90,11 @@ export default function SealCard({ state, chat, messageId }: { state: Partial<Se
         </Text>
       ) : null}
       {state.reason ? <Text size="1" color="gray">{state.reason}</Text> : null}
+      {state.forecast && status === "awaiting_seal" ? (
+        <Callout.Root size="1" color="gray" variant="surface">
+          <Callout.Text>{state.forecast}</Callout.Text>
+        </Callout.Root>
+      ) : null}
       {status === "awaiting_seal" ? (
         <Flex gap="2">
           <Button size="2" disabled={busy !== null} onClick={(e) => { e.stopPropagation(); void decide("seal"); }}>
