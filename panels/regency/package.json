@@ -25,6 +25,18 @@
         },
         "sound": {
           "type": "boolean"
+        },
+        "version": {
+          "type": "number"
+        },
+        "surface": {
+          "type": "string"
+        },
+        "subjectKind": {
+          "type": "string"
+        },
+        "subjectId": {
+          "type": "string"
         }
       },
       "additionalProperties": false

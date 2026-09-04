@@ -3,12 +3,27 @@
  * One game per object key; the panel's `stateArgs.gameKey` selects it.
  */
 import { workers } from "@workspace/runtime";
-import type { Crisis, GameState, Order, RealmId, RegentPromise, StagedIntent } from "@workspace/regency-engine";
+import type {
+  Crisis,
+  GameState,
+  Order,
+  RealmId,
+  RegentPromise,
+  StagedIntent,
+  RegencyAttentionItem,
+  SeasonReadiness,
+} from "@workspace/regency-engine";
 
 export const REGENCY_PROTOCOL = "examples.regency.v1";
 
 export type MandateLevel = "advise" | "act" | "plenary";
-export type OrderStatus = "pending" | "awaiting_seal" | "vetoed" | "withdrawn" | "resolved" | "rejected";
+export type OrderStatus =
+  | "pending"
+  | "awaiting_seal"
+  | "vetoed"
+  | "withdrawn"
+  | "resolved"
+  | "rejected";
 
 export interface OrderRow {
   id: string;
@@ -132,6 +147,8 @@ export interface GameView {
   chronicles: ChronicleEntry[];
   handovers: Handover[];
   secrets: SecretHistory | null;
+  readiness: SeasonReadiness | null;
+  attention: RegencyAttentionItem[];
 }
 
 export interface Forecast {
@@ -147,7 +164,13 @@ export interface Forecast {
 }
 
 export type SubmitOrderResult =
-  | { ok: true; orderId: string; status: OrderStatus; summary: string; needsSeal: boolean }
+  | {
+      ok: true;
+      orderId: string;
+      status: OrderStatus;
+      summary: string;
+      needsSeal: boolean;
+    }
   | { ok: false; reason: string };
 
 export class GameClient {
@@ -165,39 +188,77 @@ export class GameClient {
     return this.call<GameView>("getGame");
   }
 
+  attention(): Promise<RegencyAttentionItem[]> {
+    return this.call("attention");
+  }
+
   getSnapshot(season: number): Promise<GameState | null> {
     return this.call("getSnapshot", { season });
   }
 
-  newGame(input: { seed: string; realmName: string; rivals: number; regencySeasons?: number; scenario: "long" | "winter"; regentName?: string }): Promise<{ title: string }> {
+  newGame(input: {
+    seed: string;
+    realmName: string;
+    rivals: number;
+    regencySeasons?: number;
+    scenario: "long" | "winter";
+    regentName?: string;
+  }): Promise<{ title: string }> {
     return this.call("newGame", input);
   }
 
-  submitOrder(input: { realm: RealmId; actor: string; order: Order; rationale?: string }): Promise<SubmitOrderResult> {
+  submitOrder(input: {
+    realm: RealmId;
+    actor: string;
+    order: Order;
+    rationale?: string;
+  }): Promise<SubmitOrderResult> {
     return this.call("submitOrder", input);
   }
 
-  sealOrder(orderId: string, decision: "seal" | "veto", note?: string): Promise<{ ok: boolean; reason?: string }> {
+  sealOrder(
+    orderId: string,
+    decision: "seal" | "veto",
+    note?: string,
+  ): Promise<{ ok: boolean; reason?: string }> {
     return this.call("sealOrder", { orderId, decision, note });
   }
 
-  decideCrisis(crisisId: string, optionId: string, note?: string): Promise<{ ok: boolean; reason?: string; crisis?: Crisis }> {
+  decideCrisis(
+    crisisId: string,
+    optionId: string,
+    note?: string,
+  ): Promise<{ ok: boolean; reason?: string; crisis?: Crisis }> {
     return this.call("decideCrisis", { crisisId, optionId, note });
   }
 
-  forecast(input: { orders?: Order[]; includeOrderIds?: string[] }): Promise<Forecast> {
+  forecast(input: {
+    orders?: Order[];
+    includeOrderIds?: string[];
+  }): Promise<Forecast> {
     return this.call("forecast", input);
   }
 
-  setMandate(role: string, level: MandateLevel): Promise<Record<string, MandateLevel>> {
+  setMandate(
+    role: string,
+    level: MandateLevel,
+  ): Promise<Record<string, MandateLevel>> {
     return this.call("setMandate", { role, level });
   }
 
-  closeSeason(): Promise<{ resolved: boolean; waitingFor: RealmId[]; season: string }> {
+  closeSeason(): Promise<{
+    resolved: boolean;
+    waitingFor: RealmId[];
+    season: string;
+  }> {
     return this.call("closeSeason");
   }
 
-  proceedWithoutPending(): Promise<{ resolved: boolean; stewarded: RealmId[]; season: string }> {
+  proceedWithoutPending(): Promise<{
+    resolved: boolean;
+    stewarded: RealmId[];
+    season: string;
+  }> {
     return this.call("proceedWithoutPending");
   }
 
@@ -213,7 +274,11 @@ export class GameClient {
     return this.call("openCourt");
   }
 
-  appointProtector(input: { mandate: string; seasons: number; limits: Partial<ProtectorLimits> }): Promise<Protectorate> {
+  appointProtector(input: {
+    mandate: string;
+    seasons: number;
+    limits: Partial<ProtectorLimits>;
+  }): Promise<Protectorate> {
     return this.call("appointProtector", input);
   }
 
@@ -221,8 +286,17 @@ export class GameClient {
     return this.call("dismissProtector");
   }
 
+  dismissAttention(key: string): Promise<{ ok: true }> {
+    return this.call("dismissAttention", { key });
+  }
+
   /** The Regent puts a question to the whole council; every seated minister answers on the record. */
-  convene(question: string): Promise<{ ok: boolean; reason?: string; debateId?: string; asked?: string[] }> {
+  convene(question: string): Promise<{
+    ok: boolean;
+    reason?: string;
+    debateId?: string;
+    asked?: string[];
+  }> {
     return this.call("convene", { actor: "regent", question });
   }
 
@@ -230,19 +304,35 @@ export class GameClient {
     return this.call("closeDebate", { debateId });
   }
 
-  settlePromise(promiseId: string, status: "kept" | "broken"): Promise<{ ok: boolean; reason?: string }> {
+  settlePromise(
+    promiseId: string,
+    status: "kept" | "broken",
+  ): Promise<{ ok: boolean; reason?: string }> {
     return this.call("settlePromise", { promiseId, status });
   }
 
-  clearIntent(actor: string, intentId?: string): Promise<{ ok: boolean; cleared: number }> {
-    return this.call("clearIntent", { actor, ...(intentId ? { intentId } : {}) });
+  clearIntent(
+    actor: string,
+    intentId?: string,
+  ): Promise<{ ok: boolean; cleared: number }> {
+    return this.call("clearIntent", {
+      actor,
+      ...(intentId ? { intentId } : {}),
+    });
   }
 
-  renameArmy(army: string, name: string): Promise<{ ok: boolean; reason?: string; name?: string }> {
+  renameArmy(
+    army: string,
+    name: string,
+  ): Promise<{ ok: boolean; reason?: string; name?: string }> {
     return this.call("renameArmy", { actor: "regent", army, name });
   }
 
-  report(input: { kind: "realm" | "province" | "map" | "chronicle" | "rules"; realm?: string; province?: string }): Promise<string> {
+  report(input: {
+    kind: "realm" | "province" | "map" | "chronicle" | "rules";
+    realm?: string;
+    province?: string;
+  }): Promise<string> {
     return this.call("report", input);
   }
 }

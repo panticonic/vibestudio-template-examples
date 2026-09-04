@@ -11,6 +11,7 @@ import {
 import { panel } from "@workspace/runtime";
 import { usePanelTheme, useStateArgs } from "@workspace/react";
 import type {
+  AttentionItem,
   CouncilCard,
   CharmKind,
   FestivalRecord,
@@ -81,50 +82,60 @@ type GrimoireArgs = {
   estateKey?: string;
   apprentice?: string;
   sound?: boolean;
-  view?: string;
+  version?: number;
+  surface?: "valley" | "codex" | "journal";
+  subjectKind?: "region" | "cell" | "spell" | "spirit" | "working";
+  subjectId?: string;
+  region?: RegionId;
+  x?: number;
+  y?: number;
 };
+
+const CODEX_ROOMS: Room[] = ["study", "grimoire", "spellbook", "scry"];
+const JOURNAL_ROOMS: Room[] = ["news", "chapel", "green"];
+const surfaceForRoom = (room: Room): "valley" | "codex" | "journal" =>
+  room === "valley" || room === "spirits"
+    ? "valley"
+    : CODEX_ROOMS.includes(room)
+      ? "codex"
+      : "journal";
 
 const ROOMS: Array<{
   id: Room;
   label: string;
   glyph: string;
-  key: string;
   hint: string;
 }> = [
-  { id: "valley", label: "Valley", glyph: "⌂", key: "1", hint: "living map" },
-  { id: "circle", label: "Circle", glyph: "◯", key: "2", hint: "speak magic" },
-  { id: "study", label: "Study", glyph: "❧", key: "3", hint: "ask & learn" },
+  { id: "valley", label: "Valley", glyph: "⌂", hint: "living map" },
+  { id: "circle", label: "Circle", glyph: "◯", hint: "speak magic" },
+  { id: "study", label: "Study", glyph: "❧", hint: "ask & learn" },
   {
     id: "grimoire",
     label: "Grimoire",
     glyph: "✎",
-    key: "4",
     hint: "words & names",
   },
   {
     id: "spellbook",
     label: "Spellbook",
     glyph: "❦",
-    key: "5",
     hint: "your verses",
   },
-  { id: "scry", label: "Scrying", glyph: "◎", key: "6", hint: "read beneath" },
+  { id: "scry", label: "Scrying", glyph: "◎", hint: "read beneath" },
   {
     id: "chapel",
     label: "Chapel",
     glyph: "✟",
-    key: "7",
     hint: "seals & names",
   },
   {
     id: "spirits",
     label: "Spirits",
     glyph: "✦",
-    key: "8",
     hint: "bound voices",
   },
-  { id: "news", label: "News", glyph: "✉", key: "9", hint: "estate journal" },
-  { id: "green", label: "Green", glyph: "❀", key: "0", hint: "festivals" },
+  { id: "news", label: "News", glyph: "✉", hint: "estate journal" },
+  { id: "green", label: "Green", glyph: "❀", hint: "festivals" },
 ];
 
 function cx(...names: Array<string | false | null | undefined>): string {
@@ -395,6 +406,7 @@ function Circle({
   const [recent, setRecent] = useState<SpellRecord[]>([]);
   const [current, setCurrent] = useState<SpellRecord | null>(null);
   const poll = useRef<ReturnType<typeof setInterval> | null>(null);
+  const commandId = useRef(crypto.randomUUID());
   useEffect(() => {
     if (initialVerse) setVerse(initialVerse);
   }, [initialVerse]);
@@ -444,11 +456,12 @@ function Circle({
     }, 1500);
   };
   const speak = async () => {
-    const text = verse.trim();
-    if (!text || busy) return;
+    if (!verse.trim() || busy) return;
+    const text = verse.replace(/\r\n?/g, "\n");
     setBusy(true);
     try {
       const result: SpeakResult = await client.call("speak", {
+        commandId: commandId.current,
         apprentice,
         verse: text,
         room: "circle",
@@ -479,6 +492,7 @@ function Circle({
           playCue("cast", sound);
         }
       }
+      commandId.current = crypto.randomUUID();
     } catch (cause) {
       setKind("error");
       setLine(errorText(cause));
@@ -926,7 +940,7 @@ function StudyRoom({
             ).catch((cause) => onToast(errorText(cause)))
           }
         >
-          Speak with the familiar ↗
+          Ask the familiar what to try next ↗
         </button>
       </div>
       {error && <p className="g-error">{error}</p>}
@@ -1423,6 +1437,12 @@ function Spellbook({
   onScry: (target: ScryTarget) => void;
   onToast: (text: string) => void;
 }) {
+  const commandIds = useRef<Record<string, string>>({});
+  const idFor = (key: string) =>
+    (commandIds.current[key] ??= crypto.randomUUID());
+  const complete = (key: string) => {
+    commandIds.current[key] = crypto.randomUUID();
+  };
   return (
     <section className="g-content">
       <RoomTitle
@@ -1477,9 +1497,11 @@ function Spellbook({
                     onClick={() =>
                       void onAction(spell.id, async () => {
                         const result = await client.call("recast", {
+                          commandId: idFor(`recast:${spell.id}`),
                           apprentice,
                           spellId: spell.id,
                         });
+                        complete(`recast:${spell.id}`);
                         onToast(
                           result.ok
                             ? "Spoken again."
@@ -1496,10 +1518,16 @@ function Spellbook({
                     disabled={busy === spell.id}
                     onClick={() =>
                       void onAction(spell.id, () =>
-                        client.call("release", {
-                          apprentice,
-                          spellId: spell.id,
-                        }),
+                        client
+                          .call("release", {
+                            commandId: idFor(`release:${spell.id}`),
+                            apprentice,
+                            spellId: spell.id,
+                          })
+                          .then((result) => {
+                            complete(`release:${spell.id}`);
+                            return result;
+                          }),
                       )
                     }
                   >
@@ -1510,11 +1538,17 @@ function Spellbook({
                   disabled={busy === spell.id}
                   onClick={() =>
                     void onAction(`shelve-${spell.id}`, () =>
-                      client.call("shelve", {
-                        apprentice,
-                        spellId: spell.id,
-                        shelved: !spell.shelved,
-                      }),
+                      client
+                        .call("shelve", {
+                          commandId: idFor(`shelve:${spell.id}`),
+                          apprentice,
+                          spellId: spell.id,
+                          shelved: !spell.shelved,
+                        })
+                        .then((result) => {
+                          complete(`shelve:${spell.id}`);
+                          return result;
+                        }),
                     )
                   }
                 >
@@ -1902,6 +1936,7 @@ export default function GrimoirePanel() {
     "unknown",
   );
   const [room, setRoom] = useState<Room>("valley");
+  const [attention, setAttention] = useState<AttentionItem[]>([]);
   const [region, setRegion] = useState<RegionView | null>(null);
   const [openRegion, setOpenRegion] = useState<RegionId | null>(null);
   const [focus, setFocus] = useState<{
@@ -1930,6 +1965,8 @@ export default function GrimoirePanel() {
       if (!id) return;
       try {
         const next = await client.call("overview", { apprentice: id });
+        const guidance = await client.call("attention", { apprentice: id });
+        setAttention(guidance);
         void seatGolems(next);
         setOverview((previous) => {
           if (previous) {
@@ -1966,7 +2003,11 @@ export default function GrimoirePanel() {
   const { watching, watchDay } = useWatchDay(client, () => refresh(), setError);
   const navigate = useCallback((next: Room) => {
     setRoom(next);
-    void panel.stateArgs.set({ ...currentArgs.current, view: next });
+    void panel.stateArgs.set({
+      ...currentArgs.current,
+      version: 1,
+      surface: surfaceForRoom(next),
+    });
   }, []);
   useEffect(() => {
     installFonts();
@@ -1988,8 +2029,10 @@ export default function GrimoirePanel() {
         setFirstRun(known ? "done" : "needed");
         if (known) {
           await client.call("presence", { apprentice: id, present: true });
-          if (ROOMS.some((entry) => entry.id === bootArgs.view))
-            setRoom(bootArgs.view as Room);
+          if (bootArgs.surface === "codex")
+            setRoom(bootArgs.subjectKind === "spell" ? "scry" : "grimoire");
+          else if (bootArgs.surface === "journal") setRoom("news");
+          else setRoom("valley");
         }
       } catch (cause) {
         if (active) {
@@ -2006,6 +2049,27 @@ export default function GrimoirePanel() {
     const timer = setInterval(() => void refresh(), 2500);
     return () => clearInterval(timer);
   }, [refresh]);
+  useEffect(() => {
+    if (
+      args.surface === "codex" &&
+      args.subjectKind === "spell" &&
+      args.subjectId
+    ) {
+      setRoom("scry");
+      setScryTarget({ kind: "spell", ref: args.subjectId });
+    } else if (args.surface === "journal")
+      setRoom((current) =>
+        JOURNAL_ROOMS.includes(current) ? current : "news",
+      );
+    else if (
+      args.surface === "valley" &&
+      args.subjectKind === "region" &&
+      args.subjectId
+    ) {
+      setRoom("valley");
+      void enter(args.subjectId as RegionId);
+    }
+  }, [args.surface, args.subjectKind, args.subjectId]);
   useEffect(() => {
     if (!apprentice) return;
     return () => {
@@ -2027,9 +2091,13 @@ export default function GrimoirePanel() {
         } else navigate("valley");
         return;
       }
-      const found = ROOMS.find((entry) => entry.key === event.key);
-      if (found && !event.metaKey && !event.ctrlKey && !event.altKey)
-        navigate(found.id);
+      const destination = {
+        "1": "valley",
+        "2": "grimoire",
+        "3": "news",
+      }[event.key] as Room | undefined;
+      if (destination && !event.metaKey && !event.ctrlKey && !event.altKey)
+        navigate(destination);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -2052,7 +2120,16 @@ export default function GrimoirePanel() {
   const scry = (target: ScryTarget) => {
     setScryTarget(target);
     setRoom("scry");
-    void panel.stateArgs.set({ ...args, view: "scry" });
+    void panel.stateArgs.set({
+      ...args,
+      version: 1,
+      surface: "codex",
+      subjectKind: target.kind,
+      subjectId: target.ref,
+      region: target.region,
+      x: target.x,
+      y: target.y,
+    });
   };
   const advance = async (ticks: number) => {
     setBusy(true);
@@ -2080,6 +2157,13 @@ export default function GrimoirePanel() {
     "--wash": palette.wash,
     "--season": palette.accent,
   } as CSSProperties;
+  const surface = surfaceForRoom(room);
+  const sectionRooms =
+    surface === "codex"
+      ? CODEX_ROOMS
+      : surface === "journal"
+        ? JOURNAL_ROOMS
+        : [];
   if (firstRun === "needed" && apprentice)
     return (
       <main
@@ -2094,6 +2178,9 @@ export default function GrimoirePanel() {
             setFirstRun("done");
             void refresh();
             navigate("valley");
+            void openConversation(
+              circleChannelKey(estateKey, apprentice),
+            ).catch((cause) => say(errorText(cause)));
           }}
         />
       </main>
@@ -2124,28 +2211,61 @@ export default function GrimoirePanel() {
           </div>
         </div>
         <nav>
-          {ROOMS.map((entry) => (
+          {[
+            {
+              id: "valley" as const,
+              label: "Valley",
+              glyph: "⌂",
+              hint: "the living estate",
+              room: "valley" as Room,
+            },
+            {
+              id: "codex" as const,
+              label: "Codex",
+              glyph: "❧",
+              hint: "spells & knowledge",
+              room: "grimoire" as Room,
+            },
+            {
+              id: "journal" as const,
+              label: "Journal",
+              glyph: "✉",
+              hint: "news & decisions",
+              room: "news" as Room,
+            },
+          ].map((entry) => (
             <button
               key={entry.id}
-              className={room === entry.id ? "active" : ""}
-              onClick={() => navigate(entry.id)}
-              title={`${entry.hint} · ${entry.key}`}
+              className={surface === entry.id ? "active" : ""}
+              onClick={() => navigate(entry.room)}
+              title={entry.hint}
             >
               <span className="g-nav-glyph">{entry.glyph}</span>
               <span className="g-nav-copy">
                 <strong>{entry.label}</strong>
                 <small>{entry.hint}</small>
               </span>
-              {entry.id === "news" && overview.news.unread > 0 && (
+              {entry.id === "journal" && overview.news.unread > 0 && (
                 <i>{overview.news.unread}</i>
               )}
-              {entry.id === "chapel" && overview.council > 0 && (
+              {entry.id === "journal" && overview.council > 0 && (
                 <i>{overview.council}</i>
               )}
-              <kbd>{entry.key}</kbd>
             </button>
           ))}
         </nav>
+        <button
+          className="g-conversation"
+          onClick={() =>
+            void openConversation(
+              circleChannelKey(estateKey, apprentice),
+            ).catch((cause) => say(errorText(cause)))
+          }
+        >
+          <span>✦</span>
+          <strong>Ask the familiar what to try next</strong>
+          <small>The circle is always here</small>
+        </button>
         <div className="g-profile">
           <span>
             {overview.apprentices.find((row) => row.id === apprentice)
@@ -2177,6 +2297,49 @@ export default function GrimoirePanel() {
           onWatch={() => void watchDay()}
           watching={watching}
         />
+        <div className="g-contextbar">
+          <div className="g-section-tabs" aria-label={`${surface} sections`}>
+            {sectionRooms.map((id) => {
+              const entry = ROOMS.find((candidate) => candidate.id === id)!;
+              return (
+                <button
+                  key={id}
+                  className={room === id ? "active" : ""}
+                  onClick={() => navigate(id)}
+                >
+                  <span>{entry.glyph}</span>
+                  {entry.label}
+                </button>
+              );
+            })}
+          </div>
+          {attention[0] && (
+            <aside className={`g-attention ${attention[0].urgency}`}>
+              <span>✦</span>
+              <div>
+                <strong>{attention[0].title}</strong>
+                <small>{attention[0].explanation}</small>
+                <small className="g-attention-next">
+                  Next: {attention[0].nextAction}
+                </small>
+              </div>
+              <button
+                aria-label="Dismiss guidance"
+                onClick={() =>
+                  void client
+                    .call("acknowledgeAttention", {
+                      apprentice,
+                      key: attention[0]!.key,
+                      dismissed: true,
+                    })
+                    .then(() => setAttention((items) => items.slice(1)))
+                }
+              >
+                ×
+              </button>
+            </aside>
+          )}
+        </div>
         {error && <div className="g-errorbar">{error}</div>}
         <div className="g-stage">
           {room === "valley" ? (
@@ -2229,7 +2392,10 @@ export default function GrimoirePanel() {
               }}
               onEcho={(verse) => {
                 setDraftVerse(verse);
-                navigate("circle");
+                void openConversation(
+                  circleChannelKey(estateKey, apprentice),
+                ).catch((cause) => say(errorText(cause)));
+                say("The verse is ready to echo in the familiar's composer.");
               }}
               onToast={say}
             />

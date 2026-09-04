@@ -1,8 +1,21 @@
 import { useState } from "react";
-import { Badge, Button, Callout, Flex, Text } from "@radix-ui/themes";
-import { CheckIcon, Cross2Icon, LockClosedIcon } from "@radix-ui/react-icons";
+import { buildPanelLink } from "@workspace/runtime";
+import {
+  CourtButton,
+  CourtCard,
+  CourtError,
+  CourtLink,
+  CourtTitle,
+  Eyebrow,
+  PillFrame,
+  Row,
+  Stack,
+  Status,
+  courtColours,
+} from "./court-ui.js";
 
 interface SealState {
+  gameKey: string;
   orderId: string;
   actor: string;
   actorName?: string;
@@ -11,51 +24,68 @@ interface SealState {
   status: string;
   reason?: string | null;
   season?: string;
-  /** What a resolved copy of the season says this act would do, if sealed. */
   forecast?: string | null;
 }
-
-const STATUS_COLOR: Record<string, "amber" | "green" | "red" | "gray" | "blue"> = {
-  awaiting_seal: "amber",
+const LABEL: Record<string, string> = {
+  awaiting_seal: "awaits the seal",
+  pending: "sealed",
+  resolved: "carried out",
+  vetoed: "vetoed",
+  rejected: "refused",
+  withdrawn: "withdrawn",
+};
+const TONE: Record<string, string> = {
+  awaiting_seal: "gold",
   pending: "blue",
   resolved: "green",
   vetoed: "red",
   rejected: "red",
   withdrawn: "gray",
 };
-
-const STATUS_LABEL: Record<string, string> = {
-  awaiting_seal: "awaits the seal",
-  pending: "sealed, awaiting the season",
-  resolved: "carried out",
-  vetoed: "vetoed",
-  rejected: "could not be carried out",
-  withdrawn: "withdrawn",
-};
-
 export function Pill({ state }: { state: Partial<SealState> }) {
   return (
-    <Flex align="center" gap="1">
-      <LockClosedIcon />
-      <Text size="1" weight="medium">
-        {state.actorName ?? state.actor}: {state.summary}
-      </Text>
-      <Badge color={STATUS_COLOR[state.status ?? ""] ?? "gray"}>{STATUS_LABEL[state.status ?? ""] ?? state.status}</Badge>
-    </Flex>
+    <PillFrame
+      glyph="♛"
+      status={
+        <Status tone={TONE[state.status ?? ""] ?? "gray"}>
+          {LABEL[state.status ?? ""] ?? state.status}
+        </Status>
+      }
+    >
+      {state.actorName ?? state.actor}: {state.summary}
+    </PillFrame>
   );
 }
-
-export default function SealCard({ state, chat, messageId }: { state: Partial<SealState>; expanded: boolean; chat: any; messageId: string }) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [local, setLocal] = useState<string | null>(null);
+export default function SealCard({
+  state,
+  chat,
+  messageId,
+}: {
+  state: Partial<SealState>;
+  expanded: boolean;
+  chat: any;
+  messageId: string;
+}) {
+  const [busy, setBusy] = useState<string | null>(null),
+    [error, setError] = useState<string | null>(null),
+    [local, setLocal] = useState<string | null>(null);
   const status = local ?? state.status ?? "";
   const decide = async (decision: "seal" | "veto") => {
     setBusy(decision);
     setError(null);
     try {
-      const result = await chat.callMethodByHandle("herald", "regency.decide", { kind: "seal", orderId: state.orderId, decision });
-      if (result && typeof result === "object" && "ok" in result && !(result as { ok: boolean }).ok) {
+      const result = await chat.callMethodByHandle("herald", "regency.decide", {
+        commandId: `${messageId}:${decision}`,
+        kind: "seal",
+        orderId: state.orderId,
+        decision,
+      });
+      if (
+        result &&
+        typeof result === "object" &&
+        "ok" in result &&
+        !(result as { ok: boolean }).ok
+      ) {
         setError(String((result as { reason?: string }).reason ?? "refused"));
         return;
       }
@@ -64,51 +94,99 @@ export default function SealCard({ state, chat, messageId }: { state: Partial<Se
       try {
         await chat.updateCustomMessage?.(messageId, { ...state, status: next });
       } catch {
-        // the panel will reconcile the card on its next poll
+        /* the world will reconcile the card */
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(null);
     }
   };
+  const href = buildPanelLink("panels/regency", {
+    stateArgs: {
+      version: 1,
+      gameKey: state.gameKey,
+      surface: "archive",
+      subjectKind: "law",
+      subjectId: state.orderId,
+    },
+  });
   return (
-    <Flex direction="column" gap="2" style={{ minWidth: 280 }}>
-      <Flex align="center" gap="2" wrap="wrap">
-        <LockClosedIcon />
-        <Text weight="bold">The Regent's seal</Text>
-        <Badge color={STATUS_COLOR[status] ?? "gray"}>{STATUS_LABEL[status] ?? status}</Badge>
-        {state.season ? <Text size="1" color="gray">{state.season}</Text> : null}
-      </Flex>
-      <Text size="2">
-        <b>{state.actorName ?? state.actor}</b> asks to <i>{state.summary}</i>
-      </Text>
-      {state.rationale ? (
-        <Text size="2" color="gray" style={{ fontStyle: "italic" }}>
-          “{state.rationale}”
-        </Text>
-      ) : null}
-      {state.reason ? <Text size="1" color="gray">{state.reason}</Text> : null}
-      {state.forecast && status === "awaiting_seal" ? (
-        <Callout.Root size="1" color="gray" variant="surface">
-          <Callout.Text>{state.forecast}</Callout.Text>
-        </Callout.Root>
-      ) : null}
-      {status === "awaiting_seal" ? (
-        <Flex gap="2">
-          <Button size="2" disabled={busy !== null} onClick={(e) => { e.stopPropagation(); void decide("seal"); }}>
-            <CheckIcon /> Seal
-          </Button>
-          <Button size="2" variant="soft" color="red" disabled={busy !== null} onClick={(e) => { e.stopPropagation(); void decide("veto"); }}>
-            <Cross2Icon /> Veto
-          </Button>
-        </Flex>
-      ) : null}
-      {error ? (
-        <Callout.Root color="red" size="1">
-          <Callout.Text>{error}</Callout.Text>
-        </Callout.Root>
-      ) : null}
-    </Flex>
+    <CourtCard tone="night">
+      <Stack gap={12}>
+        <Row>
+          <Eyebrow dark>The Regent's seal</Eyebrow>
+          <Status dark tone={TONE[status] ?? "gray"}>
+            {LABEL[status] ?? status}
+          </Status>
+          {state.season ? (
+            <small style={{ marginLeft: "auto", opacity: 0.55 }}>
+              {state.season}
+            </small>
+          ) : null}
+        </Row>
+        <CourtTitle>
+          {state.actorName ?? state.actor} asks to {state.summary}
+        </CourtTitle>
+        {state.rationale ? (
+          <blockquote
+            style={{
+              margin: 0,
+              paddingLeft: 12,
+              borderLeft: `2px solid ${courtColours.goldBright}`,
+              font: "italic 14px/1.55 Georgia,serif",
+              opacity: 0.76,
+            }}
+          >
+            “{state.rationale}”
+          </blockquote>
+        ) : null}
+        {state.reason ? (
+          <small style={{ opacity: 0.62 }}>{state.reason}</small>
+        ) : null}
+        {state.forecast && status === "awaiting_seal" ? (
+          <div
+            style={{
+              padding: "11px 12px",
+              border: "1px solid rgba(201,151,66,.23)",
+              borderRadius: 12,
+              background: "rgba(255,244,215,.05)",
+              fontSize: 12,
+              lineHeight: 1.5,
+            }}
+          >
+            <Eyebrow dark>What the clerks foresee</Eyebrow>
+            <div style={{ marginTop: 4 }}>{state.forecast}</div>
+          </div>
+        ) : null}
+        <CourtLink dark href={href}>
+          Open the act in the Regent's records →
+        </CourtLink>
+        {status === "awaiting_seal" ? (
+          <Row>
+            <CourtButton
+              disabled={busy !== null}
+              onClick={(event) => {
+                event.stopPropagation();
+                void decide("seal");
+              }}
+            >
+              ♛ Set the seal
+            </CourtButton>
+            <CourtButton
+              disabled={busy !== null}
+              variant="veto"
+              onClick={(event) => {
+                event.stopPropagation();
+                void decide("veto");
+              }}
+            >
+              × Veto the act
+            </CourtButton>
+          </Row>
+        ) : null}
+        {error ? <CourtError>{error}</CourtError> : null}
+      </Stack>
+    </CourtCard>
   );
 }

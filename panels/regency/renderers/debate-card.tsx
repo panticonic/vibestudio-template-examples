@@ -1,51 +1,94 @@
-import { Badge, Flex, Separator, Text } from "@radix-ui/themes";
-import { ChatBubbleIcon } from "@radix-ui/react-icons";
-
-interface DebateState {
-  debateId: string;
-  question: string;
-  status: "open" | "closed";
-  season: string;
-  lines: Array<{ role: string; name: string; text: string }>;
-  waiting: string[];
+import {
+  CourtCard,
+  CourtTitle,
+  Eyebrow,
+  PillFrame,
+  Rule,
+  Stack,
+  Status,
+  Row,
+  courtColours,
+} from "./court-ui.js";
+interface State {
+  debateId?: string;
+  question?: string;
+  status?: "open" | "closed";
+  season?: string;
+  lines?: Array<{ role: string; name: string; text: string }>;
+  waiting?: string[];
 }
-
-export function Pill({ state }: { state: Partial<DebateState> }) {
+export function Pill({ state }: { state: State }) {
   return (
-    <Flex align="center" gap="1">
-      <ChatBubbleIcon />
-      <Text size="1" weight="medium">{state.question}</Text>
-      <Badge color={state.status === "open" ? "amber" : "gray"}>{(state.lines ?? []).length} of 4</Badge>
-    </Flex>
+    <PillFrame
+      glyph="♟"
+      status={
+        <Status tone={state.status === "open" ? "gold" : "green"}>
+          {(state.lines ?? []).length} of 4
+        </Status>
+      }
+    >
+      {state.question ?? "The council is asked"}
+    </PillFrame>
   );
 }
-
-export default function DebateCard({ state }: { state: Partial<DebateState>; expanded: boolean }) {
-  const lines = state.lines ?? [];
-  const waiting = state.waiting ?? [];
+export default function DebateCard({
+  state,
+}: {
+  state: State;
+  expanded: boolean;
+}) {
+  const lines = state.lines ?? [],
+    waiting = state.waiting ?? [];
   return (
-    <Flex direction="column" gap="2" style={{ minWidth: 300, maxWidth: 620 }}>
-      <Flex align="center" gap="2" wrap="wrap">
-        <ChatBubbleIcon />
-        <Text weight="bold">The council is asked</Text>
-        <Badge color={state.status === "open" ? "amber" : "green"}>{state.status === "open" ? `${lines.length} of 4 have answered` : "closed"}</Badge>
-        {state.season ? <Text size="1" color="gray">{state.season}</Text> : null}
-      </Flex>
-      <Text size="3" style={{ fontFamily: "Georgia, serif" }}>{state.question}</Text>
-      <Separator size="4" />
-      <Flex direction="column" gap="2">
-        {lines.map((l) => (
-          <Flex key={l.role} direction="column" gap="1">
-            <Text size="1" color="gray" weight="medium">{l.name} · {l.role}</Text>
-            <Text size="2">{l.text}</Text>
-          </Flex>
-        ))}
-        {waiting.length ? (
-          <Text size="1" color="gray" style={{ fontStyle: "italic" }}>
-            still to speak: {waiting.join(", ")}
-          </Text>
-        ) : null}
-      </Flex>
-    </Flex>
+    <CourtCard tone="night">
+      <Stack gap={13}>
+        <Row>
+          <Eyebrow dark>The council is asked</Eyebrow>
+          <Status dark tone={state.status === "open" ? "gold" : "green"}>
+            {state.status === "open"
+              ? `${lines.length} of 4 have answered`
+              : "counsel complete"}
+          </Status>
+          {state.season ? (
+            <small style={{ marginLeft: "auto", opacity: 0.55 }}>
+              {state.season}
+            </small>
+          ) : null}
+        </Row>
+        <CourtTitle>{state.question}</CourtTitle>
+        <Rule dark />
+        <Stack gap={12}>
+          {lines.map((line) => (
+            <div
+              key={line.role}
+              style={{
+                paddingLeft: 12,
+                borderLeft: "2px solid rgba(201,151,66,.35)",
+              }}
+            >
+              <small
+                style={{
+                  display: "block",
+                  marginBottom: 3,
+                  color: courtColours.goldBright,
+                }}
+              >
+                {line.name} · {line.role}
+              </small>
+              <span style={{ font: "14px/1.55 Georgia,serif" }}>
+                {line.text}
+              </span>
+            </div>
+          ))}
+          {waiting.length ? (
+            <small
+              style={{ color: "rgba(255,244,215,.55)", fontStyle: "italic" }}
+            >
+              Still to speak: {waiting.join(", ")}
+            </small>
+          ) : null}
+        </Stack>
+      </Stack>
+    </CourtCard>
   );
 }

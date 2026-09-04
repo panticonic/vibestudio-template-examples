@@ -22,7 +22,6 @@ import {
   seasonLabel,
   totalCompanies,
   type GameState,
-  type Order,
 } from "@workspace/regency-engine";
 import {
   GameClient,
@@ -43,10 +42,17 @@ import {
   type SeatProgress,
 } from "./lib/court.js";
 import { decorationPath, layoutMap, snowPath } from "./lib/geometry.js";
-import { closeAudio, playCue } from "./lib/sound.js";
+import { closeAudio } from "./lib/sound.js";
 import "./styles.css";
 
-type RegencyArgs = { gameKey?: string; sound?: boolean };
+type RegencyArgs = {
+  gameKey?: string;
+  sound?: boolean;
+  version?: number;
+  surface?: "map" | "archive";
+  subjectKind?: "province" | "army" | "event" | "law" | "promise";
+  subjectId?: string;
+};
 type Tab = "realm" | "matters" | "council" | "diplomacy" | "chronicle";
 const TABS: Array<{ id: Tab; label: string; icon: string; hint: string }> = [
   { id: "realm", label: "Realm", icon: "♛", hint: "the crown" },
@@ -118,6 +124,7 @@ function Setup({
         setBusy("seating");
         const view = await client.getGame();
         if (view.state) await seatTheCourt(client, view.state, setProgress);
+        await openCourt(courtChannel(client.gameKey));
       }
       onFounded();
     } catch (cause) {
@@ -525,10 +532,13 @@ function RealmDashboard({
           {world.phase === "orders" && (
             <button
               className="r-primary"
-              disabled={busy || awaiting > 0}
-              onClick={() => void run(() => client.closeSeason())}
+              onClick={() =>
+                void openCourt(courtChannel(client.gameKey)).catch((cause) =>
+                  notify(String(cause), "error"),
+                )
+              }
             >
-              Close the season
+              Close court with the Herald
             </button>
           )}
           {world.phase === "closing" && (
@@ -673,13 +683,11 @@ function RealmDashboard({
 function Matters({
   view,
   client,
-  refresh,
   notify,
   onProvince,
 }: {
   view: GameView;
   client: GameClient;
-  refresh: () => Promise<void>;
   notify: (text: string, kind?: "error") => void;
   onProvince: (id: string) => void;
 }) {
@@ -688,22 +696,7 @@ function Matters({
   const crises = world.crises.filter((crisis) => crisis.chosen === null);
   const [busy, setBusy] = useState<string | null>(null);
   const [forecasts, setForecasts] = useState<Record<string, Forecast>>({});
-  const [directOrder, setDirectOrder] = useState(
-    '{"kind":"build","province":"p1","building":"farm"}',
-  );
-  const [directError, setDirectError] = useState<string | null>(null);
   const [lawOpen, setLawOpen] = useState<string | null>(null);
-  const run = async (key: string, fn: () => Promise<unknown>) => {
-    setBusy(key);
-    try {
-      await fn();
-      await refresh();
-    } catch (cause) {
-      notify(cause instanceof Error ? cause.message : String(cause), "error");
-    } finally {
-      setBusy(null);
-    }
-  };
   const preview = async (order: OrderRow) => {
     setBusy(`forecast-${order.id}`);
     try {
@@ -731,25 +724,6 @@ function Matters({
     } finally {
       setBusy(null);
     }
-  };
-  const submitDirect = async () => {
-    setDirectError(null);
-    let order: Order;
-    try {
-      order = JSON.parse(directOrder) as Order;
-    } catch {
-      setDirectError("That is not valid JSON.");
-      return;
-    }
-    await run("direct", async () => {
-      const result = await client.submitOrder({
-        realm: world.playerRealm,
-        actor: "regent",
-        order,
-      });
-      if (!result.ok) throw new Error(result.reason);
-      notify(`Ordered: ${result.summary}`);
-    });
   };
   const player = world.realms[world.playerRealm]!;
   const otherOrders = view.orders.filter(
@@ -808,17 +782,9 @@ function Matters({
                   </div>
                   <p>{option.text}</p>
                   <span>{describeEffects(world, option.effects)}</span>
-                  <button
-                    className="r-primary"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      void run(option.id, () =>
-                        client.decideCrisis(crisis.id, option.id),
-                      )
-                    }
-                  >
-                    Choose this course
-                  </button>
+                  <small>
+                    Choose this course in conversation with the Herald.
+                  </small>
                 </article>
               ))}
             </div>
@@ -854,32 +820,12 @@ function Matters({
             )}
             <div className="r-actions">
               <button
-                className="r-primary"
-                disabled={busy !== null}
-                onClick={() =>
-                  void run(`seal-${order.id}`, () =>
-                    client.sealOrder(order.id, "seal"),
-                  )
-                }
-              >
-                Set the seal
-              </button>
-              <button
-                disabled={busy !== null}
-                onClick={() =>
-                  void run(`veto-${order.id}`, () =>
-                    client.sealOrder(order.id, "veto"),
-                  )
-                }
-              >
-                Veto
-              </button>
-              <button
                 disabled={busy !== null}
                 onClick={() => void preview(order)}
               >
                 Forecast
               </button>
+              <small>The Herald carries the seal in court conversation.</small>
             </div>
           </article>
         ))}
@@ -961,27 +907,6 @@ function Matters({
           </div>
         )}
       </section>
-      <details className="r-card r-direct-order">
-        <summary>The Regent’s own hand</summary>
-        <p>
-          Submit a typed order directly when you choose to act without a
-          minister.
-        </p>
-        <textarea
-          rows={4}
-          value={directOrder}
-          onChange={(event) => setDirectOrder(event.target.value)}
-          spellCheck={false}
-        />
-        {directError && <p className="r-error">{directError}</p>}
-        <button
-          className="r-primary"
-          disabled={busy !== null}
-          onClick={() => void submitDirect()}
-        >
-          Enter the order
-        </button>
-      </details>
     </div>
   );
 }
@@ -1685,7 +1610,22 @@ export default function RegencyPanel() {
   const [view, setView] = useState<GameView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("realm");
+  const [archiveOpen, setArchiveOpen] = useState(args.surface === "archive");
   const [selected, setSelected] = useState<string | null>(null);
+  const selectProvince = useCallback(
+    (id: string | null) => {
+      setSelected(id);
+      void panel.stateArgs.set({
+        ...args,
+        version: 1,
+        surface: "map",
+        ...(id
+          ? { subjectKind: "province", subjectId: id }
+          : { subjectKind: undefined, subjectId: undefined }),
+      });
+    },
+    [args],
+  );
   const [notices, setNotices] = useState<
     Array<{ id: number; text: string; kind?: "error" }>
   >([]);
@@ -1701,6 +1641,7 @@ export default function RegencyPanel() {
   }, []);
   const refresh = useCallback(async () => {
     try {
+      await client.attention();
       setView(await client.getGame());
       setError(null);
     } catch (cause) {
@@ -1715,6 +1656,24 @@ export default function RegencyPanel() {
       closeAudio();
     };
   }, [refresh]);
+  useEffect(() => {
+    setArchiveOpen(args.surface === "archive");
+    if (args.subjectKind === "province" && args.subjectId) {
+      setSelected(args.subjectId);
+      return;
+    }
+    if (args.surface !== "archive") return;
+    if (args.subjectKind === "promise") setTab("diplomacy");
+    else if (args.subjectKind === "event")
+      setTab(args.subjectId === "season-readiness" ? "realm" : "chronicle");
+    else if (args.subjectKind === "law")
+      setTab(
+        args.subjectId === "mandates" || args.subjectId === "protectorate"
+          ? "council"
+          : "matters",
+      );
+    else if (args.subjectKind === "army") setTab("realm");
+  }, [args.surface, args.subjectKind, args.subjectId]);
   const awaiting =
     view?.orders.filter((row) => row.status === "awaiting_seal").length ?? 0;
   useEffect(() => {
@@ -1728,46 +1687,10 @@ export default function RegencyPanel() {
       )
         return;
       if (event.key === "Escape") setSelected(null);
-      if (
-        event.key === "s" &&
-        view?.orders.find((row) => row.status === "awaiting_seal")
-      ) {
-        const order = view.orders.find(
-          (row) => row.status === "awaiting_seal",
-        )!;
-        void client
-          .sealOrder(order.id, "seal")
-          .then(() => {
-            playCue("seal", sound);
-            return refresh();
-          })
-          .catch((cause) =>
-            notify(
-              cause instanceof Error ? cause.message : String(cause),
-              "error",
-            ),
-          );
-      }
-      if (
-        event.key === " " &&
-        view?.state?.phase === "orders" &&
-        awaiting === 0
-      ) {
-        event.preventDefault();
-        void client
-          .closeSeason()
-          .then(refresh)
-          .catch((cause) =>
-            notify(
-              cause instanceof Error ? cause.message : String(cause),
-              "error",
-            ),
-          );
-      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [view, client, refresh, notify, sound, awaiting]);
+  }, []);
   if (error && !view)
     return (
       <main className={cx("regency-react", theme === "dark" && "dark")}>
@@ -1810,21 +1733,42 @@ export default function RegencyPanel() {
             </small>
           </div>
         </div>
-        <nav>
-          {TABS.map((entry) => (
+        {view.attention[0] && (
+          <div className={`r-attention ${view.attention[0].urgency}`}>
+            <span>♟</span>
+            <div>
+              <strong>{view.attention[0].title}</strong>
+              <small>{view.attention[0].explanation}</small>
+              <small className="r-attention-next">
+                Next: {view.attention[0].nextAction}
+              </small>
+            </div>
             <button
-              className={tab === entry.id ? "active" : ""}
-              key={entry.id}
-              onClick={() => setTab(entry.id)}
+              aria-label="Dismiss guidance"
+              onClick={() =>
+                void client
+                  .dismissAttention(view.attention[0]!.key)
+                  .then(refresh)
+              }
             >
-              <span>{entry.icon}</span>
-              <strong>{entry.label}</strong>
-              {entry.id === "matters" && awaiting + pending > 0 && (
-                <i>{awaiting + pending}</i>
-              )}
+              ×
             </button>
-          ))}
-        </nav>
+          </div>
+        )}
+        <button
+          className="r-archive-button"
+          onClick={() => {
+            const next = !archiveOpen;
+            setArchiveOpen(next);
+            void panel.stateArgs.set({
+              ...args,
+              version: 1,
+              surface: next ? "archive" : "map",
+            });
+          }}
+        >
+          {archiveOpen ? "Close records" : "Open records"} <span>❧</span>
+        </button>
         <button
           className="r-court-button"
           onClick={() =>
@@ -1833,7 +1777,7 @@ export default function RegencyPanel() {
             )
           }
         >
-          Enter court <span>↗</span>
+          Return to court <span>↗</span>
         </button>
       </header>
       <div className="r-workspace">
@@ -1841,56 +1785,145 @@ export default function RegencyPanel() {
           <StrategyMap
             world={world}
             selected={selected}
-            onSelect={setSelected}
+            onSelect={selectProvince}
             intents={view.intents}
           />
           {selected && (
             <ProvinceCard
               world={world}
               id={selected}
-              onClose={() => setSelected(null)}
+              onClose={() => selectProvince(null)}
             />
           )}
         </div>
-        <aside className="r-command">
-          <div className="r-command-scroll">
-            {tab === "realm" ? (
-              <RealmDashboard
-                view={view}
-                client={client}
-                refresh={refresh}
-                notify={notify}
-                sound={sound}
-                onSound={(value) =>
-                  void panel.stateArgs.set({ ...args, sound: value })
+        <aside
+          className={cx(
+            "r-command",
+            "r-conversational",
+            archiveOpen && "archive-open",
+          )}
+        >
+          {!archiveOpen ? (
+            <div className="r-glance">
+              <p className="r-eyebrow">The Regent's desk</p>
+              <h2>
+                {view.readiness?.state === "blocked_by_seals"
+                  ? "The seal is wanted"
+                  : view.readiness?.state === "ready_with_defaults"
+                    ? "Court may close"
+                    : view.readiness?.state === "waiting_for_courts"
+                      ? "The realm is waiting"
+                      : view.readiness?.state === "finished"
+                        ? "The history is written"
+                        : "The court is ready"}
+              </h2>
+              <p>
+                {view.attention[0]?.explanation ??
+                  "The map is quiet. Return to court for counsel, or point at a province to give the council context."}
+              </p>
+              <p className="r-next-action">
+                <strong>Next</strong>{" "}
+                {view.attention[0]?.nextAction ??
+                  "Ask the council what changed and what deserves your decision first."}
+              </p>
+              <div className="r-glance-stats">
+                <span>
+                  <b>{Math.round(world.realms[world.playerRealm]!.treasury)}</b>{" "}
+                  treasury
+                </span>
+                <span>
+                  <b>
+                    {Math.round(world.realms[world.playerRealm]!.legitimacy)}
+                  </b>{" "}
+                  legitimacy
+                </span>
+                <span>
+                  <b>{awaiting + pending}</b> before court
+                </span>
+              </div>
+              <button
+                className="r-primary"
+                onClick={() =>
+                  void openCourt(courtChannel(gameKey)).catch((cause) =>
+                    notify(String(cause), "error"),
+                  )
                 }
-              />
-            ) : tab === "matters" ? (
-              <Matters
-                view={view}
-                client={client}
-                refresh={refresh}
-                notify={notify}
-                onProvince={setSelected}
-              />
-            ) : tab === "council" ? (
-              <Council
-                view={view}
-                client={client}
-                refresh={refresh}
-                notify={notify}
-              />
-            ) : tab === "diplomacy" ? (
-              <Diplomacy
-                view={view}
-                client={client}
-                refresh={refresh}
-                notify={notify}
-              />
-            ) : (
-              <Chronicle view={view} onProvince={setSelected} />
-            )}
-          </div>
+              >
+                Ask the council what to do next <span>↗</span>
+              </button>
+              {view.readiness?.state === "waiting_for_courts" && (
+                <button
+                  className="r-secondary"
+                  onClick={() =>
+                    void client
+                      .proceedWithoutPending()
+                      .then(refresh)
+                      .catch((cause) => notify(String(cause), "error"))
+                  }
+                >
+                  Proceed without the other courts
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <nav className="r-record-tabs" aria-label="Realm records">
+                {TABS.map((entry) => (
+                  <button
+                    className={tab === entry.id ? "active" : ""}
+                    key={entry.id}
+                    onClick={() => setTab(entry.id)}
+                  >
+                    <span>{entry.icon}</span>
+                    {entry.label}
+                    {entry.id === "matters" && awaiting + pending > 0 ? (
+                      <i>{awaiting + pending}</i>
+                    ) : null}
+                  </button>
+                ))}
+              </nav>
+              <div className="r-command-scroll">
+                {tab === "realm" ? (
+                  <RealmDashboard
+                    view={view}
+                    client={client}
+                    refresh={refresh}
+                    notify={notify}
+                    sound={sound}
+                    onSound={(value) =>
+                      void panel.stateArgs.set({ ...args, sound: value })
+                    }
+                  />
+                ) : tab === "matters" ? (
+                  <Matters
+                    view={view}
+                    client={client}
+                    notify={notify}
+                    onProvince={(id) => selectProvince(id)}
+                  />
+                ) : tab === "council" ? (
+                  <Council
+                    view={view}
+                    client={client}
+                    refresh={refresh}
+                    notify={notify}
+                  />
+                ) : tab === "diplomacy" ? (
+                  <Diplomacy
+                    view={view}
+                    client={client}
+                    refresh={refresh}
+                    notify={notify}
+                  />
+                ) : (
+                  <Chronicle
+                    view={view}
+                    onProvince={(id) => selectProvince(id)}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </aside>
       </div>
       {world.outcome && (

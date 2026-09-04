@@ -29,8 +29,26 @@
         "sound": {
           "type": "boolean"
         },
-        "view": {
+        "version": {
+          "type": "number"
+        },
+        "surface": {
           "type": "string"
+        },
+        "subjectKind": {
+          "type": "string"
+        },
+        "subjectId": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
         }
       },
       "additionalProperties": false

@@ -14,7 +14,7 @@ describe("the Regency React panel", () => {
     };
     expect(manifest.vibestudio.entry).toBe("index.tsx");
     expect(manifest.dependencies["@workspace/react"]).toBe("workspace:*");
-    expect(manifest.dependencies.react).toMatch(/^\^19/);
+    expect(manifest.dependencies["react"]).toMatch(/^\^19/);
     expect(manifest.dependencies["react-dom"]).toMatch(/^\^19/);
     expect(manifest.dependencies).not.toHaveProperty("svelte");
     expect(manifest.dependencies).not.toHaveProperty("@workspace/svelte");
@@ -31,16 +31,12 @@ describe("the Regency React panel", () => {
     for (const marker of [
       "newGame",
       "seatTheCourt",
-      "closeSeason",
       "proceedWithoutPending",
-      "sealOrder",
-      "decideCrisis",
       "forecast",
       "convene",
       "settlePromise",
       "setMandate",
       "appointProtector",
-      "submitOrder",
       "redeliverBriefings",
     ])
       expect(source).toContain(marker);
@@ -51,20 +47,46 @@ describe("the Regency React panel", () => {
       "r-ending",
     ])
       expect(source).toContain(visual);
+    expect(source).toContain("r-record-tabs");
+    expect(source).toContain("r-glance");
+    expect(source).toContain("Return to court");
+    expect(source).not.toContain("<nav>\n          {TABS.map");
+    expect(source).not.toContain("r-direct-order");
+    expect(source).not.toContain("JSON.parse(directOrder)");
+    expect(source).not.toMatch(
+      /client\.(sealOrder|decideCrisis|closeSeason)\(/,
+    );
   });
 
   it("ships React renderers for every chat card", () => {
     expect(
       readdirSync(resolve(__dirname, "renderers"))
-        .filter((name) => name.endsWith(".tsx"))
+        .filter((name) => name.endsWith("-card.tsx"))
         .sort(),
     ).toEqual([
+      "briefing-card.tsx",
       "debate-card.tsx",
+      "directory-card.tsx",
+      "forecast-card.tsx",
       "handover-card.tsx",
+      "mandate-card.tsx",
       "matter-card.tsx",
+      "protector-card.tsx",
+      "readiness-card.tsx",
       "seal-card.tsx",
       "season-card.tsx",
     ]);
+    const rendererSource = readdirSync(resolve(__dirname, "renderers"))
+      .filter((name) => name.endsWith(".tsx"))
+      .map((name) =>
+        readFileSync(resolve(__dirname, "renderers", name), "utf8"),
+      )
+      .join("\n");
+    expect(rendererSource).not.toContain("@radix-ui/themes");
+    expect(rendererSource).not.toMatch(
+      /var\(--(?:accent|amber|gray|bronze|color-panel|black)/,
+    );
+    expect(rendererSource).toContain("CourtCard");
   });
 
   it("uses typed workspace services and preserves its authority ceiling", () => {

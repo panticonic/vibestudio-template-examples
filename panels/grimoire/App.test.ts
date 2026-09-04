@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,21 +26,16 @@ describe("the Grimoire React panel", () => {
     expect(app()).not.toMatch(/\.svelte|@workspace\/svelte|\$state|\$derived/);
   });
 
-  it("preserves every room and the interactive world paths", () => {
+  it("reduces navigation to Valley, Codex, and Journal without losing world paths", () => {
     const source = app();
-    for (const room of [
-      "valley",
-      "circle",
-      "study",
-      "grimoire",
-      "spellbook",
-      "scry",
-      "chapel",
-      "spirits",
-      "news",
-      "green",
-    ])
-      expect(source).toContain(`id: \"${room}\"`);
+    expect(source).toContain('id: "valley" as const');
+    expect(source).toContain('id: "codex" as const');
+    expect(source).toContain('id: "journal" as const');
+    expect(source).toContain("Ask the familiar what to try next");
+    expect(source).toContain("g-section-tabs");
+    expect(source).toContain('"2": "grimoire"');
+    expect(source).toContain('"3": "news"');
+    expect(source).not.toContain("entry.key === event.key");
     for (const marker of [
       "newEstate",
       "joinEstate",
@@ -63,6 +58,28 @@ describe("the Grimoire React panel", () => {
     expect(source).toContain("openConversation");
     expect(source).toContain("drawRegion");
     expect(source).toContain("StudyRoom");
+  });
+
+  it("ships the complete conversational card family", () => {
+    expect(
+      readdirSync(join(here, "renderers"))
+        .filter((name) => name.endsWith("-card.tsx"))
+        .sort(),
+    ).toEqual([
+      "chapel-card.tsx",
+      "festival-card.tsx",
+      "hall-card.tsx",
+      "reading-card.tsx",
+      "scry-card.tsx",
+      "spell-card.tsx",
+      "verse-card.tsx",
+    ]);
+    const rendererSource = readdirSync(join(here, "renderers"))
+      .filter((name) => name.endsWith(".tsx"))
+      .map((name) => readFileSync(join(here, "renderers", name), "utf8"))
+      .join("\n");
+    expect(rendererSource).toContain("FolioPill");
+    expect(rendererSource).not.toMatch(/minWidth:\s*300/);
   });
 
   it("uses the typed workspace runtime layers for services and owned channels", () => {
