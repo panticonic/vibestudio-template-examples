@@ -5,7 +5,7 @@
  * ordinary workspace chat agents (`workers/grimoire-agents`) subscribed to
  * those channels with a seat in their config. Everything here is idempotent.
  */
-import { contextId as runtimeContextId, openPanel, panelTree, rpc } from "@workspace/runtime";
+import { contextId as runtimeContextId, openPanel, panelTree, workers } from "@workspace/runtime";
 import { addAgentToChannel } from "@workspace-skills/agents";
 import type { AgentSeatConfig, Participant, SpiritId } from "@workspace/grimoire-engine";
 import type { EstateClient } from "./client.js";
@@ -27,12 +27,7 @@ export const SPIRIT_TITLES: Record<string, string> = {
 };
 
 async function ensureChannel(channelId: string, contextId: string): Promise<void> {
-  await rpc.call(
-    "main",
-    "runtime.createEntity",
-    [{ kind: "do", execution: { surface: "code", source: CHANNEL_SOURCE }, className: CHANNEL_CLASS, key: channelId, contextId }],
-    { idempotencyKey: `${channelId}:create` },
-  );
+  await workers.createDurableObject(CHANNEL_SOURCE, CHANNEL_CLASS, { key: channelId, contextId });
 }
 
 export interface SeatResult { participant: Participant | null; error: string | null }

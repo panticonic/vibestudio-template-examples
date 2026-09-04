@@ -1489,7 +1489,7 @@ export class RegencyGameDO extends DurableObjectBase {
   }
 
   override async alarm(): Promise<{ wakeAt: number } | null> {
-    this.ensureReady();
+    await super.alarm();
     this.sql.exec(`INSERT INTO meta (key, value) VALUES ('drain', '0') ON CONFLICT(key) DO UPDATE SET value = '0'`);
     this.sql.exec(`UPDATE briefings SET status = 'pending' WHERE status = 'failed' AND attempts < ?`, BRIEFING_ATTEMPTS);
     await this.deliverBriefings();

@@ -20,4 +20,14 @@ describe("Hello Svelte example", () => {
     expect(source).toContain('aria-label="decrement"');
     expect(compiled.js.code.length).toBeGreaterThan(1_000);
   });
+
+  it("requests only the context boundary used by panel metadata", () => {
+    const manifest = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as {
+      vibestudio: { authority: { requests: Array<{ capability: string }> } };
+    };
+
+    expect(manifest.vibestudio.authority.requests.map((request) => request.capability)).toEqual([
+      "context.boundary",
+    ]);
+  });
 });

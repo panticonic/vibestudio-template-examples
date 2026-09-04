@@ -28,6 +28,16 @@ describe("the Grimoire panel", () => {
     expect(app).toContain('client.call("presence"');
   });
 
+  it("uses the typed workspace runtime layers for services and owned channels", () => {
+    const client = readFileSync(join(here, "lib", "client.ts"), "utf8");
+    const estate = readFileSync(join(here, "lib", "estate.ts"), "utf8");
+
+    expect(client).toContain("workers.durableObjectService(GRIMOIRE_PROTOCOL, estateKey)");
+    expect(client).not.toContain("workers.resolveService");
+    expect(estate).toContain("workers.createDurableObject(CHANNEL_SOURCE, CHANNEL_CLASS");
+    expect(estate).not.toContain('"runtime.createEntity"');
+  });
+
   it("lays out every region of the valley", async () => {
     const { VALLEY_LAYOUT } = await import("./lib/layout.js");
     const { REGION_ORDER } = await import("@workspace/grimoire-engine");

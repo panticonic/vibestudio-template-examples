@@ -1,9 +1,13 @@
 {
   "name": "@workspace-workers/sample-do",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "dependencies": {
     "@workspace/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
   },
   "vibestudio": {
     "title": "Sample Durable Object",
@@ -19,7 +23,17 @@
     },
     "authority": {
       "provides": [],
-      "requests": []
+      "requests": [
+        {
+          "capability": "context.boundary",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "critical",
+          "evidence": "intentional-broad"
+        }
+      ]
     }
   }
 }

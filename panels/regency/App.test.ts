@@ -52,6 +52,16 @@ describe("Regency panel", () => {
     expect(app).toContain("setStateArgs({ sound: on })");
     expect(app).toContain("<Ending");
   });
+
+  it("uses the typed workspace runtime layers for services and owned channels", () => {
+    const client = readFileSync(resolve(__dirname, "lib", "client.ts"), "utf8");
+    const court = readFileSync(resolve(__dirname, "lib", "court.ts"), "utf8");
+
+    expect(client).toContain("workers.durableObjectService(REGENCY_PROTOCOL, gameKey)");
+    expect(client).not.toContain("workers.resolveService");
+    expect(court).toContain("workers.createDurableObject(CHANNEL_SOURCE, CHANNEL_CLASS");
+    expect(court).not.toContain('"runtime.createEntity"');
+  });
 });
 
 describe("reading the law and the numbers", () => {

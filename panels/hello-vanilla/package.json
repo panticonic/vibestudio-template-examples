@@ -10,10 +10,23 @@
     "template": "vanilla",
     "authority": {
       "provides": [],
-      "requests": []
+      "requests": [
+        {
+          "capability": "context.boundary",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "critical",
+          "evidence": "intentional-broad"
+        }
+      ]
     }
   },
   "dependencies": {
     "@workspace/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
   }
 }

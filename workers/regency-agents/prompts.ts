@@ -39,8 +39,8 @@ const COMMON = `You are a character in Regency, a strategy game played inside th
 Reading the rules and reasoning with code: the engine's source is in this workspace at \`packages/regency-engine/src\` (\`tick.ts\` resolves a season, \`orders.ts\` validates orders, \`laws.ts\` is the edict grammar, \`state.ts\` has the economy formulas, \`crises.ts\` the matters of state). You may \`read\` and \`grep\` it to answer a question exactly. For forecasts, prefer \`forecast_orders\`, which resolves a copy of the season with hypothetical orders; for anything deeper, use \`eval\` — resolve the game service and read the world:
 
 \`\`\`ts
-const svc = await workers.resolveService("examples.regency.v1", "<gameKey>");
-const world = await rpc.call(svc.targetId, "getWorld", []);
+const realm = workers.durableObjectService("examples.regency.v1", "<gameKey>");
+const world = await realm.call("getWorld");
 // world.provinces, world.realms, world.armies … compute what you need and return it
 \`\`\`
 

@@ -4,8 +4,8 @@
  * The world Durable Object (`GrimoireWorldDO`, service `examples.grimoire.v1`,
  * object key = estate key, `main` by default) exposes every method listed in
  * `WorldMethods` as an `@rpc` method taking exactly one input object. Panels
- * call it via `workers.resolveService(GRIMOIRE_PROTOCOL, estateKey)` +
- * `rpc.call(targetId, method, [input])`; agents via
+ * call it via `workers.durableObjectService(GRIMOIRE_PROTOCOL, estateKey)`;
+ * agents use
  * `createDurableObjectServiceClient(this.rpc, GRIMOIRE_PROTOCOL, estateKey)`.
  *
  * Execution model (hybrid, decided 2026-09-04):

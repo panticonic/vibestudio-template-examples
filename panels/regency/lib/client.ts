@@ -2,7 +2,7 @@
  * Thin client for the Regency state service (`examples.regency.v1`).
  * One game per object key; the panel's `stateArgs.gameKey` selects it.
  */
-import { rpc, workers } from "@workspace/runtime";
+import { workers } from "@workspace/runtime";
 import type { Crisis, GameState, Order, RealmId, RegentPromise, StagedIntent } from "@workspace/regency-engine";
 
 export const REGENCY_PROTOCOL = "examples.regency.v1";
@@ -151,20 +151,14 @@ export type SubmitOrderResult =
   | { ok: false; reason: string };
 
 export class GameClient {
-  private targetId: string | null = null;
+  private readonly service;
 
-  constructor(readonly gameKey: string) {}
-
-  private async target(): Promise<string> {
-    if (this.targetId) return this.targetId;
-    const svc = await workers.resolveService(REGENCY_PROTOCOL, this.gameKey);
-    if (svc.kind !== "durable-object") throw new Error("The Regency service is not a Durable Object service.");
-    this.targetId = svc.targetId;
-    return svc.targetId;
+  constructor(readonly gameKey: string) {
+    this.service = workers.durableObjectService(REGENCY_PROTOCOL, gameKey);
   }
 
   async call<T>(method: string, ...args: unknown[]): Promise<T> {
-    return rpc.call<T>(await this.target(), method, args);
+    return this.service.call<T>(method, ...args);
   }
 
   getGame(): Promise<GameView> {
