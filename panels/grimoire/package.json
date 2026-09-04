@@ -7,8 +7,7 @@
   "vibestudio": {
     "title": "Grimoire",
     "icon": "./assets/icon.svg",
-    "entry": "index.ts",
-    "template": "svelte",
+    "entry": "index.tsx",
     "tests": [
       {
         "name": "native",
@@ -99,11 +98,12 @@
   },
   "dependencies": {
     "@workspace/runtime": "workspace:*",
-    "@workspace/svelte": "workspace:*",
+    "@workspace/react": "workspace:*",
     "@workspace/grimoire-engine": "workspace:*",
     "@workspace-skills/agents": "workspace:*",
     "@workspace/pubsub": "workspace:*",
-    "svelte": "^5.56.9"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

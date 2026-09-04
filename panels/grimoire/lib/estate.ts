@@ -8,6 +8,7 @@
 import { contextId as runtimeContextId, openPanel, panelTree, workers } from "@workspace/runtime";
 import { addAgentToChannel } from "@workspace-skills/agents";
 import type { AgentSeatConfig, Participant, SpiritId } from "@workspace/grimoire-engine";
+import { hallChannelKey } from "@workspace/grimoire-engine";
 import type { EstateClient } from "./client.js";
 
 const AGENT_SOURCE = "workers/grimoire-agents";
@@ -150,4 +151,22 @@ export function mintApprenticeId(): string {
   else for (let i = 0; i < 6; i++) bytes[i] = Math.floor(Math.random() * 256);
   for (const b of bytes) s += alphabet[b % alphabet.length];
   return `apprentice-${s}`;
+}
+
+/**
+ * A hall: two or more spirits seated together in one channel so they can
+ * argue in public. The world is told (`convene`) and wakes each of them
+ * with the topic; the player may be admitted by opening the conversation.
+ */
+export async function convene(client: EstateClient, spirits: SpiritId[], topic: string, apprentice: string): Promise<{ ok: boolean; reason?: string; channelId: string }> {
+  const estateKey = client.estateKey;
+  const channelId = hallChannelKey(estateKey, spirits);
+  const participants = await client.call("listParticipants", {}).catch(() => [] as Participant[]);
+  for (const id of spirits) {
+    if (participants.some((p) => p.channelId === channelId && p.role === `spirit:${id}`)) continue;
+    const r = await seat(client, channelId, { role: `spirit:${id}`, estateKey, handle: id, name: SPIRIT_TITLES[id] ?? id, directory: directory(estateKey, apprentice) }, null);
+    if (r.error) return { ok: false, reason: r.error, channelId };
+  }
+  const out = await client.call("convene", { apprentice, spirits, topic, channelId });
+  return { ok: out.ok, reason: out.reason, channelId };
 }

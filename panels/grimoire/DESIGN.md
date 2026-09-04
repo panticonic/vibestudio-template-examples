@@ -10,12 +10,12 @@ repository at `docs/grimoire-design.md`.
 
 ## Four units
 
-| Unit | Kind | Role |
-| --- | --- | --- |
-| `packages/grimoire-engine` | package | Pure and deterministic: 27 regions with elevation, flows and ley lines; the 22-rule reaction table; creatures with legible source; the calendar and festivals; the lexicon as a concept index matched fuzzily in any language; the form gate; spell records and capability gating; the world binding shipped as a prelude; effect validation with ceilings, ether and soft stakes; the letter, the undone list, notebooks, stories, stale workings, seed idioms, the voice bible; news and scrying pages. |
-| `workers/grimoire-world` | Durable Object | `GrimoireWorldDO`, service `examples.grimoire.v1`, one estate per object key. Owns the regions, the sky, every spell record and its writing, persistent wards, automata, charters and workings, the spell cache, inscriptions, bargains, council cards, festivals, the undone list and the news. Runs the tick, evaluates ward triggers without code generation, wakes the agents, and enforces the spell record at commit. |
-| `workers/grimoire-agents` | agent worker | `GrimoireAgentWorker`, a subclass of the default chat agent. One class, every voice: the familiar (two channels, the circle and the study, over one conversation per apprentice), each spirit, the Moor, and chartered golems. The seat comes from the channel subscription config. |
-| `panels/grimoire` | Svelte panel | The valley (an SVG map drawn wrong where the estate is wrong, and a canvas per region), the circle, the study, the grimoire, the spellbook, the scrying page, the chapel, the spirits, the news and the green. Seats the agents on first run. |
+| Unit                       | Kind           | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/grimoire-engine` | package        | Pure and deterministic: 27 regions with elevation, flows and ley lines; the 22-rule reaction table; creatures with legible source; the calendar and festivals; the lexicon as a concept index matched fuzzily in any language; the form gate; spell records and capability gating; the world binding shipped as a prelude; effect validation with ceilings, ether and soft stakes; the letter, the undone list, notebooks, stories, stale workings, seed idioms, the voice bible; news and scrying pages. |
+| `workers/grimoire-world`   | Durable Object | `GrimoireWorldDO`, service `examples.grimoire.v1`, one estate per object key. Owns the regions, the sky, every spell record and its writing, persistent wards, automata, charters and workings, the spell cache, inscriptions, bargains, council cards, festivals, the undone list and the news. Runs the tick, evaluates ward triggers without code generation, wakes the agents, and enforces the spell record at commit.                                                                               |
+| `workers/grimoire-agents`  | agent worker   | `GrimoireAgentWorker`, a subclass of the default chat agent. One class, every voice: the familiar (two channels, the circle and the study, over one conversation per apprentice), each spirit, the Moor, and chartered golems. The seat comes from the channel subscription config.                                                                                                                                                                                                                       |
+| `panels/grimoire`          | React panel    | The valley, the circle, the study, the grimoire, the spellbook, the scrying page, the chapel, the spirits, the news and the green. Seats the agents on first run.                                                                                                                                                                                                                                                                                                                                         |
 
 ## The casting loop
 
@@ -86,5 +86,45 @@ running without error, and the milestones. The world suite drives the first
 hour, a full hear → rehearse → commit → recast cycle, a ward that fires on its
 trigger, releasing Ilvane's ward, seat authentication and the news. The
 agent suite checks seats, tools and the cast path through the sandbox. The
-panel suite compiles every component and checks the valley layout covers all
+panel suite checks the React/runtime contract and that the valley layout covers all
 27 regions.
+
+## The second slate (2026-09-04)
+
+Added after the first live run, to make the world worth looking at and the
+agent visible:
+
+- **The hero valley** (`HeroValley.tsx`): regions drawn as terrain with a
+  texture per kind, a live thumbnail per region from the world's coarse
+  picture (`RegionSummary.thumb`), the river as a ribbon with banks, the wall
+  as stones, the hearth glowing across the manor at night, dawn and dusk
+  washes by hour, awake spirits' wants beside their anchors, golems where
+  they stand.
+- **The trail** (`Trail.tsx`): the world records every stage of the
+  familiar's craft on the spell record (`SpellRecord.trail`: spoken, heard,
+  looked, written, rehearsed, cast, misfired, sealed, fired, promoted) and
+  the circle streams it in the margin. After a cast, scrying is one click
+  away with a teaser of the words heard uncertainly.
+- **Guaranteed first-hour beats**: the second cantrip in the garden misfires
+  into moths whatever the familiar wrote; the first misfire adds "Well." and
+  a one-time scry suggestion to the margin.
+- **The familiar's library** (`Library.tsx`): idioms, seed and learned; the
+  world promotes a spell into the library after three clean firings.
+- **Halls** (`Hall.tsx`, world `convene`): two or three awake spirits seated
+  in one channel and woken to argue about a matter, with the player admitted.
+- **Chartered golems as agents** (`WatchDay.tsx`): the panel seats any golem
+  the world reports as chartered; golems explain themselves on the region
+  canvas and write to the news.
+- **The household** (`Household.tsx`): who is where, and a door to open the
+  estate as another apprentice.
+- **Watch the day**: twenty-four ticks in short steps with the map redrawn
+  between them.
+- **Fonts** (`lib/fonts.ts`): two shipped OFL faces, a serif for the
+  familiar and a script for verse.
+- **The bench** (`workers/grimoire-agents/bench.ts`): reference verses with
+  expected gate, resonance, tier and intent outcomes, plus voice anchors the
+  familiar's prompt must keep.
+
+Two build traps: workerd rejects worker modules that export anything but
+classes, functions and the default handler; and the panel bundler treats
+`url(#id)` in CSS as a dependency, so SVG filters are referenced by attribute.

@@ -410,8 +410,23 @@ function drawEntity(ctx: CanvasRenderingContext2D, e: Entity, px: number, py: nu
     }
     if (s >= 10) {
       ctx.fillStyle = rgba(p.ink, 0.8);
-      ctx.font = `${Math.max(8, s * 0.7)}px "Iowan Old Style", Palatino, Georgia, serif`;
+      ctx.font = `${Math.max(8, s * 0.7)}px "Grimoire Serif", "Iowan Old Style", Palatino, Georgia, serif`;
       ctx.fillText(e.name, px + s * 0.6, py + s * 0.4);
+      // A chartered golem explains itself on the map: its last line in a small bubble.
+      if (e.bound?.mode === "charter" && e.last) {
+        const text = e.last.length > 48 ? e.last.slice(0, 46) + "…" : e.last;
+        ctx.font = `italic ${Math.max(9, s * 0.55)}px "Grimoire Serif", Georgia, serif`;
+        const w = ctx.measureText(text).width + s * 0.6;
+        const bx = px + s * 0.6, by = py - s * 0.9;
+        ctx.fillStyle = rgba(p.paper, 0.92);
+        ctx.strokeStyle = rgba(p.ink, 0.5);
+        ctx.beginPath();
+        ctx.roundRect(bx, by - s * 0.55, w, s * 0.8, s * 0.2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = rgba(p.ink, 0.9);
+        ctx.fillText(text, bx + s * 0.3, by + s * 0.05);
+      }
     }
     return;
   }

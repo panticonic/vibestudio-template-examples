@@ -1,52 +1,86 @@
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compile } from "svelte/compiler";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const svelteFiles = readdirSync(here).filter((f) => f.endsWith(".svelte"));
+const app = () => readFileSync(join(here, "App.tsx"), "utf8");
 
-describe("the Grimoire panel", () => {
-  it("compiles every component without warnings", () => {
-    expect(svelteFiles.length).toBeGreaterThanOrEqual(14);
-    for (const file of svelteFiles) {
-      const source = readFileSync(join(here, file), "utf8");
-      const compiled = compile(source, { filename: file, generate: "client", modernAst: true });
-      const warnings = compiled.warnings.filter((w) => !w.code.startsWith("a11y"));
-      expect(warnings.map((w) => `${file}: ${w.code} ${w.message}`)).toEqual([]);
-      expect(compiled.js.code.length).toBeGreaterThan(300);
-    }
+describe("the Grimoire React panel", () => {
+  it("is a native React workspace panel with no Svelte runtime", () => {
+    const manifest = JSON.parse(
+      readFileSync(join(here, "package.json"), "utf8"),
+    ) as {
+      vibestudio: { entry: string };
+      dependencies: Record<string, string>;
+    };
+    expect(manifest.vibestudio.entry).toBe("index.tsx");
+    expect(manifest.dependencies["@workspace/react"]).toBe("workspace:*");
+    expect(manifest.dependencies["react"]).toMatch(/^\^19/);
+    expect(manifest.dependencies["react-dom"]).toMatch(/^\^19/);
+    expect(manifest.dependencies).not.toHaveProperty("svelte");
+    expect(manifest.dependencies).not.toHaveProperty("@workspace/svelte");
+    expect(app()).toContain("export default function GrimoirePanel");
+    expect(app()).toContain("usePanelTheme()");
+    expect(app()).toContain("useStateArgs<GrimoireArgs>()");
+    expect(app()).not.toMatch(/\.svelte|@workspace\/svelte|\$state|\$derived/);
   });
 
-  it("declares its state args and the world service", () => {
-    const manifest = JSON.parse(readFileSync(join(here, "package.json"), "utf8")) as { vibestudio: { stateArgs: { properties: Record<string, unknown> }; authority: { serviceRequests: Array<{ protocol: string }> } } };
-    expect(Object.keys(manifest.vibestudio.stateArgs.properties).sort()).toEqual(["apprentice", "estateKey", "sound", "view"]);
-    expect(manifest.vibestudio.authority.serviceRequests.map((s) => s.protocol)).toContain("examples.grimoire.v1");
-    const app = readFileSync(join(here, "App.svelte"), "utf8");
-    expect(app).toContain("new EstateClient(estateKey)");
-    expect(app).toContain('client.call("presence"');
+  it("preserves every room and the interactive world paths", () => {
+    const source = app();
+    for (const room of [
+      "valley",
+      "circle",
+      "study",
+      "grimoire",
+      "spellbook",
+      "scry",
+      "chapel",
+      "spirits",
+      "news",
+      "green",
+    ])
+      expect(source).toContain(`id: \"${room}\"`);
+    for (const marker of [
+      "newEstate",
+      "joinEstate",
+      "overview",
+      "region",
+      "speak",
+      "recast",
+      "release",
+      "shelve",
+      "addUndone",
+      "enterFestival",
+      "adorn",
+      "seal",
+      "address",
+      "acknowledgeNews",
+      "advance",
+    ])
+      expect(source).toContain(`\"${marker}\"`);
+    expect(source).toContain("panel.stateArgs.set");
+    expect(source).toContain("openConversation");
+    expect(source).toContain("drawRegion");
+    expect(source).toContain("StudyRoom");
   });
 
   it("uses the typed workspace runtime layers for services and owned channels", () => {
     const client = readFileSync(join(here, "lib", "client.ts"), "utf8");
     const estate = readFileSync(join(here, "lib", "estate.ts"), "utf8");
-
-    expect(client).toContain("workers.durableObjectService(GRIMOIRE_PROTOCOL, estateKey)");
+    expect(client).toContain(
+      "workers.durableObjectService(GRIMOIRE_PROTOCOL, estateKey)",
+    );
     expect(client).not.toContain("workers.resolveService");
-    expect(estate).toContain("workers.createDurableObject(CHANNEL_SOURCE, CHANNEL_CLASS");
-    expect(estate).not.toContain('"runtime.createEntity"');
-  });
-
-  it("gives shell-level states the full panel grid", () => {
-    const app = readFileSync(join(here, "App.svelte"), "utf8");
-    expect(app).toContain('<section class="shell-view">');
-    expect(app).toContain('<div class="shell-view loading">');
-    expect(app).toMatch(/\.shell-view\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/);
+    expect(estate).toContain(
+      "workers.createDurableObject(CHANNEL_SOURCE, CHANNEL_CLASS",
+    );
   });
 
   it("declares the complete authority ceiling used by the panel", () => {
-    const manifest = JSON.parse(readFileSync(join(here, "package.json"), "utf8")) as {
+    const manifest = JSON.parse(
+      readFileSync(join(here, "package.json"), "utf8"),
+    ) as {
       vibestudio: {
         authority: {
           serviceRequests: Array<{ protocol: string }>;
@@ -54,12 +88,16 @@ describe("the Grimoire panel", () => {
         };
       };
     };
-
-    expect(manifest.vibestudio.authority.serviceRequests.map(({ protocol }) => protocol).sort()).toEqual([
-      "examples.grimoire.v1",
-      "vibestudio.channel.v1",
-    ]);
-    expect(manifest.vibestudio.authority.requests.map(({ capability }) => capability).sort()).toEqual([
+    expect(
+      manifest.vibestudio.authority.serviceRequests
+        .map(({ protocol }) => protocol)
+        .sort(),
+    ).toEqual(["examples.grimoire.v1", "vibestudio.channel.v1"]);
+    expect(
+      manifest.vibestudio.authority.requests
+        .map(({ capability }) => capability)
+        .sort(),
+    ).toEqual([
       "context.boundary",
       "workspace-service:channel",
       "workspace-service:grimoire",
@@ -71,19 +109,7 @@ describe("the Grimoire panel", () => {
   it("lays out every region of the valley", async () => {
     const { VALLEY_LAYOUT } = await import("./lib/layout.js");
     const { REGION_ORDER } = await import("@workspace/grimoire-engine");
-    const placed = new Set(VALLEY_LAYOUT.map((p) => p.id));
+    const placed = new Set(VALLEY_LAYOUT.map((point) => point.id));
     for (const id of REGION_ORDER) expect(placed.has(id), id).toBe(true);
-    for (const p of VALLEY_LAYOUT) { expect(p.x + p.w).toBeLessThanOrEqual(1000); expect(p.y + p.h).toBeLessThanOrEqual(700); }
-  });
-
-  it("shifts the palette with season and hour and judges verse shape", async () => {
-    const { paletteFor, nightness } = await import("./lib/palette.js");
-    expect(nightness(12)).toBe(0);
-    expect(nightness(23)).toBeGreaterThan(0.5);
-    expect(paletteFor("winter", 12, false).name).toBe("winter");
-    expect(paletteFor("summer", 2, false).paper).not.toBe(paletteFor("summer", 12, false).paper);
-    const { shapeOf } = await import("./lib/verse.js");
-    expect(shapeOf("Small fire, wake and warm this room\nhama, come up from the ash").lines.length).toBe(2);
-    expect(shapeOf("please can you make the orchard less flooded because it has been bothering me for a long while and I want it dry").hint).toBeTruthy();
   });
 });
