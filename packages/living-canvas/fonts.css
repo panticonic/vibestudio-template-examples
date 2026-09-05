@@ -1,0 +1,11 @@
+@font-face {
+  font-family: Storybook;
+  src: url("./assets/KaTeX_Main-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: Storybook;
+  src: url("./assets/KaTeX_Main-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-display: swap;
+}

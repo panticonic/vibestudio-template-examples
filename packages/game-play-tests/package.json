@@ -1,0 +1,16 @@
+{
+  "name": "@workspace/game-play-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Native play-throughs of the example games using their real agents.",
+  "exports": {
+    ".": "./index.ts",
+    "./grimoire": "./grimoire.ts",
+    "./regency": "./regency.ts",
+    "./grimoire-art": "./grimoire-art.ts"
+  },
+  "dependencies": {
+    "@workspace/testkit": "workspace:*"
+  }
+}

@@ -1,24 +1,86 @@
-/**
- * Thin typed client for the world service (`examples.grimoire.v1`).
- * One estate per object key; the panel's `stateArgs.estateKey` selects it.
- */
-import { workers } from "@workspace/runtime";
-import type { WorldIn, WorldMethodName, WorldOut } from "@workspace/grimoire-engine";
-
-export const GRIMOIRE_PROTOCOL = "examples.grimoire.v1";
-
-export class EstateClient {
-  private readonly service;
-
-  constructor(readonly estateKey: string) {
-    this.service = workers.durableObjectService(GRIMOIRE_PROTOCOL, estateKey);
+import type { Artworks } from "@workspace/living-canvas";
+import { contextId, rpc, workers } from "@workspace/runtime";
+import { addAgentToChannel } from "@workspace-skills/agents";
+import { waitForApprovalResolution } from "@workspace/pubsub";
+import type { Game } from "@workspace/grimoire-engine";
+export type View = {
+  game: Game;
+  garden: Game["life"]["garden"];
+  notice: string;
+  artworks: Artworks;
+  seated: boolean;
+  pending: {
+    id: string;
+    wish: string;
+    started: number;
+    attempt: number;
+    error: string | null;
+    reply: string;
+  } | null;
+};
+export class StoryClient {
+  private service;
+  private artKey = "";
+  private artworks: Artworks = {};
+  private async withArt(view: View) {
+    const ids = view.game.scene.assets ?? [],
+      key = JSON.stringify(ids);
+    if (key !== this.artKey) {
+      this.artworks = ids.length
+        ? await this.service.call<Artworks>("getArt", { ids })
+        : {};
+      this.artKey = key;
+    }
+    return { ...view, artworks: this.artworks };
   }
-
-  async call<M extends WorldMethodName>(method: M, input: WorldIn<M>): Promise<WorldOut<M>> {
-    return this.service.call<WorldOut<M>>(method, input);
+  constructor(readonly key: string) {
+    this.service = workers.durableObjectService("examples.grimoire.v1", key);
   }
-}
-
-export function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  async get() {
+    return this.withArt(await this.service.call<View>("getGame"));
+  }
+  linger(id: string) {
+    return this.service.call("linger", { id }).then(() => this.get());
+  }
+  visit(residentId: string) {
+    return this.service.call("visit", { residentId }).then(() => this.get());
+  }
+  play(id: string, wish: string) {
+    return this.service.call<View>("play", { id, wish }).then(() => this.get());
+  }
+  retry() {
+    return this.service.call<View>("retry").then(() => this.get());
+  }
+  cancel() {
+    return this.service.call<View>("cancel").then(() => this.get());
+  }
+  async seat() {
+    if (!contextId) throw new Error("This game needs a workspace context.");
+    for (const role of ["wild", "moth"]) {
+      const channelId = `grimoire-story-${this.key}-${role}`;
+      const seat = await addAgentToChannel({
+        source: "workers/grimoire-agents",
+        className: "GrimoireAgentWorker",
+        handle: role,
+        name: role === "moth" ? "Moth" : "The wild",
+        channelId,
+        contextId,
+        replay: false,
+        config: {
+          role,
+          gameKey: this.key,
+          wakePolicy: "manual",
+          thinkingLevel: "low",
+        },
+        waitForReview: (id) => waitForApprovalResolution(rpc, id),
+      });
+      if (!seat.ok || !seat.targetId)
+        throw new Error("Your storyteller could not arrive. Please try again.");
+      await this.service.call("registerParticipant", {
+        targetId: seat.targetId,
+        channelId,
+        role,
+      });
+    }
+  }
 }

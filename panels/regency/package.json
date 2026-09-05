@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Regency: rule a realm through a council of agents, treat with rival sovereigns and their ambassadors, and watch the map change season by season.",
+  "description": "Rule a living realm through conversation with independent advisors, executable policies and an evolving illustrated map.",
   "vibestudio": {
     "title": "Regency",
     "icon": "./assets/icon.svg",
@@ -21,21 +21,6 @@
       "type": "object",
       "properties": {
         "gameKey": {
-          "type": "string"
-        },
-        "sound": {
-          "type": "boolean"
-        },
-        "version": {
-          "type": "number"
-        },
-        "surface": {
-          "type": "string"
-        },
-        "subjectKind": {
-          "type": "string"
-        },
-        "subjectId": {
           "type": "string"
         }
       },
@@ -112,15 +97,14 @@
     }
   },
   "dependencies": {
-    "@radix-ui/react-icons": "^1.3.2",
-    "@radix-ui/themes": "^3.3.0",
     "@workspace/runtime": "workspace:*",
     "@workspace/react": "workspace:*",
     "@workspace/regency-engine": "workspace:*",
     "@workspace-skills/agents": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@workspace/pubsub": "workspace:*"
+    "@workspace/pubsub": "workspace:*",
+    "@workspace/living-canvas": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

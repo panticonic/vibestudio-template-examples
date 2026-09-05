@@ -1,0 +1,21 @@
+{
+  "name": "@workspace/living-canvas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/SceneCanvas.tsx",
+    "./image-tool": "./src/image-tool.ts",
+    "./fonts.css": "./fonts.css",
+    "./execution": "./src/execution.ts"
+  },
+  "dependencies": {
+    "zod": "^3.25.76",
+    "acorn": "^8.18.0",
+    "react": "^19.0.0",
+    "@workspace/pi-core": "workspace:*",
+    "react-markdown": "^9.1.0",
+    "@vibestudio/service-schemas": "workspace:*"
+  }
+}

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The voices of the Grimoire estate: the familiar who carries verse into code, the spirits bound to the valley's features, the Moor beyond the wall, and chartered golems.",
+  "description": "A persistent enchanted garden, interpreted by Moth the familiar.",
   "vibestudio": {
     "icon": "./assets/icon.svg",
     "entry": "index.ts",
@@ -24,8 +24,8 @@
       ]
     },
     "agent": {
-      "displayName": "Grimoire Familiar",
-      "description": "Familiar, spirit, golem or the Moor in a game of Grimoire"
+      "displayName": "Moth",
+      "description": "A persistent enchanted garden, interpreted by Moth the familiar."
     },
     "exposeModules": [
       "@workspace/runtime",
@@ -278,8 +278,6 @@
     }
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.27.12",
-    "@vibestudio/service-schemas": "workspace:*",
     "@workspace/agentic-core": "workspace:*",
     "@workspace/agentic-do": "workspace:*",
     "@workspace/grimoire-engine": "workspace:*",
@@ -288,7 +286,8 @@
     "@workspace/pubsub": "workspace:*",
     "@workspace/runtime": "workspace:*",
     "@workspace-workers/agent-worker": "workspace:*",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "@workspace/living-canvas": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

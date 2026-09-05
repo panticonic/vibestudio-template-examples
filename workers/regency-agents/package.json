@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Chat agents that sit at the courts of the Regency example: the Regent's council, rival sovereigns and their ambassadors.",
+  "description": "A living realm with independent advisors, executable policies and persistent consequences.",
   "vibestudio": {
     "icon": "./assets/icon.svg",
     "entry": "index.ts",
@@ -24,8 +24,8 @@
       ]
     },
     "agent": {
-      "displayName": "Regency Courtier",
-      "description": "Minister, sovereign or ambassador in a game of Regency"
+      "displayName": "Willowmere residents",
+      "description": "A living realm with independent advisors, executable policies and persistent consequences."
     },
     "exposeModules": [
       "@workspace/runtime",
@@ -278,7 +278,6 @@
     }
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.27.12",
     "@workspace-workers/agent-worker": "workspace:*",
     "@workspace/agentic-core": "workspace:*",
     "@workspace/agentic-do": "workspace:*",
@@ -287,7 +286,8 @@
     "@workspace/pubsub": "workspace:*",
     "@workspace/regency-engine": "workspace:*",
     "@workspace/runtime": "workspace:*",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "@workspace/living-canvas": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

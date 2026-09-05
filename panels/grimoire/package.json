@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Grimoire: inherit a dead sorcerer's estate, speak verse in the circle, and watch your familiar turn it into the writing under the words. The valley, the study, the spellbook, the scrying page, the spirits and the estate's news.",
+  "description": "An enchanted garden that answers ordinary wishes through a familiar agent.",
   "vibestudio": {
     "title": "Grimoire",
     "icon": "./assets/icon.svg",
@@ -22,33 +22,6 @@
       "properties": {
         "estateKey": {
           "type": "string"
-        },
-        "apprentice": {
-          "type": "string"
-        },
-        "sound": {
-          "type": "boolean"
-        },
-        "version": {
-          "type": "number"
-        },
-        "surface": {
-          "type": "string"
-        },
-        "subjectKind": {
-          "type": "string"
-        },
-        "subjectId": {
-          "type": "string"
-        },
-        "region": {
-          "type": "string"
-        },
-        "x": {
-          "type": "number"
-        },
-        "y": {
-          "type": "number"
         }
       },
       "additionalProperties": false
@@ -130,7 +103,8 @@
     "@workspace-skills/agents": "workspace:*",
     "@workspace/pubsub": "workspace:*",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@workspace/living-canvas": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

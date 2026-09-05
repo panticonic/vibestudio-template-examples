@@ -1,8 +1,10 @@
 systemEpoch: 0
 template:
   name: Examples
-  description: Sample panels and workers for learning and experimentation, including Regency, a strategy game whose council and rival courts are workspace agents, and Grimoire, a game where verse becomes code and a familiar agent carries it into a living valley.
+  description: Agent-driven playable examples. Grimoire is an enchanted garden that answers your wishes; Regency is a conversational strategy game where independent advisors author executable policy for a living realm.
   repositories:
+    - packages/living-canvas
+    - packages/game-play-tests
     - packages/grimoire-engine
     - packages/regency-engine
     - panels/grimoire
@@ -26,7 +28,7 @@ services:
     name: regency
     title: Regency game
     action: read and change the state of a Regency game
-    description: Holds the world, orders and season clock of the Regency strategy game so its panel and agents share one truth.
+    description: Holds the realm, advisor memories, executable policies and observed consequences behind Regency’s living illustration.
     notability: everyday
     presentation:
       domain: automation
@@ -35,6 +37,7 @@ services:
       - examples.regency.v1
     authority:
       principals:
+        - host
         - user
         - code
       binding:
@@ -47,7 +50,7 @@ services:
     name: grimoire
     title: Grimoire estate
     action: read and change the state of a Grimoire estate
-    description: Holds the valley, the sky, every spell and its writing, the wards and bindings, the spirits and the news of the Grimoire game so its panel and agents share one truth.
+    description: Holds the enchanted garden, wishes and their visible consequences so Moth and the player share one truth.
     notability: everyday
     presentation:
       domain: automation

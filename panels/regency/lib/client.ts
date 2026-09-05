@@ -1,338 +1,98 @@
-/**
- * Thin client for the Regency state service (`examples.regency.v1`).
- * One game per object key; the panel's `stateArgs.gameKey` selects it.
- */
-import { workers } from "@workspace/runtime";
-import type {
-  Crisis,
-  GameState,
-  Order,
-  RealmId,
-  RegentPromise,
-  StagedIntent,
-  RegencyAttentionItem,
-  SeasonReadiness,
-} from "@workspace/regency-engine";
-
-export const REGENCY_PROTOCOL = "examples.regency.v1";
-
-export type MandateLevel = "advise" | "act" | "plenary";
-export type OrderStatus =
-  | "pending"
-  | "awaiting_seal"
-  | "vetoed"
-  | "withdrawn"
-  | "resolved"
-  | "rejected";
-
-export interface OrderRow {
-  id: string;
-  season: number;
-  realm: RealmId;
-  actor: string;
-  order: Order;
-  rationale: string;
-  status: OrderStatus;
-  reason: string | null;
-  submittedAt: string;
-}
-
-export interface Participant {
-  role: string;
-  realm: RealmId;
-  channelId: string;
-  participantId: string;
-  targetId: string;
-  handle: string;
-  name: string;
-  kind?: "court" | "chambers";
-}
-
-export interface Briefing {
-  id: string;
-  season: number;
-  role: string;
-  targetId: string;
-  channelId: string;
-  content: string;
-  status: "pending" | "delivered" | "failed";
-  error: string | null;
-  attempts: number;
-}
-
-export interface EventRow {
-  seq: number;
-  season: number;
-  kind: string;
-  text: string;
-  realms: RealmId[];
-  province?: string;
-  data?: Record<string, unknown>;
-}
-
-export interface ProtectorLimits {
-  maySealWar: boolean;
-  maySealLaws: boolean;
-  maySealTreaties: boolean;
-  mayDecideCrises: boolean;
-  mayCloseSeason: boolean;
-}
-
-export interface Protectorate {
-  active: boolean;
-  mandate: string;
-  seasonsLeft: number;
-  limits: ProtectorLimits;
-  startedSeason: number;
-}
-
-export interface Bribe {
-  id: string;
-  season: number;
-  fromRealm: RealmId;
-  targetRole: string;
-  gold: number;
-  note: string;
-  status: "pending" | "accepted" | "reported" | "expired";
-  untilSeason: number | null;
-}
-
-export interface Debate {
-  id: string;
-  season: number;
-  question: string;
-  openedBy: string;
-  status: "open" | "closed";
-  lines: Array<{ role: string; name: string; text: string }>;
-}
-
-export interface ChronicleEntry {
-  year: number;
-  season: number;
-  text: string;
-}
-
-export interface Handover {
-  id: string;
-  season: number;
-  mandate: string;
-  text: string;
-}
-
-export interface SecretHistory {
-  bribes: Bribe[];
-  dossiers: Array<{ role: string; text: string }>;
-  doctrines: Array<{ realm: RealmId; text: string; season: number }>;
-  promises: RegentPromise[];
-  diaries: Array<{ realm: RealmId; text: string }>;
-  chambers: Array<{ role: string; channelId: string }>;
-}
-
-export interface GameView {
-  state: GameState | null;
-  participants: Participant[];
-  mandates: Record<string, MandateLevel>;
-  orders: OrderRow[];
-  events: EventRow[];
-  briefings: Briefing[];
-  waitingFor: RealmId[];
-  snapshots: number[];
-  protectorate: Protectorate | null;
-  bribes: Bribe[];
-  dossiers: Array<{ role: string; text: string }>;
-  doctrines: Array<{ realm: RealmId; text: string; season: number }>;
-  intents: StagedIntent[];
-  promises: RegentPromise[];
-  debates: Debate[];
-  chronicles: ChronicleEntry[];
-  handovers: Handover[];
-  secrets: SecretHistory | null;
-  readiness: SeasonReadiness | null;
-  attention: RegencyAttentionItem[];
-}
-
-export interface Forecast {
-  season: string;
-  treasury: { before: number; after: number };
-  legitimacy: { before: number; after: number };
-  estates: Record<string, number>;
-  provinces: { before: number; after: number };
-  wars: string[];
-  events: string[];
-  rejected: string[];
-  assumption: string;
-}
-
-export type SubmitOrderResult =
-  | {
-      ok: true;
-      orderId: string;
-      status: OrderStatus;
-      summary: string;
-      needsSeal: boolean;
+import type { Artworks } from "@workspace/living-canvas";
+import { contextId, rpc, workers } from "@workspace/runtime";
+import { addAgentToChannel } from "@workspace-skills/agents";
+import { waitForApprovalResolution } from "@workspace/pubsub";
+import type { Game } from "@workspace/regency-engine";
+export type View = {
+  game: Game;
+  painting: boolean;
+  artworks: Artworks;
+  seated: boolean;
+  neededSeats: Array<{ role: string; name: string }>;
+  pending: {
+    id: string;
+    wish: string;
+    started: number;
+    attempt: number;
+    error: string | null;
+    world: unknown | null;
+    cast: Array<{ id: string; name: string }>;
+    audience: string[];
+    voices: Record<string, { text: string }>;
+  } | null;
+};
+export class StoryClient {
+  private service;
+  private artKey = "";
+  private artworks: Artworks = {};
+  private async withArt(view: View) {
+    const ids = view.game.scene.assets ?? [],
+      key = JSON.stringify(ids);
+    if (key !== this.artKey) {
+      this.artworks = ids.length
+        ? await this.service.call<Artworks>("getArt", { ids })
+        : {};
+      this.artKey = key;
     }
-  | { ok: false; reason: string };
-
-export class GameClient {
-  private readonly service;
-
-  constructor(readonly gameKey: string) {
-    this.service = workers.durableObjectService(REGENCY_PROTOCOL, gameKey);
+    return { ...view, artworks: this.artworks };
   }
-
-  async call<T>(method: string, ...args: unknown[]): Promise<T> {
-    return this.service.call<T>(method, ...args);
+  constructor(readonly key: string) {
+    this.service = workers.durableObjectService("examples.regency.v1", key);
   }
-
-  getGame(): Promise<GameView> {
-    return this.call<GameView>("getGame");
+  async get() {
+    let view = await this.service.call<View>("getGame");
+    for (const seat of view.neededSeats)
+      await this.seatRole(seat.role, seat.name);
+    if (view.neededSeats.length)
+      view = await this.service.call<View>("getGame");
+    return this.withArt(view);
   }
-
-  attention(): Promise<RegencyAttentionItem[]> {
-    return this.call("attention");
+  advance(id: string, months: number) {
+    return this.service.call("advance", { id, months }).then(() => this.get());
   }
-
-  getSnapshot(season: number): Promise<GameState | null> {
-    return this.call("getSnapshot", { season });
+  enact(id: string, proposalId: string) {
+    return this.service
+      .call("enact", { id, proposalId })
+      .then(() => this.get());
   }
-
-  newGame(input: {
-    seed: string;
-    realmName: string;
-    rivals: number;
-    regencySeasons?: number;
-    scenario: "long" | "winter";
-    regentName?: string;
-  }): Promise<{ title: string }> {
-    return this.call("newGame", input);
+  play(id: string, wish: string) {
+    return this.service.call<View>("play", { id, wish }).then(() => this.get());
   }
-
-  submitOrder(input: {
-    realm: RealmId;
-    actor: string;
-    order: Order;
-    rationale?: string;
-  }): Promise<SubmitOrderResult> {
-    return this.call("submitOrder", input);
+  retry() {
+    return this.service.call<View>("retry").then(() => this.get());
   }
-
-  sealOrder(
-    orderId: string,
-    decision: "seal" | "veto",
-    note?: string,
-  ): Promise<{ ok: boolean; reason?: string }> {
-    return this.call("sealOrder", { orderId, decision, note });
+  cancel() {
+    return this.service.call<View>("cancel").then(() => this.get());
   }
-
-  decideCrisis(
-    crisisId: string,
-    optionId: string,
-    note?: string,
-  ): Promise<{ ok: boolean; reason?: string; crisis?: Crisis }> {
-    return this.call("decideCrisis", { crisisId, optionId, note });
+  async seat() {
+    if (!contextId) throw new Error("This game needs a workspace context.");
+    for (const role of ["storyteller"])
+      await this.seatRole(role, "The scene artist");
   }
-
-  forecast(input: {
-    orders?: Order[];
-    includeOrderIds?: string[];
-  }): Promise<Forecast> {
-    return this.call("forecast", input);
-  }
-
-  setMandate(
-    role: string,
-    level: MandateLevel,
-  ): Promise<Record<string, MandateLevel>> {
-    return this.call("setMandate", { role, level });
-  }
-
-  closeSeason(): Promise<{
-    resolved: boolean;
-    waitingFor: RealmId[];
-    season: string;
-  }> {
-    return this.call("closeSeason");
-  }
-
-  proceedWithoutPending(): Promise<{
-    resolved: boolean;
-    stewarded: RealmId[];
-    season: string;
-  }> {
-    return this.call("proceedWithoutPending");
-  }
-
-  redeliverBriefings(): Promise<{ delivered: number; failed: number }> {
-    return this.call("redeliverBriefings");
-  }
-
-  registerParticipant(p: Participant): Promise<Participant[]> {
-    return this.call("registerParticipant", p);
-  }
-
-  openCourt(): Promise<{ delivered: number; failed: number }> {
-    return this.call("openCourt");
-  }
-
-  appointProtector(input: {
-    mandate: string;
-    seasons: number;
-    limits: Partial<ProtectorLimits>;
-  }): Promise<Protectorate> {
-    return this.call("appointProtector", input);
-  }
-
-  dismissProtector(): Promise<Protectorate | null> {
-    return this.call("dismissProtector");
-  }
-
-  dismissAttention(key: string): Promise<{ ok: true }> {
-    return this.call("dismissAttention", { key });
-  }
-
-  /** The Regent puts a question to the whole council; every seated minister answers on the record. */
-  convene(question: string): Promise<{
-    ok: boolean;
-    reason?: string;
-    debateId?: string;
-    asked?: string[];
-  }> {
-    return this.call("convene", { actor: "regent", question });
-  }
-
-  closeDebate(debateId: string): Promise<{ ok: boolean; reason?: string }> {
-    return this.call("closeDebate", { debateId });
-  }
-
-  settlePromise(
-    promiseId: string,
-    status: "kept" | "broken",
-  ): Promise<{ ok: boolean; reason?: string }> {
-    return this.call("settlePromise", { promiseId, status });
-  }
-
-  clearIntent(
-    actor: string,
-    intentId?: string,
-  ): Promise<{ ok: boolean; cleared: number }> {
-    return this.call("clearIntent", {
-      actor,
-      ...(intentId ? { intentId } : {}),
+  private async seatRole(role: string, name: string) {
+    const channelId = `regency-story-${this.key}-${role}`;
+    const seat = await addAgentToChannel({
+      source: "workers/regency-agents",
+      className: "RegencyAgentWorker",
+      handle: role.replace(":", "-"),
+      name,
+      channelId,
+      contextId,
+      replay: false,
+      config: {
+        gameKey: this.key,
+        role,
+        wakePolicy: "manual",
+        thinkingLevel: "low",
+      },
+      waitForReview: (id) => waitForApprovalResolution(rpc, id),
     });
-  }
-
-  renameArmy(
-    army: string,
-    name: string,
-  ): Promise<{ ok: boolean; reason?: string; name?: string }> {
-    return this.call("renameArmy", { actor: "regent", army, name });
-  }
-
-  report(input: {
-    kind: "realm" | "province" | "map" | "chronicle" | "rules";
-    realm?: string;
-    province?: string;
-  }): Promise<string> {
-    return this.call("report", input);
+    if (!seat.ok || !seat.targetId)
+      throw new Error("Your storyteller could not arrive. Please try again.");
+    await this.service.call("registerParticipant", {
+      targetId: seat.targetId,
+      channelId,
+      role,
+    });
   }
 }

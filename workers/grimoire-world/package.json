@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The valley of Grimoire: one Durable Object per estate holding the regions, the sky, every spell record and its writing, the persistent wards and bindings, the spirits' wants, the council, the undone list and the news.",
+  "description": "A persistent enchanted garden, interpreted by Moth the familiar.",
   "dependencies": {
-    "@vibestudio/service-schemas": "workspace:*",
     "@workspace/runtime": "workspace:*",
-    "@workspace/grimoire-engine": "workspace:*"
+    "@workspace/grimoire-engine": "workspace:*",
+    "acorn": "^8.14.0",
+    "@workspace/living-canvas": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

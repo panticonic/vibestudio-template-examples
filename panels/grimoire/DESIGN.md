@@ -1,130 +1,70 @@
-# Grimoire — how it is built
+# Grimoire — some things grow when we talk
 
-Grimoire is a game built natively on the Vibestudio workspace. You inherit a
-dead sorcerer's estate. The magic is still running and nobody turned it off.
-You cannot ask for what you want; you can only speak verse in the circle, and
-your familiar, a workspace agent, carries the verse down into the deep tongue,
-which is code, and the valley does what was written. The full design, with the
-world, the lexicon, the campaign and the familiar's craft, is in the host
-repository at `docs/grimoire-design.md`.
+The player befriends a small world through conversation with Moth. They can invent
+anything, but delight comes from what persists: a hesitant lantern snail chooses a
+home the player made, familiar creatures recognise a returning hand, and an ordinary
+patch of ground becomes a place with shared memories. There is no spell grammar,
+inventory, quest queue, offline decay or punishment for absence.
 
-## Four units
+Talk to Moth, touch a creature, or linger. These are the whole opening interface.
+Sol wants a damp, sheltered place beside the stream. The player can care for him,
+ask about his world, or go somewhere completely different. The opening situation
+is an invitation, not a required task.
 
-| Unit                       | Kind           | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| -------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/grimoire-engine` | package        | Pure and deterministic: 27 regions with elevation, flows and ley lines; the 22-rule reaction table; creatures with legible source; the calendar and festivals; the lexicon as a concept index matched fuzzily in any language; the form gate; spell records and capability gating; the world binding shipped as a prelude; effect validation with ceilings, ether and soft stakes; the letter, the undone list, notebooks, stories, stale workings, seed idioms, the voice bible; news and scrying pages. |
-| `workers/grimoire-world`   | Durable Object | `GrimoireWorldDO`, service `examples.grimoire.v1`, one estate per object key. Owns the regions, the sky, every spell record and its writing, persistent wards, automata, charters and workings, the spell cache, inscriptions, bargains, council cards, festivals, the undone list and the news. Runs the tick, evaluates ward triggers without code generation, wakes the agents, and enforces the spell record at commit.                                                                               |
-| `workers/grimoire-agents`  | agent worker   | `GrimoireAgentWorker`, a subclass of the default chat agent. One class, every voice: the familiar (two channels, the circle and the study, over one conversation per apprentice), each spirit, the Moor, and chartered golems. The seat comes from the channel subscription config.                                                                                                                                                                                                                       |
-| `panels/grimoire`          | React panel    | The valley, the circle, the study, the grimoire, the spellbook, the scrying page, the chapel, the spirits, the news and the green. Seats the agents on first run.                                                                                                                                                                                                                                                                                                                                         |
+## Public life and private perspectives
 
-## The casting loop
+The garden persists habitats, residents, preferences, weather, discoveries and
+executable enchantments. Resident forms and traits are open vocabulary. Needs are
+minimum comforts; extra shelter is welcome. Shared ecological time handles gentle
+water and flower growth, choosing comfortable homes, settling and recognition.
+Repeated tapping does not accumulate affection within the same day.
 
-1. The player speaks in the circle. The world runs the **form gate**
-   (deterministic, cheap: shape, never vocabulary). Prose gets one warm line
-   from the familiar's voice bible; three in a row open the study.
-2. The first verse-shaped speech lights the hearth, because the Hearth is
-   kind; the world does that itself and grants the eight elements and two
-   verbs.
-3. The **spell cache**: a verse the player has cast before, or a variation
-   with one name or number swapped, reuses its writing with no model turn.
-   The world runs the stored source in its own sandbox and commits.
-4. Otherwise the lexicon **resonates** the verse into concepts, the world
-   mints a **spell record** (caster, concepts earned, tier guess, ether
-   budget, scope) and wakes the familiar with a verse wake.
-5. The familiar stages the turn with typed tools: `hear` (the intent record,
-   checked against the record), `look`/`read_cells` (never writes from the
-   verse alone), `rehearse` (runs its writing in its own eval sandbox against
-   a fork), `cast` (runs it against the live snapshot and submits the batch),
-   or `misfire` / `reject` with closed reasons.
-6. The world validates every effect at `commit`: capabilities earned by the
-   verse, the tier's rehearsal rule and effect ceiling, ether charged per
-   receipt, soft stakes. Persistent tiers install their source; the world
-   re-runs it on its trigger from then on. Council-required workings become a
-   card in the chapel and cast when sealed.
-7. The valley changes, the spell joins the spellbook, and the player may scry.
+Moth handles the foreground conversation and can acknowledge the player immediately.
+`weave` executes ordinary JavaScript against the pending garden in a finite native
+EvalDO without external capabilities. A creation can add a habitat or inhabitant,
+change existing relationships and resources, or install a recurring rule receiving
+`garden`, its private `state`, and `events`. Linger runs those rules before shared
+life. Validation and revision checks precede a durable commit.
 
-## Execution model
+The wild is a separate background agent, with private desires and memories for
+inhabitants and unresolved mysteries. It observes the committed world and gives
+Moth a manifestation, rather than exposing private thoughts. It cannot overwrite
+public changes or block a conversation. Stale background results are discarded.
 
-Both the familiar and the world run spell source through the same program:
-`composeProgram(source, snapshot)` from the engine wraps the binding prelude
-(the `makeWorld` function serialised as text) around the writing, so scrying
-shows one kind of record no matter who ran it.
+## A world made of code
 
-- The familiar runs its writing in **its own** eval sandbox through the
-  workspace's eval service, against a `Snapshot` it fetched from the world,
-  and submits the resulting effect batch. This is the demo moment: an agent
-  writing real code and running it with the same eval every agent has.
-- The world runs **unattended** source (ward firings, automata, working
-  continuations, spirits' acts, the Moor) through the eval service in its own
-  sandbox. Tests inject a local executor.
-- Ward cell predicates are evaluated by a tiny expression evaluator, because
-  workerd forbids code generation outside the sandbox.
+The entire opening illustration is ordinary editable Canvas code. Agents author
+`paint(ctx, art, time, pointer, memory)` in a 1200 by 760 coordinate space.
+`art.world` is the current public garden on every frame; updating life does not
+reload the drawing. The library supplies optional shapes, plants, lighting, texture,
+randomness and motion. It is not an entity registry. Ladybugs can have their own
+wing cases, spots, legs and behaviour, rather than becoming a substitute effect.
 
-## Time
+Code executes in a dedicated worker inside an opaque-origin, networkless iframe.
+Only pixels return; a watchdog stops stalled rendering and offers repair. Reduced
+motion freezes animation while preserving interaction. Resident inspection is a
+transparent target, so controls do not cover the creature's face. Discoveries
+remain available as keepsakes, including older ones.
 
-The world advances by ticks it owns: a cast, a firing, "let the day pass" in
-the panel, and, while someone is present, a slow idle cadence driven by the
-server's alarm driver. No spell can observe that cadence, and nothing in the
-game is a timeout. Wakes to agents are durable rows delivered by RPC with a
-steering id, so redelivery is a no-op and failures are retried by
-`redeliver`.
+The native painter is exposed for occasional memorable places or keepsakes. Reuse
+images and compose motion over them; do not regenerate art for ordinary conversation.
+Game artwork bytes use the host blob store; SQLite stores only references.
 
-## Testing
+## Persistence and evidence
 
-From the host checkout, with the units copied into the Base checkout:
+Schema version 4 starts the `living_garden` format separately from retired demo
+saves. Pending enchantments commit with Moth's completed turn. Linger is an atomic,
+idempotent player action; background interpretation comes afterward. Roles are
+authenticated, retries keep command identity, and canceled work cannot commit later.
 
-```
-node node_modules/vitest/vitest.mjs run --config vitest.userland.config.ts packages/grimoire-engine workers/grimoire-world workers/grimoire-agents panels/grimoire
-node node_modules/tsx/dist/cli.mjs scripts/type-check-userland.ts
-```
+Focused tests cover ecology, recognition, arbitrary forms, generated code, ownership,
+idempotency and background supersession. The real `testkit:grimoire-play` scenario
+asks for a shelter and ladybugs, lingers, checks Sol's discovery and verifies mobile
+layout. A successful renderer alone is not evidence that the creation is delightful;
+inspect the resulting inhabitants and picture too.
 
-The engine suite covers generation determinism, the calendar, the orchard's
-flood and drain, soft stakes under the Moor, the gate corpus, resonance in
-several languages, cache matching, the binding round trip through the shipped
-prelude, ceilings and ether at commit, every stale working and seed idiom
-running without error, and the milestones. The world suite drives the first
-hour, a full hear → rehearse → commit → recast cycle, a ward that fires on its
-trigger, releasing Ilvane's ward, seat authentication and the news. The
-agent suite checks seats, tools and the cast path through the sandbox. The
-panel suite checks the React/runtime contract and that the valley layout covers all
-27 regions.
-
-## The second slate (2026-09-04)
-
-Added after the first live run, to make the world worth looking at and the
-agent visible:
-
-- **The hero valley** (`HeroValley.tsx`): regions drawn as terrain with a
-  texture per kind, a live thumbnail per region from the world's coarse
-  picture (`RegionSummary.thumb`), the river as a ribbon with banks, the wall
-  as stones, the hearth glowing across the manor at night, dawn and dusk
-  washes by hour, awake spirits' wants beside their anchors, golems where
-  they stand.
-- **The trail** (`Trail.tsx`): the world records every stage of the
-  familiar's craft on the spell record (`SpellRecord.trail`: spoken, heard,
-  looked, written, rehearsed, cast, misfired, sealed, fired, promoted) and
-  the circle streams it in the margin. After a cast, scrying is one click
-  away with a teaser of the words heard uncertainly.
-- **Guaranteed first-hour beats**: the second cantrip in the garden misfires
-  into moths whatever the familiar wrote; the first misfire adds "Well." and
-  a one-time scry suggestion to the margin.
-- **The familiar's library** (`Library.tsx`): idioms, seed and learned; the
-  world promotes a spell into the library after three clean firings.
-- **Halls** (`Hall.tsx`, world `convene`): two or three awake spirits seated
-  in one channel and woken to argue about a matter, with the player admitted.
-- **Chartered golems as agents** (`WatchDay.tsx`): the panel seats any golem
-  the world reports as chartered; golems explain themselves on the region
-  canvas and write to the news.
-- **The household** (`Household.tsx`): who is where, and a door to open the
-  estate as another apprentice.
-- **Watch the day**: twenty-four ticks in short steps with the map redrawn
-  between them.
-- **Fonts** (`lib/fonts.ts`): two shipped OFL faces, a serif for the
-  familiar and a script for verse.
-- **The bench** (`workers/grimoire-agents/bench.ts`): reference verses with
-  expected gate, resonance, tier and intent outcomes, plus voice anchors the
-  familiar's prompt must keep.
-
-Two build traps: workerd rejects worker modules that export anything but
-classes, functions and the default handler; and the panel bundler treats
-`url(#id)` in CSS as a dependency, so SVG filters are referenced by attribute.
+Live image generation remains integration-blocked: the native service generates a
+PNG, but its canonical `vcs.edit` save encounters `SQLITE_TOOBIG` because the semantic
+materialization outbox stores binary bytes inline in `gad_effect_intents.payload_json`.
+The failing `testkit:grimoire-art` scenario is retained. This needs a repair at the
+native content persistence boundary; game-side images already use blob references.
