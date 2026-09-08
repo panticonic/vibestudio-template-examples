@@ -208,6 +208,95 @@ singletonObjects:
     key: workspace-missions
     source: workers/missions
 systemEpoch: 0
+template:
+  description: Agent-driven playable examples. Grimoire is an enchanted garden that answers your wishes; Regency is a conversational strategy game where independent advisors author executable policy for a living realm.
+  files:
+    - .gitattributes
+    - .ignore
+    - package.json
+    - tsconfig.json
+    - types/assets.d.ts
+  name: Examples
+  repositories:
+    - about/new
+    - about/testbench
+    - extensions/claude-code
+    - extensions/file-tools
+    - extensions/git-bridge
+    - extensions/image-service
+    - extensions/pdf-ingest
+    - extensions/shell
+    - extensions/templates
+    - extensions/test-runner
+    - packages/about-shared
+    - packages/agent-loop
+    - packages/agentic-chat
+    - packages/agentic-core
+    - packages/agentic-do
+    - packages/agentic-protocol
+    - packages/cdp-client
+    - packages/channel-fork
+    - packages/channel-policies
+    - packages/eval
+    - packages/game-play-tests
+    - packages/grimoire-engine
+    - packages/harness
+    - packages/integrations
+    - packages/living-canvas
+    - packages/model-catalog
+    - packages/omnibox-core
+    - packages/pi-ai
+    - packages/pi-core
+    - packages/pubsub
+    - packages/quickfire-core
+    - packages/react
+    - packages/regency-engine
+    - packages/runtime
+    - packages/svelte
+    - packages/template-registry
+    - packages/testkit
+    - packages/tool-ui
+    - packages/ui
+    - packages/vcs-engine
+    - panels/chat
+    - panels/grimoire
+    - panels/hello-svelte
+    - panels/hello-vanilla
+    - panels/regency
+    - panels/terminal
+    - projects/default
+    - skills/agentic-development
+    - skills/agents
+    - skills/api-integrations
+    - skills/architecture
+    - skills/capabilities
+    - skills/extensiondev
+    - skills/gad-context
+    - skills/messaging
+    - skills/provenance-orientation
+    - skills/sandbox
+    - skills/templates
+    - skills/terminal
+    - skills/vibestudio-vcs
+    - skills/web-research
+    - skills/workspace-dev
+    - templates/default
+    - templates/svelte
+    - templates/vanilla
+    - workers/agent-worker
+    - workers/grimoire-agents
+    - workers/grimoire-world
+    - workers/hello
+    - workers/missions
+    - workers/model-settings
+    - workers/pubsub-channel
+    - workers/quickfire-service
+    - workers/regency-agents
+    - workers/regency-realm
+    - workers/sample-do
+    - workers/silent-agent-worker
+    - workers/workspace-presentation
+    - workers/workspace-source
 templateRegistry:
   ref: refs/heads/main
   url: git+https://github.com/panticonic/vibestudio-template-registry.git
