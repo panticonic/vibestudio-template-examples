@@ -140,7 +140,7 @@ body {
 .adventure-imprint {
   color: var(--muted);
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.19em;
   text-transform: uppercase;
@@ -160,7 +160,7 @@ body {
   white-space: nowrap;
   border: 0;
   background: none;
-  font-size: 11px !important;
+  font-size: 12px !important;
   letter-spacing: 0.055em;
   border-bottom: 1px solid var(--line);
 }
@@ -177,7 +177,7 @@ body {
   padding: 9px 0 11px;
   max-width: 1560px;
   margin: auto;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
@@ -197,7 +197,7 @@ body {
   position: relative;
   isolation: isolate;
   max-width: 1560px;
-  height: clamp(270px, 42dvh, 460px);
+  height: clamp(270px, 36dvh, 420px);
   margin: auto;
   overflow: hidden;
   background: var(--paper-raised);
@@ -240,7 +240,7 @@ body {
   justify-content: space-between;
   align-items: center;
   color: #fff6e7ba;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
@@ -263,7 +263,7 @@ body {
 }
 .adventure-eyebrow {
   color: var(--accent);
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.7;
   font-weight: 600;
   letter-spacing: 0.17em;
@@ -290,13 +290,19 @@ body {
   text-wrap: pretty;
 }
 .adventure-scene-caption {
+  padding: 5px 8px;
+  background: #0a141bcc;
+  border-radius: 2px;
   position: absolute;
   bottom: 18px;
   right: 27px;
-  color: #fcf7e96e;
-  font-size: 8px;
+  color: #fff5df;
+  font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.19em;
+  letter-spacing: 0.04em;
+}
+.adventure-scene-caption:empty {
+  display: none;
 }
 .adventure-image-wait {
   position: absolute;
@@ -314,7 +320,7 @@ body {
 }
 .adventure-image-wait p {
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
 }
 .adventure-body {
@@ -337,15 +343,15 @@ body {
   font-size: 18px;
 }
 .adventure-prose {
-  max-height: clamp(90px, 14dvh, 155px);
+  max-height: clamp(220px, 28dvh, 320px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
   padding-right: 12px;
   font-family: var(--serif);
-  font-size: 21px;
-  line-height: 1.45;
+  font-size: 22px;
+  line-height: 1.5;
   color: var(--ink);
   letter-spacing: 0.005em;
 }
@@ -388,7 +394,7 @@ body {
 .adventure-error details {
   margin: 12px 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .adventure-error summary {
   cursor: pointer;
@@ -433,7 +439,7 @@ body {
   border-top: 1px solid var(--line);
 }
 .adventure-composer-footer > span {
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
 }
@@ -446,7 +452,7 @@ body {
   color: var(--paper);
   border: 1px solid var(--accent);
   padding: 11px 15px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
 }
 .adventure-composer-footer button:not(:disabled):hover {
@@ -458,7 +464,7 @@ body {
   display: flex;
   justify-content: space-between;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.02em;
 }
 .adventure-save-note > span {
@@ -479,7 +485,7 @@ body {
 }
 .adventure-collection h3,
 .adventure-exits h3 {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -487,7 +493,7 @@ body {
 }
 .adventure-collection-title > span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 .adventure-entity-list {
   display: flex;
@@ -534,7 +540,7 @@ body {
   display: block;
   margin-top: 5px;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 0.02em;
 }
 .adventure-entity-arrow {
@@ -591,7 +597,7 @@ body {
   gap: 7px;
 }
 .adventure-inspector-actions button {
-  font-size: 10px;
+  font-size: 12px;
   border: 1px solid var(--line);
   background: none;
   padding: 7px 10px;
@@ -629,7 +635,7 @@ body {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 22px;
 }
@@ -663,7 +669,7 @@ body {
   color: var(--paper);
   border: 0;
   padding: 9px 15px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .adventure-colophon {
   display: flex;
@@ -674,7 +680,7 @@ body {
   padding: 20px 0 24px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 .adventure-colophon .adventure-crest {
   width: 24px;
@@ -712,7 +718,7 @@ body {
   padding: 0;
   background: none;
   color: var(--muted) !important;
-  font-size: 10px !important;
+  font-size: 12px !important;
 }
 .adventure-journal .adventure-section-heading {
   display: block;
@@ -737,7 +743,7 @@ body {
   padding: 16px 0;
 }
 .adventure-entry-time {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--accent);
   padding-top: 6px;
 }
@@ -868,7 +874,7 @@ body {
   }
   .adventure-imprint {
     max-width: 420px;
-    font-size: 8px;
+    font-size: 12px;
   }
   .adventure-composer-footer {
     gap: 10px;
@@ -902,15 +908,15 @@ body {
   .adventure-imprint {
     max-width: 310px;
     letter-spacing: 0.12em;
-    font-size: 7px;
+    font-size: 12px;
     line-height: 1.5;
   }
   .adventure-journal-button {
-    font-size: 9px !important;
+    font-size: 12px !important;
     gap: 9px;
   }
   .adventure-edition {
-    font-size: 7px;
+    font-size: 12px;
     line-height: 1.5;
     letter-spacing: 0.08em;
   }
@@ -921,7 +927,7 @@ body {
     margin: 0 6px 1px;
   }
   .adventure-scene {
-    height: clamp(270px, 38dvh, 340px);
+    height: clamp(270px, 30dvh, 320px);
     margin: 0 -20px;
   }
   .adventure-scene-content {
@@ -962,8 +968,8 @@ body {
     margin-top: 0;
   }
   .adventure-prose {
-    font-size: 20px;
-    max-height: 112px;
+    font-size: 21px;
+    max-height: clamp(220px, 36dvh, 300px);
   }
   .adventure-house .adventure-scene {
     border-radius: 65px 65px 0 0;
@@ -992,7 +998,7 @@ body {
   }
   .adventure-imprint {
     max-width: 205px;
-    font-size: 6px;
+    font-size: 12px;
   }
   .adventure-journal-button {
     max-width: 54px;
@@ -1005,10 +1011,6 @@ body {
   }
   .adventure-edition {
     justify-content: flex-end;
-  }
-  .adventure-prose {
-    max-height: 90px;
-    font-size: 19px;
   }
   .adventure-section-heading {
     margin-bottom: 9px;
@@ -1024,17 +1026,14 @@ body {
     line-height: 1.35;
   }
   .adventure-location .adventure-eyebrow {
-    font-size: 8px;
+    font-size: 12px;
   }
   .adventure-scene-content {
     padding: 26px;
   }
-  .adventure-scene {
-    height: clamp(250px, 38dvh, 300px);
-  }
   .adventure-scene-caption {
     right: 23px;
-    font-size: 6px;
+    font-size: 12px;
   }
   .adventure-composer {
     padding: 14px 16px;
@@ -1045,7 +1044,7 @@ body {
   .adventure-composer-footer button {
     gap: 10px;
     padding: 11px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .adventure-sidebar {
     gap: 25px 20px;
@@ -1062,7 +1061,7 @@ body {
     font-size: 17px;
   }
   .adventure-entity small {
-    font-size: 7px;
+    font-size: 12px;
   }
   .adventure-entity-arrow {
     display: none;
@@ -1083,5 +1082,243 @@ body {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+.adventure-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-shrink: 0;
+}
+.adventure-journey-menu {
+  position: relative;
+  font-size: 12px;
+  z-index: 5;
+}
+.adventure-journey-menu summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+.adventure-journey-menu > div {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: 290px;
+  max-width: calc(100vw - 40px);
+  padding: 20px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 32px #0005;
+}
+.adventure-journey-menu button {
+  width: 100%;
+  background: var(--accent);
+  color: var(--paper);
+  border: 0;
+  padding: 12px;
+  text-align: left;
+}
+.adventure-journey-menu p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 10px;
+}
+.adventure-journey-menu label {
+  display: block;
+  margin-top: 18px;
+  line-height: 1.5;
+}
+.adventure-journey-menu select {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  padding: 9px;
+  font: inherit;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.adventure-prose .adventure-stage-direction {
+  color: var(--muted);
+  font-size: 18px;
+  font-style: italic;
+  padding-left: 15px;
+  border-left: 1px solid var(--line);
+}
+.adventure-prose .adventure-stage-direction::first-letter {
+  float: none;
+  font-size: inherit;
+  margin: 0;
+  color: inherit;
+}
+.adventure-turn-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.adventure-turn-controls button {
+  background: none;
+  color: var(--accent);
+  border: 1px solid var(--line);
+  padding: 9px 12px;
+}
+.adventure-turn-controls button:hover {
+  border-color: var(--accent);
+}
+.adventure-readable {
+  white-space: pre-wrap;
+  font-family: var(--serif);
+  font-size: 20px;
+  line-height: 1.5;
+  padding: 15px;
+  margin: 15px 0 0;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.adventure-exits small {
+  display: block;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.adventure-journal-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+}
+.adventure-journal-tabs button {
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  background: none;
+  font-size: 14px;
+}
+.adventure-journal-tabs button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.adventure-notebook-page h2 {
+  font-family: var(--serif);
+  font-size: 36px;
+  font-weight: 400;
+  margin: 0 0 15px;
+}
+.adventure-notebook-page h3 {
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 500;
+  margin: 0 0 10px;
+}
+.adventure-notebook-page p,
+.adventure-notebook-page blockquote {
+  font-family: var(--serif);
+  font-size: 21px;
+  line-height: 1.5;
+}
+.adventure-notebook-page .adventure-notebook-note {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+.adventure-notebook-page article {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.adventure-notebook-page blockquote {
+  margin: 18px 0;
+  padding-left: 18px;
+  border-left: 1px solid var(--accent);
+  font-style: italic;
+}
+.adventure-notebook-map {
+  list-style: none;
+  padding: 0;
+}
+.adventure-notebook-map li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--serif);
+  font-size: 23px;
+}
+.adventure-notebook-map small {
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 12px;
+}
+.adventure-pending {
+  line-height: 1.6;
+}
+.adventure-edition {
+  flex-wrap: wrap;
+  line-height: 1.5;
+}
+.adventure-location-mark {
+  letter-spacing: 0.1em;
+}
+@media (max-width: 760px) {
+  .adventure-header-actions {
+    flex-direction: column;
+    gap: 0;
+    align-items: flex-end;
+  }
+  .adventure-imprint {
+    display: none;
+  }
+  .adventure-journal-button {
+    padding: 7px 0;
+    max-width: none;
+    white-space: nowrap;
+  }
+  .adventure-journey-menu summary {
+    padding: 7px 0;
+  }
+  .adventure-edition > span:first-child {
+    display: none;
+  }
+  .adventure-edition {
+    justify-content: flex-end;
+  }
+  .adventure-composer textarea {
+    font-size: 16px;
+  }
+  .adventure-composer-footer {
+    align-items: center;
+  }
+  .adventure-composer-footer > span {
+    max-width: 150px;
+  }
+  .adventure-composer-footer button {
+    min-height: 44px;
+  }
+  .adventure-entity small {
+    display: none;
+  }
+  .adventure-collection h3 {
+    letter-spacing: 0.06em;
+  }
+  .adventure-location .adventure-eyebrow {
+    letter-spacing: 0.06em;
+  }
+  .adventure-scene-caption {
+    max-width: calc(100% - 45px);
+    font-size: 12px;
+    right: 22px;
+    bottom: 8px;
   }
 }

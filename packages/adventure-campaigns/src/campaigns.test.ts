@@ -29,6 +29,20 @@ describe("authored adventures", () => {
       world.behaviors.some((b) => b.entityId === "sorting-cabinet" && b.trigger === "receive")
     ).toBe(true);
   });
+  it("makes the opening window observable without exposing the customs office", () => {
+    const world = initialWorld(deadLetterOffice);
+    const api = createWorldAPI(world, world.playerId);
+    expect(api.inspect("customs-window").description).toContain("You can meet her inside");
+    expect(() => api.inspect("elin")).toThrow("perceive");
+    expect(() => api.inspect("sorting-cabinet")).toThrow("perceive");
+  });
+  it("offers an executable insertion action and a deposit slot, without a false tide control", () => {
+    const world = initialWorld(deadLetterOffice);
+    const api = createWorldAPI(world, world.playerId);
+    world.entities.find((entity) => entity.id === world.playerId)!.location = "customs";
+    expect(api.inspect("sorting-cabinet").actions).toEqual(["Insert a letter"]);
+    expect(api.inspect("sorting-cabinet").components.insertionSlot).toBe(true);
+  });
   it("keeps diplomatic acceptance distinct from an offered promise", () => {
     const world = initialWorld(missingCountry);
     expect(world.entities.find((e) => e.id === "guest-book")?.components["entries"]).toEqual([]);

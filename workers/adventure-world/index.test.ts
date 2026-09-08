@@ -103,12 +103,16 @@ describe("durable adventure orchestration", () => {
     });
     await t.agent("person:clerk", "finish", { turnId: "one", text: "" });
     expect(t.deliveries.at(-1)).toBe("do:artist");
-    await expect(t.agent("artist", "publishArtwork", { turnId: "one" })).rejects.toThrow(
+    await expect(t.agent("artist", "publishArtwork", { turnId: "one:scene" })).rejects.toThrow(
       "no illustration"
     );
-    await t.agent("artist", "setImageJob", { turnId: "one", jobId: "painted", placeId: "room" });
+    await t.agent("artist", "setImageJob", {
+      turnId: "one:scene",
+      jobId: "painted",
+      placeId: "room",
+    });
     await t.agent("artist", "publishArtwork", {
-      turnId: "one",
+      turnId: "one:scene",
       asset: { id: "scene", digest: "painted" },
     });
     await t.user("play", { id: "one", text: "Talk to the clerk" });
@@ -198,12 +202,15 @@ describe("durable adventure orchestration", () => {
       code: 'world.patch("inn",{description:"A warm inn with amber lamps",components:{...world.entity("inn").components,frontier:false}});world.add({id:"host",name:"Host",kind:"person",description:"An attentive host",location:"inn",components:{goals:["Offer supper"],memory:[]}});world.add({id:"bell",name:"Bell",kind:"object",description:"A brass bell",location:"inn",components:{}});world.world.behaviors.push({id:"ring",entityId:"bell",trigger:"ring",state:{},code:"world.emit(String(42));"});',
     });
     const resumed = await t.agent("player", "perspective");
-    expect(resumed.pending.participants).toEqual(["clerk"]);
+    expect(resumed.pending.participants).toEqual([]);
     await t.agent("player", "execute", { turnId: "one", code: resumed.pending.continuationCode });
     expect((await t.user("getGame")).view.location.id).toBe("inn");
     await t.agent("player", "finish", { turnId: "one", text: "You enter the inn." });
+    expect((await t.user("getGame")).pending.participants).toEqual(["clerk", "host"]);
+    // The clerk witnessed departure; the new host witnessed arrival. Both retain their own turn.
     await t.agent("person:clerk", "finish", { turnId: "one", text: "" });
-    expect(t.deliveries.at(-1)).toBe("do:artist");
+    const needed = (await t.user("getGame")).neededSeats;
+    expect(needed.map((seat: any) => seat.role)).toEqual(["person:host"]);
   });
   it("can repair malformed existing behavior without invoking it during maintenance", async () => {
     const c = structuredClone(campaign);
@@ -248,7 +255,7 @@ describe("durable adventure orchestration", () => {
     const resumed = await t.agent("builder", "perspective");
     expect(resumed.world.tick).toBe(1);
     expect(resumed.world.entities.find((e: any) => e.id === "clerk").components.memory).toEqual([
-      "You said: Hello",
+      "The traveller said: Hello",
     ]);
   });
   it("surfaces an unfinished native turn as resumable and ignores completed or stale stops", async () => {
@@ -262,7 +269,7 @@ describe("durable adventure orchestration", () => {
     expect((await t.user("getGame")).pending.error).toBeUndefined();
     await t.agent("player", "finish", { turnId: "one", text: "You look around." });
     await t.agent("player", "participantStopped", { turnId: "one" });
-    expect((await t.user("getGame")).pending.error).toBeUndefined();
+    expect((await t.user("getGame")).pending).toBeNull();
   });
   it("rejects a different campaign for an existing journey", async () => {
     const t = await boot();
@@ -277,5 +284,231 @@ describe("durable adventure orchestration", () => {
     expect(
       state.view.entities.find((e: any) => e.id === "clerk").components.knowledge
     ).toBeUndefined();
+  });
+  it("does not wake models for an unchanged scene or an unwitnessed question", async () => {
+    const t = await boot();
+    await t.user("setOpeningArtwork", { asset: { id: "cover", digest: "cover" } });
+    await t.user("play", { id: "question", text: "What is this room?" });
+    await t.agent("player", "execute", { turnId: "question", code: "return world.observe()" });
+    await t.agent("player", "finish", { turnId: "question", text: "You are in the room." });
+    const game = await t.user("getGame");
+    expect(game.pending).toBeNull();
+    expect(game.background.scene).toBeNull();
+    expect(game.visual.fresh).toBe(true);
+    expect(t.deliveries).toEqual(["do:player"]);
+  });
+  it("unlocks foreground while painting and tags late art with its captured composition", async () => {
+    const c = structuredClone(campaign);
+    c.entities[0]!.components.exits = { north: "garden" };
+    c.entities.push({
+      id: "garden",
+      kind: "place",
+      name: "Garden",
+      description: "Roses",
+      components: { exits: { south: "room" } },
+    });
+    const t = await boot(c);
+    await t.user("setOpeningArtwork", { asset: { id: "cover", digest: "cover" } });
+    await t.user("play", { id: "north", text: "Go north" });
+    await t.agent("player", "execute", { turnId: "north", code: 'world.move("garden")' });
+    await t.agent("player", "finish", { turnId: "north", text: "You reach the garden." });
+    const reaction = await t.user("getGame");
+    expect(reaction.pending.participants).toEqual(["clerk"]);
+    expect(reaction.background.scene).toBeNull();
+    await t.agent("person:clerk", "finish", { turnId: "north", text: "" });
+    const painting = await t.user("getGame");
+    expect(painting.pending).toBeNull();
+    expect(painting.background.scene.placeId).toBe("garden");
+    const sceneId = painting.background.scene.id;
+    await t.agent("artist", "setImageJob", {
+      turnId: sceneId,
+      jobId: "garden-job",
+      placeId: "garden",
+    });
+    await t.user("play", { id: "south", text: "Go south" });
+    await t.agent("player", "execute", { turnId: "south", code: 'world.move("room")' });
+    await t.agent("artist", "publishArtwork", {
+      turnId: sceneId,
+      asset: { id: "garden-art", digest: "garden" },
+    });
+    const returned = await t.user("getGame");
+    expect(returned.pending.id).toBe("south");
+    expect(returned.view.location.id).toBe("room");
+    expect(returned.world.artwork.garden.id).toBe("garden-art");
+    expect(returned.world.artwork.room.id).toBe("cover");
+    expect(returned.visual.artworkSignature).not.toBe(painting.visual.signature);
+  });
+  it("cancels in-flight work without reverting prior commits or accepting late effects", async () => {
+    const t = await boot();
+    await t.user("play", { id: "cancel", text: "Greet the clerk" });
+    await t.agent("player", "execute", {
+      turnId: "cancel",
+      code: 'world.say("clerk","Already said")',
+    });
+    const original = (t.instance as any).rpc.call;
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    (t.instance as any).rpc.call = async (target: string, method: string, args: any[]) => {
+      if (method === "eval.start") {
+        entered();
+        await gate;
+      }
+      return original(target, method, args);
+    };
+    const late = t.agent("player", "execute", {
+      turnId: "cancel",
+      code: 'world.say("clerk","Too late")',
+    });
+    await started;
+    await t.user("cancel");
+    release();
+    expect(await late).toEqual({ cancelled: true });
+    const game = await t.user("getGame");
+    expect(game.pending).toBeNull();
+    expect(game.world.tick).toBe(1);
+    expect(game.world.journal.some((e: any) => e.text.includes("Already said"))).toBe(true);
+    expect(game.world.journal.some((e: any) => e.text.includes("Too late"))).toBe(false);
+    expect(t.deliveries).not.toContain("do:builder");
+  });
+  it("treats optimistic contention as reobservation rather than a world defect", async () => {
+    const t = await boot();
+    await t.user("play", { id: "race", text: "Inspect the room" });
+    const original = (t.instance as any).rpc.call;
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    (t.instance as any).rpc.call = async (target: string, method: string, args: any[]) => {
+      if (method === "eval.start") {
+        entered();
+        await gate;
+      }
+      return original(target, method, args);
+    };
+    const late = t.agent("player", "execute", {
+      turnId: "race",
+      code: 'world.say("clerk","Stale")',
+    });
+    await started;
+    const stored = JSON.parse(
+      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+    );
+    stored.world.revision++;
+    t.sql.exec("UPDATE adventure SET body=? WHERE id=1", JSON.stringify(stored));
+    release();
+    expect((await late).retry).toBe(true);
+    const game = await t.user("getGame");
+    expect(game.pending.phase).toBe("player");
+    expect(game.world.tick).toBe(0);
+    expect(t.deliveries).not.toContain("do:builder");
+  });
+  it("wakes an offscreen participant from a scheduled witnessed event, leaving unrelated residents idle", async () => {
+    const c = structuredClone(campaign);
+    c.entities.push(
+      { id: "tower", kind: "place", name: "Tower", description: "", components: {} },
+      {
+        id: "watcher",
+        kind: "person",
+        name: "Watcher",
+        description: "",
+        location: "tower",
+        components: {},
+      }
+    );
+    c.behaviors = [
+      {
+        id: "alarm",
+        entityId: "tower",
+        trigger: "bell",
+        state: {},
+        code: 'world.emit("The watch bell rings.","action",["watcher"]);',
+      },
+    ];
+    const t = await boot(c);
+    const stored = JSON.parse(
+      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+    );
+    stored.world.schedule.push({ id: "wake", entityId: "tower", at: 1, trigger: "bell" });
+    t.sql.exec("UPDATE adventure SET body=? WHERE id=1", JSON.stringify(stored));
+    await t.user("play", { id: "wait", text: "Wait briefly" });
+    await t.agent("player", "execute", { turnId: "wait", code: "world.wait(1)" });
+    await t.agent("player", "finish", { turnId: "wait", text: "Time passes." });
+    const game = await t.user("getGame");
+    expect(game.pending.participants).toEqual(["watcher"]);
+    expect(game.neededSeats.map((seat: any) => seat.role)).toEqual(["person:watcher"]);
+    expect(game.view.events.some((e: any) => e.text.includes("watch bell"))).toBe(false);
+    expect(t.deliveries).not.toContain("do:person:clerk");
+  });
+  it("migrates old foreground painting to a resumable background task with the exact native job", async () => {
+    const t = await boot();
+    const stored = JSON.parse(
+      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+    );
+    delete stored.orchestrationVersion;
+    delete stored.scenes;
+    delete stored.artworkSignatures;
+    stored.pending = {
+      id: "legacy-turn",
+      phase: "artist",
+      text: "Look around",
+      participants: [],
+      replies: [],
+      attempt: 2,
+    };
+    stored.imageJob = {
+      id: "already-generating",
+      placeId: "room",
+      revision: stored.world.revision,
+    };
+    t.sql.exec("UPDATE adventure SET body=? WHERE id=1", JSON.stringify(stored));
+    const game = await t.user("getGame");
+    expect(game.pending).toBeNull();
+    expect(game.background.scene.id).toBe("legacy-turn");
+    expect(t.deliveries.at(-1)).toBe("do:artist");
+    const artist = await t.agent("artist", "perspective");
+    expect(artist.imageJob.id).toBe("already-generating");
+    expect(artist.pending.id).toBe("legacy-turn");
+    await t.agent("artist", "publishArtwork", {
+      turnId: "legacy-turn",
+      asset: { id: "legacy-art", digest: "finished" },
+    });
+    expect((await t.user("getGame")).world.artwork.room.id).toBe("legacy-art");
+    const migrated = JSON.parse(
+      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+    );
+    expect(migrated.engineSource).toBe(stored.engineSource);
+    expect(migrated.world.behaviors).toEqual(stored.world.behaviors);
+    expect(migrated.scenes).toEqual([]);
+    expect(migrated.orchestrationVersion).toBe(2);
+  });
+  it("preserves a completed legacy journey when adding independent scene bookkeeping", async () => {
+    const t = await boot();
+    const stored = JSON.parse(
+      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+    );
+    delete stored.orchestrationVersion;
+    delete stored.scenes;
+    delete stored.artworkSignatures;
+    stored.receipts.push("finished");
+    stored.world.artwork.room = { id: "saved-art", digest: "kept" };
+    t.sql.exec("UPDATE adventure SET body=? WHERE id=1", JSON.stringify(stored));
+    const game = await t.user("getGame");
+    expect(game.pending).toBeNull();
+    expect(game.background.scene).toBeNull();
+    expect(game.world.artwork.room.id).toBe("saved-art");
+    const migrated = JSON.parse(
+      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+    );
+    expect(migrated.world).toEqual(stored.world);
+    expect(migrated.engineSource).toBe(stored.engineSource);
+    expect(migrated.receipts).toEqual(["finished"]);
   });
 });

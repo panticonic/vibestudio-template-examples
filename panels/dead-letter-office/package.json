@@ -13,6 +13,25 @@
       "properties": {
         "gameKey": {
           "type": "string"
+        },
+        "journeys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "label"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

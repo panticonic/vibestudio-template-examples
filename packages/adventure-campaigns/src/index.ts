@@ -6,7 +6,13 @@ const place = (
   description: string,
   exits: Record<string, string>,
   extra: Record<string, unknown> = {}
-): Entity => ({ id, name, kind: "place", description, components: { exits, ...extra } });
+): Entity => ({
+  id,
+  name,
+  kind: "place",
+  description,
+  components: { exits, ...extra },
+});
 const person = (
   id: string,
   name: string,
@@ -35,7 +41,6 @@ const object = (
   location,
   description,
   components,
-  actions: components["actions"] as string[] | undefined,
 });
 
 export const deadLetterOffice: Campaign = {
@@ -71,6 +76,7 @@ export const deadLetterOffice: Campaign = {
       "Rain shines on the causeway. The customs house glows above the tide steps; across the water, the beacon throws one long shadow.",
       { "Customs house": "customs", "Along the quay": "quay" },
       {
+        visualFields: ["tide", "weather"],
         tide: "falling",
         weather: "fine rain",
         visualAnchors: ["green-black customs house", "brass postbox", "distant white lighthouse"],
@@ -86,7 +92,11 @@ export const deadLetterOffice: Campaign = {
       "quay",
       "Lantern Quay",
       "A row of lamps follows the harbour wall. The Lantern Inn is open. A chained ferry strains against its mooring beside a customs notice.",
-      { "Ferry landing": "landing", "Lantern Inn": "inn", "Tide steps": "drowned-quarter" }
+      {
+        "Ferry landing": "landing",
+        "Lantern Inn": "inn",
+        "Tide steps": "drowned-quarter",
+      }
     ),
     place(
       "archive",
@@ -147,6 +157,13 @@ export const deadLetterOffice: Campaign = {
       ]
     ),
     object(
+      "customs-window",
+      "The woman at the customs-house window",
+      "landing",
+      "Through the lit window, a woman in a blue wool cardigan holds up a cream envelope with a red double-lighthouse seal. She gestures toward the customs-house door. You can meet her inside.",
+      { depicts: "elin" }
+    ),
+    object(
       "mara-letter",
       "The double-sealed letter",
       "courier",
@@ -171,8 +188,8 @@ export const deadLetterOffice: Campaign = {
       "sorting-cabinet",
       "The sorting cabinet",
       "customs",
-      "Twelve brass pigeonholes and a blue glass tide dial. A narrow return slot is just wide enough for a letter.",
-      { container: true, actions: ["Insert a letter", "Turn the tide dial"], slots: 12 }
+      "Twelve brass pigeonholes and a blue glass tide dial. A narrow return slot accepts letters while the drawers remain closed. The blue dial indicates the tide; it is not a handle.",
+      { container: true, insertionSlot: true, slots: 12 }
     ),
     object(
       "permit",
@@ -245,19 +262,29 @@ export const missingCountry: Campaign = {
       "The Embassy Vestibule",
       "A winter garden beyond the glass doors catches the morning light. The front desk has a telephone, an empty visitors' book, and one unopened official notice.",
       { "Reception salon": "salon", "Outside, to Registry Square": "square" },
-      { visualAnchors: ["ivory arched vestibule", "burgundy stair runner", "silver moth crest"] }
+      {
+        visualAnchors: ["ivory arched vestibule", "burgundy stair runner", "silver moth crest"],
+      }
     ),
     place(
       "salon",
       "The Reception Salon",
       "Faded damask, a samovar and chairs arranged for a delegation that has not arrived. Three blue waves wind around a painted ceiling.",
-      { Vestibule: "vestibule", "Map room": "map-room", "Winter garden": "garden" }
+      {
+        Vestibule: "vestibule",
+        "Map room": "map-room",
+        "Winter garden": "garden",
+      }
     ),
     place(
       "square",
       "Registry Square",
       "Trams loop around a municipal clock. The embassy's name has disappeared from the stone directory, leaving a clean rectangle.",
-      { Embassy: "vestibule", "City Registry": "registry", "Station arcade": "station" }
+      {
+        Embassy: "vestibule",
+        "City Registry": "registry",
+        "Station arcade": "station",
+      }
     ),
     place(
       "map-room",
@@ -384,7 +411,10 @@ export const missingCountry: Campaign = {
       "The ivory telephone",
       "vestibule",
       "A black braided cord disappears into the panelling.",
-      { communication: true, contacts: ["City Registry", "Stationmaster", "Foreign Ministry"] }
+      {
+        communication: true,
+        contacts: ["City Registry", "Stationmaster", "Foreign Ministry"],
+      }
     ),
   ],
 };
@@ -438,6 +468,7 @@ export const wanderingHouse: Campaign = {
         "Up to your room": "guest-room",
       },
       {
+        visualFields: ["moving"],
         moving: true,
         visualAnchors: [
           "bifurcated walnut stair",
@@ -545,6 +576,7 @@ export const wanderingHouse: Campaign = {
       "lobby",
       "A circular brass table carrying a slowly turning relief landscape. An orchard hangs above a sea of clouds; further routes wait beyond its rim.",
       {
+        visualFields: ["moving", "destination"],
         destination: "outside",
         moving: true,
         actions: ["Choose a destination", "Turn the route key"],
@@ -563,6 +595,7 @@ export const wanderingHouse: Campaign = {
       "engine-room",
       "A brass wheel judders around an empty ceramic bearing seat.",
       {
+        visualFields: ["working"],
         working: false,
         needs: "A small smooth ceramic bearing",
         actions: ["Fit a replacement bearing"],
@@ -573,7 +606,11 @@ export const wanderingHouse: Campaign = {
       "The chipped teacup",
       "conservatory",
       "A discarded blue-glazed cup. A curved chip sits on its saucer.",
-      { portable: true, material: "glazed ceramic", parts: ["smooth blue ceramic chip"] }
+      {
+        portable: true,
+        material: "glazed ceramic",
+        parts: ["smooth blue ceramic chip"],
+      }
     ),
     object(
       "seedling",
@@ -597,6 +634,21 @@ export const wanderingHouse: Campaign = {
 
 deadLetterOffice.behaviors = [
   {
+    id: "customs-window-presence",
+    entityId: "customs-window",
+    trigger: "tick",
+    state: {},
+    code: `
+    const present = world.entity("elin").location === "customs";
+    world.patch(self.id, {
+      name: present ? "The woman at the customs-house window" : "The customs-house window",
+      description: present
+        ? "Through the lit window, a woman in a blue wool cardigan holds up a cream envelope with a red double-lighthouse seal. She gestures toward the customs-house door. You can meet her inside."
+        : "The lit customs-house window is empty now. The door below leads inside."
+    });
+    `,
+  },
+  {
     id: "harbour-tide",
     entityId: "harbour-bell",
     trigger: "Ring the bell",
@@ -612,6 +664,17 @@ deadLetterOffice.behaviors = [
       world.patch(quarter.id,{components:{...quarter.components,requires:null}});
       world.emit("The tide has drawn back from the old steps. A walkable path glitters between the drowned houses.");
     }
+  `,
+  },
+  {
+    id: "cabinet-insertion",
+    entityId: "sorting-cabinet",
+    trigger: "Insert a letter",
+    state: {},
+    code: `
+    const letterId = event.itemId || world.observe().inventory.find(item => item.components.addressee)?.id;
+    if (!letterId) throw new Error("Choose a letter you are carrying to put through the return slot.");
+    world.give(letterId, self.id);
   `,
   },
   {
@@ -746,3 +809,12 @@ wanderingHouse.behaviors = [
 ];
 
 export const campaigns = [deadLetterOffice, missingCountry, wanderingHouse];
+
+for (const [campaign, roleName] of [
+  [deadLetterOffice, "The courier"],
+  [missingCountry, "The ambassador"],
+  [wanderingHouse, "The guest from Room Seventeen"],
+] as const) {
+  campaign.entities.find((entity) => entity.id === campaign.playerId)!.components.roleName =
+    roleName;
+}

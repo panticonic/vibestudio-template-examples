@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { GeneratedImage } from "@workspace/react";
+import { panel } from "@workspace/runtime";
 import type { Campaign, Entity, JournalEntry } from "@workspace/adventure-engine";
 import { useAdventure, useCampaignKey } from "./useAdventure.js";
+import { JournalTabs } from "./JournalTabs.js";
 import "./styles.css";
 
 export type AdventureTheme = "letters" | "embassy" | "house";
@@ -186,14 +188,14 @@ export function AdventureComposer({
         placeholder={placeholder}
         disabled={disabled}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
             if (value.trim() && !disabled) onSubmit(value.trim());
           }
         }}
       />
       <div className="adventure-composer-footer">
-        <span>{pending || "Speak naturally. The world is listening."}</span>
+        <span>{pending || "Enter to continue · Shift+Enter for a new line"}</span>
         <button type="submit" disabled={disabled || !value.trim()}>
           {pending ? "A moment…" : "Continue the story"}
           <span aria-hidden="true">→</span>
@@ -208,11 +210,13 @@ export function AdventurePanel({
   theme,
   cover,
   presentation,
+  campaigns = [],
 }: {
   campaign: Campaign;
   theme: AdventureTheme;
   cover?: string;
   presentation?: Partial<AdventurePresentation>;
+  campaigns?: Array<{ id: string; title: string; source: string }>;
 }) {
   const identity = { ...presentations[theme], theme, cover, ...presentation };
   const session = useCampaignKey(campaign);
@@ -228,28 +232,55 @@ export function AdventurePanel({
   const [words, setWords] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [journalOpen, setJournalOpen] = useState(false);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
   const journalRef = useRef<HTMLDialogElement>(null);
   const proseRef = useRef<HTMLDivElement>(null);
+  const followingProse = useRef(true);
   const item = [...entities, ...inventory].find((entity) => entity.id === selected);
   const pending = story.game?.pending;
-  const busy = story.working || (!!pending && !pending.error);
+  const busy = story.working || !!pending;
+  const currentParticipant = pending?.participants.find((id) => !pending.replies.includes(id));
+  const participantName =
+    story.game?.world.entities.find((entity) => entity.id === currentParticipant)?.name ??
+    story.game?.neededSeats.find((seat) => seat.role === `person:${currentParticipant}`)?.name;
+  const scene = story.game?.background.scene;
+  const painting =
+    scene?.placeId === location.id && (scene.status === "queued" || scene.status === "painting");
+  const diagnostic = pending?.diagnostic?.replace(/^Error:\s*/, "") ?? "";
+  const frontierName = diagnostic.startsWith("FRONTIER:")
+    ? story.game?.world.entities.find(
+        (entity) => entity.id === diagnostic.slice("FRONTIER:".length).trim()
+      )?.name
+    : undefined;
   const waiting = !story.game
     ? "Opening your journal…"
     : pending?.phase === "builder"
-      ? "The world keeper is resolving an unexpected turn…"
-      : pending?.phase === "artist"
-        ? "The scene comes into focus…"
+      ? diagnostic.startsWith("FRONTIER:")
+        ? `Exploring ${frontierName ?? "a new place"} for the first time; new places take a little longer…`
+        : diagnostic.startsWith("UNMODELED:")
+          ? "Making room for your idea…"
+          : "The world keeper is repairing an unexpected turn…"
+      : pending?.phase === "participants"
+        ? participantName
+          ? `${participantName} is responding…`
+          : "Someone considers their next move…"
         : busy
-          ? "The world responds…"
+          ? "Considering your intention…"
           : null;
-  const error = session.error ?? story.error ?? pending?.error;
+  const error = navigationError ?? session.error ?? story.error ?? pending?.error;
   useEffect(() => {
     setSelected(null);
   }, [location.id]);
   useEffect(() => {
     const prose = proseRef.current;
-    if (prose) prose.scrollTop = prose.scrollHeight;
+    if (prose && followingProse.current) prose.scrollTop = prose.scrollHeight;
   }, [journal.at(-1)?.id]);
+  useEffect(() => {
+    setWords("");
+    setSelected(null);
+    setJournalOpen(false);
+    followingProse.current = true;
+  }, [session.key]);
   useEffect(() => {
     if (journalOpen) journalRef.current?.showModal();
     else journalRef.current?.close();
@@ -262,9 +293,18 @@ export function AdventurePanel({
     setWords(text);
     document.getElementById("adventure-intention")?.focus();
   }
-  const prose = journal
-    .filter((entry) => ["narration", "speech", "player"].includes(entry.kind))
-    .slice(-4);
+  const prose = journal.slice(-40);
+  async function changeCampaign(id: string) {
+    const destination = campaigns.find((option) => option.id === id);
+    if (!destination || destination.id === campaign.id) return;
+    try {
+      await panel.reopen({ source: destination.source, stateArgs: {} });
+    } catch (reason) {
+      setNavigationError(reason instanceof Error ? reason.message : String(reason));
+    }
+  }
+  const tide = location.components["tide"];
+  const clock = location.components["clock"] ?? location.components["timeOfDay"];
   const sceneLoading = (
     <div className="adventure-image-wait" role="status">
       <Crest theme={theme} />
@@ -283,6 +323,8 @@ export function AdventurePanel({
       data-asset-id={artwork?.id ?? ""}
       data-pending={pending?.phase ?? ""}
       data-ready={Boolean(story.game)}
+      data-scene-fresh={Boolean(story.game?.visual.fresh)}
+      data-scene-status={scene?.status ?? ""}
     >
       <header className="adventure-masthead">
         <div className="adventure-brand">
@@ -292,18 +334,79 @@ export function AdventurePanel({
             <h1>{campaign.title}</h1>
           </div>
         </div>
-        <button className="adventure-journal-button" onClick={() => setJournalOpen(true)}>
-          Your journal <span aria-hidden="true">↗</span>
-        </button>
+        <div className="adventure-header-actions">
+          <button className="adventure-journal-button" onClick={() => setJournalOpen(true)}>
+            Your journal <span aria-hidden="true">↗</span>
+          </button>
+          <details className="adventure-journey-menu">
+            <summary>Journeys</summary>
+            <div>
+              <button disabled={busy} onClick={() => void session.newJourney()}>
+                Begin a new journey
+              </button>
+              <p>Your existing journeys stay saved.</p>
+              {session.journeys.length > 1 && (
+                <label>
+                  Resume a journey
+                  <select
+                    value={session.key ?? ""}
+                    disabled={busy}
+                    onChange={(event) => void session.chooseJourney(event.target.value)}
+                  >
+                    {session.journeys.map((journey) => (
+                      <option key={journey.key} value={journey.key}>
+                        {journey.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {campaigns.length > 0 && (
+                <label>
+                  Choose an adventure
+                  <select
+                    value={campaign.id}
+                    disabled={busy}
+                    onChange={(event) => void changeCampaign(event.target.value)}
+                  >
+                    {campaigns.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+          </details>
+        </div>
       </header>
       <div className="adventure-edition">
         <span>{identity.chapter}</span>
         <span>
-          Chapter I <i /> Moment {String(story.game?.world.tick ?? 0).padStart(2, "0")}
+          Moment {String(story.game?.world.tick ?? 0).padStart(2, "0")}
+          {typeof tide === "string" && (
+            <>
+              {" "}
+              <i /> Tide: {tide}
+            </>
+          )}
+          {typeof clock === "string" && (
+            <>
+              {" "}
+              <i /> {clock}
+            </>
+          )}
         </span>
       </div>
       <AdventureScene
-        caption=""
+        caption={
+          artwork && !story.game?.visual.fresh
+            ? `Previous view${painting ? " · A new illustration is being painted" : ""}`
+            : painting
+              ? "A new illustration is being painted"
+              : ""
+        }
         image={
           artwork ? (
             <GeneratedImage
@@ -319,7 +422,7 @@ export function AdventurePanel({
             />
           ) : initialCover ? (
             <img src={initialCover} alt={opening.description} />
-          ) : pending?.phase === "artist" ? (
+          ) : painting ? (
             sceneLoading
           ) : (
             <div className="adventure-image-wait">
@@ -332,7 +435,9 @@ export function AdventurePanel({
       >
         <div className="adventure-location-mark">
           <span>Presently</span>
-          <span>{String(story.game?.world.tick ?? 0).padStart(2, "0")} / ∞</span>
+          {typeof location.components["weather"] === "string" && (
+            <span>{location.components["weather"]}</span>
+          )}
         </div>
         <div className="adventure-location">
           <span className="adventure-eyebrow">{campaign.subtitle}</span>
@@ -351,6 +456,12 @@ export function AdventurePanel({
           <div
             className="adventure-prose"
             ref={proseRef}
+            onScroll={() => {
+              const prose = proseRef.current;
+              if (prose)
+                followingProse.current =
+                  prose.scrollHeight - prose.scrollTop - prose.clientHeight < 30;
+            }}
             tabIndex={0}
             aria-label="Recent story"
             aria-live="polite"
@@ -360,12 +471,16 @@ export function AdventurePanel({
               prose.map((entry) => (
                 <p
                   key={entry.id}
+                  data-event-id={entry.id}
+                  data-event-kind={entry.kind}
                   className={
                     entry.kind === "speech"
                       ? "adventure-dialogue"
                       : entry.kind === "player"
                         ? "adventure-player-intention"
-                        : ""
+                        : entry.kind === "narration"
+                          ? ""
+                          : "adventure-stage-direction"
                   }
                 >
                   {entry.text}
@@ -391,7 +506,9 @@ export function AdventurePanel({
                   ? pending.phase === "builder"
                     ? "The world keeper is working to resolve this. You can resume if the story has stopped."
                     : "Your last action is still here. Resume when you’re ready."
-                  : "We couldn’t open this journey yet. Please try again in a moment."}
+                  : story.game
+                    ? "Part of the journey could not finish loading. Your progress is saved; you can keep exploring or try again."
+                    : "We couldn’t open this journey yet. Please try again in a moment."}
               </p>
               <details>
                 <summary>Details</summary>
@@ -409,10 +526,33 @@ export function AdventurePanel({
             value={words}
             onChange={setWords}
             onSubmit={(text) => void play(text)}
-            disabled={busy || !story.game || !!pending?.error}
+            disabled={busy || !story.game}
             pending={waiting}
             placeholder={identity.prompt}
           />
+          <div className="adventure-turn-controls">
+            {pending ? (
+              <button disabled={story.working} onClick={() => void story.cancel()}>
+                Cancel this intention
+              </button>
+            ) : (
+              <button
+                disabled={busy || !story.game}
+                onClick={() =>
+                  void play(
+                    "Please give me a gentle, spoiler-light hint based only on what I have discovered. Suggest one useful next step without taking it for me."
+                  )
+                }
+              >
+                A gentle hint
+              </button>
+            )}
+            <span>
+              {pending
+                ? "Completed actions stay in your journal."
+                : "Time moves with your actions."}
+            </span>
+          </div>
           <div className="adventure-save-note">
             Your place in the story is kept automatically.<span aria-hidden="true">✦</span>
           </div>
@@ -434,6 +574,11 @@ export function AdventurePanel({
                 </button>
               </div>
               <p>{item.description}</p>
+              {typeof item.components.readable === "string" && (
+                <blockquote className="adventure-readable" aria-label={`Text of ${item.name}`}>
+                  {item.components.readable}
+                </blockquote>
+              )}
               <div className="adventure-inspector-actions">
                 <button onClick={() => compose(`Examine ${item.name}.`)}>Examine</button>
                 {item.kind === "person" && (
@@ -465,10 +610,14 @@ export function AdventurePanel({
             {Object.entries(exits).map(([label, destination]) => (
               <button
                 key={destination}
-                disabled={busy || !story.game || !!pending?.error}
+                disabled={busy || !story.game}
                 onClick={() => void play(`Go ${label}.`)}
               >
-                <span>{label}</span>
+                <span>
+                  {label}
+                  {story.game?.world.entities.find((entity) => entity.id === destination)
+                    ?.components.frontier && <small>Unexplored</small>}
+                </span>
                 <span aria-hidden="true">⟶</span>
               </button>
             ))}
@@ -495,7 +644,10 @@ export function AdventurePanel({
           <button className="adventure-journal-close" onClick={() => setJournalOpen(false)}>
             Close journal <span aria-hidden="true">×</span>
           </button>
-          <AdventureJournal entries={journal} title={identity.journalTitle} />
+          <JournalTabs
+            game={story.game}
+            history={<AdventureJournal entries={journal} title={identity.journalTitle} />}
+          />
         </div>
       </dialog>
     </main>

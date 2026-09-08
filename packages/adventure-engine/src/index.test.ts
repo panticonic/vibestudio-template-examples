@@ -37,7 +37,11 @@ const campaign: Campaign = {
       kind: "person",
       description: "",
       location: "hall",
-      components: { memory: ["private"], knowledge: ["secret"], goals: ["leave"] },
+      components: {
+        memory: ["private"],
+        knowledge: ["secret"],
+        goals: ["leave"],
+      },
     },
     {
       id: "box",
@@ -89,7 +93,7 @@ describe("composable adventure world", () => {
       api = createWorldAPI(w, "player");
     api.say("clerk", "Who posted this?");
     expect(w.entities.find((e) => e.id === "clerk")!.components.memory).toContain(
-      "You said: Who posted this?"
+      "The traveller said: Who posted this?"
     );
     expect(api.observe().events.at(-1)?.audience).toEqual(["player", "clerk"]);
   });
@@ -113,7 +117,12 @@ describe("composable adventure world", () => {
       clock: () => ticks++,
       bell: (world: any) => world.patch("box", { description: "The bell rang" }),
     });
-    (api as any).schedule({ id: "bell", at: 2, entityId: "box", trigger: "ring" });
+    (api as any).schedule({
+      id: "bell",
+      at: 2,
+      entityId: "box",
+      trigger: "ring",
+    });
     api.wait(3);
     expect(ticks).toBe(3);
     expect(api.inspect("box").description).toBe("The bell rang");
@@ -127,13 +136,87 @@ describe("composable adventure world", () => {
       clerk = createWorldAPI(w, "clerk");
     clerk.take("letter");
     expect(player.observe().events.some((e) => e.text.includes("takes Letter"))).toBe(false);
-    w.behaviors.push({ id: "remote-bell", entityId: "road", trigger: "tick", code: "", state: {} });
+    w.behaviors.push({
+      id: "remote-bell",
+      entityId: "road",
+      trigger: "tick",
+      code: "",
+      state: {},
+    });
     const ticking = createWorldAPI(w, "player", false, {
       "remote-bell": (api: any) => api.emit("The far bell rings."),
     });
     ticking.wait(1);
     expect(ticking.observe().events.some((e) => e.text === "The far bell rings.")).toBe(false);
     expect(clerk.observe().events.some((e) => e.text === "The far bell rings.")).toBe(true);
+  });
+  it("shows departures and arrivals to their own witnesses without leaking later remote speech", () => {
+    const w = initialWorld(campaign);
+    w.entities.find((e) => e.id === "road")!.components.frontier = false;
+    w.entities.push({
+      id: "visitor",
+      name: "Visitor",
+      kind: "person",
+      location: "road",
+      description: "",
+      components: {},
+    });
+    const player = createWorldAPI(w, "player"),
+      clerk = createWorldAPI(w, "clerk"),
+      visitor = createWorldAPI(w, "visitor");
+    player.say("clerk", "See you later");
+    const before = w.tick;
+    clerk.move("road");
+    expect(w.tick).toBe(before + 1);
+    expect(player.observe().events.some((e) => e.text === "Clerk leaves Hall")).toBe(true);
+    expect(player.observe().events.some((e) => e.text === "Clerk arrives at Road")).toBe(false);
+    expect(visitor.observe().events.some((e) => e.text === "Clerk arrives at Road")).toBe(true);
+    expect(visitor.observe().events.some((e) => e.text === "Clerk leaves Hall")).toBe(false);
+    expect(visitor.observe().events.some((e) => e.text.includes("See you later"))).toBe(false);
+    expect(clerk.observe().events.some((e) => e.text === "Clerk leaves Hall")).toBe(false);
+    clerk.say("visitor", "A private conversation along the road");
+    expect(player.observe().events.some((e) => e.text.includes("private conversation"))).toBe(
+      false
+    );
+  });
+  it("supports deposits through a slot without exposing or extracting closed contents", () => {
+    const w = initialWorld(campaign);
+    w.entities.find((e) => e.id === "box")!.components.insertionSlot = true;
+    w.entities.find((e) => e.id === "letter")!.location = "player";
+    const api = createWorldAPI(w, "player");
+    api.give("letter", "box");
+    expect(w.entities.find((e) => e.id === "letter")!.location).toBe("box");
+    expect(api.observe().entities.map((e) => e.id)).not.toContain("letter");
+    expect(() => api.take("letter")).toThrow("perceive");
+    expect(api.inspect("box").components.open).toBe(false);
+  });
+  it("advertises executable behaviors only and charges composed actions once", () => {
+    const w = initialWorld(campaign);
+    w.entities.find((e) => e.id === "box")!.actions = ["Imaginary action"];
+    w.behaviors.push({
+      id: "open-box",
+      entityId: "box",
+      trigger: "Unlatch",
+      code: "",
+      state: {},
+    });
+    const api = createWorldAPI(w, "player", false, {
+      "open-box": (world: any) => world.open("box"),
+    });
+    expect(api.inspect("box").actions).toEqual(["Unlatch"]);
+    api.act("box", "Unlatch");
+    expect(w.tick).toBe(1);
+  });
+  it("identifies the player by role in NPC views, memories and speech without leaking knowledge", () => {
+    const w = initialWorld(campaign);
+    w.entities.find((e) => e.id === "player")!.components.roleName = "The courier";
+    const player = createWorldAPI(w, "player"),
+      npc = createWorldAPI(w, "clerk");
+    player.say("clerk", "Hello");
+    expect(npc.inspect("player").name).toBe("The courier");
+    expect(npc.recall()).toContain("The courier said: Hello");
+    expect(npc.observe().events.at(-1)!.text).toBe("The courier: Hello");
+    expect(player.observe().events.at(-1)!.text).toBe("You: Hello");
   });
   it("rejects broken references and containment cycles", () => {
     const w = initialWorld(campaign);

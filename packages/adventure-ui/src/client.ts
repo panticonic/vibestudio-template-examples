@@ -1,12 +1,11 @@
 import { contextId, images, rpc, workers } from "@workspace/runtime";
-import { addAgentToChannel } from "@workspace-skills/agents";
-import { waitForApprovalResolution } from "@workspace/pubsub";
 import type { Campaign, ServiceView } from "@workspace/adventure-engine";
 
 /** One campaign has one durable world; all participating panels see the same story. */
 export class AdventureClient {
   private readonly service;
   private initialization?: Promise<void>;
+  private coverImport?: Promise<void>;
   private seats = new Map<string, Promise<void>>();
 
   constructor(
@@ -19,7 +18,9 @@ export class AdventureClient {
 
   private initialize() {
     if (!this.initialization) {
-      this.initialization = this.initializeWorld();
+      this.initialization = this.service
+        .call("init", { campaign: this.campaign })
+        .then(() => undefined);
       this.initialization.catch(() => {
         this.initialization = undefined;
       });
@@ -27,8 +28,7 @@ export class AdventureClient {
     return this.initialization;
   }
 
-  private async initializeWorld() {
-    const game = await this.service.call<ServiceView>("init", { campaign: this.campaign });
+  private async importCover(game: ServiceView) {
     if (!this.cover || game.world.tick !== 0 || game.world.artwork[game.view.location.id]) return;
     const response = await fetch(this.cover);
     if (!response.ok) throw new Error("The opening illustration could not be opened.");
@@ -46,10 +46,23 @@ export class AdventureClient {
 
   async get(): Promise<ServiceView> {
     await this.initialize();
-    let game = await this.service.call<ServiceView>("getGame");
-    for (const seat of game.neededSeats) await this.seat(seat.role, seat.name);
-    if (game.neededSeats.length) game = await this.service.call<ServiceView>("getGame");
-    return game;
+    return this.service.call<ServiceView>("getGame");
+  }
+
+  /** The caller publishes the useful world view before starting optional preparation. */
+  async prepare(game: ServiceView) {
+    if (!this.coverImport) {
+      this.coverImport = this.importCover(game);
+      void this.coverImport.catch(() => {
+        this.coverImport = undefined;
+      });
+    }
+    const results = await Promise.allSettled([
+      this.coverImport,
+      ...game.neededSeats.map(({ role, name }) => this.seat(role, name)),
+    ]);
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
   }
 
   async play(id: string, text: string) {
@@ -60,6 +73,11 @@ export class AdventureClient {
 
   async retry() {
     await this.service.call("retry");
+    return this.get();
+  }
+
+  async cancel() {
+    await this.service.call("cancel");
     return this.get();
   }
 
@@ -77,6 +95,10 @@ export class AdventureClient {
 
   private async seatRole(role: string, name: string) {
     if (!contextId) throw new Error("This adventure needs an open workspace.");
+    const [{ addAgentToChannel }, { waitForApprovalResolution }] = await Promise.all([
+      import("@workspace-skills/agents"),
+      import("@workspace/pubsub"),
+    ]);
     const channelId = `adventure-${this.key}-${role}`;
     const participant = await addAgentToChannel({
       source: "workers/adventure-agents",

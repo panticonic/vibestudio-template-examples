@@ -1,3 +1,4 @@
+import { sceneSnapshot } from "./scene.js";
 import { runInNewContext } from "node:vm";
 import { it, expect } from "vitest";
 import { initialWorld, createWorldAPI, type Campaign } from "@workspace/adventure-engine";
@@ -80,7 +81,7 @@ async function runCampaign(campaign: Campaign, code: string) {
 it("executes the postal cabinet and ferry release as causal authored behaviors", async () => {
   const result = await runCampaign(
     deadLetterOffice,
-    'world.move("customs");world.open("sorting-cabinet");world.give("mara-letter","sorting-cabinet");world.take("permit");world.move("landing");world.move("quay");world.give("permit","tomas");return world.observe();'
+    'world.move("customs");world.act("sorting-cabinet","Insert a letter");world.open("sorting-cabinet");world.take("permit");world.move("landing");world.move("quay");world.give("permit","tomas");return world.observe();'
   );
   expect(result.world.entities.find((e: any) => e.id === "ferry").components.locked).toBe(false);
   expect(result.world.entities.find((e: any) => e.id === "mara-letter").location).toBe(
@@ -88,6 +89,43 @@ it("executes the postal cabinet and ferry release as causal authored behaviors",
   );
   expect(result.world.relations.some((r: any) => r.kind === "postal-route")).toBe(true);
   expect(result.world.relations.some((r: any) => r.kind === "promised-passage")).toBe(true);
+});
+it("inserts a carried letter into the closed cabinet through its discoverable action in one tick", async () => {
+  const result = await runCampaign(
+    deadLetterOffice,
+    'world.move("customs");world.act("sorting-cabinet","Insert a letter");return world.observe();'
+  );
+  expect(result.world.tick).toBe(2);
+  expect(result.world.entities.find((entity: any) => entity.id === "mara-letter").location).toBe(
+    "sorting-cabinet"
+  );
+  expect(
+    result.world.entities.find((entity: any) => entity.id === "sorting-cabinet").components.open
+  ).not.toBe(true);
+});
+it("repaints the actual harbour tide change using the same visible facts sent to its artist", async () => {
+  const before = initialWorld(deadLetterOffice);
+  const initial = sceneSnapshot(before);
+  const result = await runCampaign(
+    deadLetterOffice,
+    'world.act("harbour-bell","Ring the bell");world.act("harbour-bell","Ring the bell");'
+  );
+  const after = sceneSnapshot(result.world);
+  expect(after.signature).not.toBe(initial.signature);
+  expect(after.view.location.components["visual"].tide).toBe("low");
+  expect(initial.view.location.components["visual"].tide).toBe("falling");
+  before.tick += 100;
+  before.journal.push({
+    id: "story",
+    tick: before.tick,
+    actor: before.playerId,
+    text: "Time passes",
+    kind: "narration",
+  });
+  before.entities.find((entity) => entity.id === before.playerId)!.components.memory = [
+    "A private recollection",
+  ];
+  expect(sceneSnapshot(before).signature).toBe(initial.signature);
 });
 it("offers asylum without inventing a refugees consent", async () => {
   const result = await runCampaign(

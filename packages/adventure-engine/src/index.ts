@@ -2,6 +2,8 @@
 export interface Components extends Record<string, any> {
   exits?: Record<string, string>;
   frontier?: boolean;
+  /** Component fields whose public values affect the scene illustration. */
+  visualFields?: string[];
   hidden?: boolean;
   open?: boolean;
   sealed?: boolean;
@@ -9,6 +11,10 @@ export interface Components extends Record<string, any> {
   readable?: string;
   portable?: boolean;
   container?: boolean;
+  /** An inlet permits deposits while the container remains closed. */
+  insertionSlot?: boolean;
+  /** How other participants address the player, whose UI name may be “You”. */
+  roleName?: string;
   locked?: boolean;
   memory?: string[];
   knowledge?: string[];
@@ -195,8 +201,13 @@ export function createWorldAPI(
     }
     return false;
   };
+  const participantName = (e: Entity) =>
+    e.id === world.playerId && e.name === "You"
+      ? (e.components.roleName ?? "The traveller")
+      : e.name;
   const publicEntity = (e: Entity) => {
     const copy = structuredClone(e);
+    if (actorId !== world.playerId) copy.name = participantName(e);
     const lifecycle = new Set([
       "enter",
       "leave",
@@ -209,12 +220,13 @@ export function createWorldAPI(
     ]);
     copy.actions = [
       ...new Set([
-        ...(e.actions ?? []),
         ...world.behaviors
           .filter((b) => b.entityId === e.id && !lifecycle.has(b.trigger))
           .map((b) => b.trigger),
       ]),
     ];
+    // Authored labels are not executable affordances. The behavior registry owns actions.
+    delete copy.components.actions;
     if (!privileged && e.id !== actorId) {
       for (const key of ["knowledge", "memory", "goals", "private", "secret"])
         delete copy.components[key];
@@ -257,7 +269,17 @@ export function createWorldAPI(
     inventory: world.entities.filter((e) => e.location === actorId).map(publicEntity),
     exits: { ...(place().components.exits ?? {}) },
     events: structuredClone(
-      world.journal.filter((e) => !e.audience || e.audience.includes(actorId)).slice(-30)
+      world.journal
+        .filter((e) => !e.audience || e.audience.includes(actorId))
+        .slice(-30)
+        .map((e) =>
+          actorId !== world.playerId && e.actor === world.playerId && e.kind === "speech"
+            ? {
+                ...e,
+                text: e.text.replace(/^You:/, participantName(entity(world.playerId)) + ":"),
+              }
+            : e
+        )
     ),
   });
   const invoke = (entityId: string, trigger: string, payload: any = {}) => {
@@ -310,7 +332,12 @@ export function createWorldAPI(
       const target = entity(destination);
       if (target.kind !== "place") throw new Error("Destination is not a place");
       if (target.components.frontier) throw new Error("FRONTIER:" + destination);
-      invoke(place().id, "leave", { destination });
+      const origin = place();
+      const departureWitnesses = world.entities
+        .filter((e) => e.kind === "person" && e.id !== actorId && e.location === origin.id)
+        .map((e) => e.id);
+      invoke(origin.id, "leave", { destination });
+      emit(actionText("leave") + " " + origin.name, "action", departureWitnesses);
       actor().location = destination;
       emit(actionText("arrive") + " at " + target.name);
       invoke(destination, "enter", { actorId });
@@ -332,7 +359,11 @@ export function createWorldAPI(
       const receiver = accessible(to);
       if (receiver.kind !== "person" && receiver.components.container !== true)
         throw new Error("Choose a person or container");
-      if (receiver.components.container && receiver.components.open !== true)
+      if (
+        receiver.components.container &&
+        receiver.components.open !== true &&
+        !receiver.components.insertionSlot
+      )
         throw new Error("The container is closed");
       if (e.location !== actorId) throw new Error("You are not carrying " + e.name);
       e.location = to;
@@ -357,7 +388,7 @@ export function createWorldAPI(
       const message = emit(actor().name + ": " + text, "speech", [actorId, to]);
       receiver.components.memory = [
         ...(receiver.components.memory ?? []),
-        actor().name + " said: " + text,
+        participantName(actor()) + " said: " + text,
       ];
       invoke(to, "speak", { actorId, text });
       advance();
@@ -379,8 +410,9 @@ export function createWorldAPI(
       accessible(id);
       if (!world.behaviors.some((b) => b.entityId === id && b.trigger === action))
         throw new Error("UNMODELED:" + id + ":" + action);
+      const startedAt = world.tick;
       invoke(id, action, { ...payload, actorId });
-      advance();
+      if (world.tick === startedAt) advance();
       return observe();
     },
     wait: advance,
@@ -439,6 +471,16 @@ export type ServiceView = {
   world: World;
   view: View;
   pending: PendingTurn | null;
+  background: {
+    scene: {
+      id: string;
+      placeId: string;
+      signature: string;
+      status: "queued" | "painting" | "error";
+      error?: string;
+    } | null;
+  };
+  visual: { signature: string; artworkSignature?: string; fresh: boolean };
   seated: boolean;
   neededSeats: { role: AdventureRole; name: string }[];
 };

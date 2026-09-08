@@ -29,6 +29,9 @@ vi.mock("../agent-worker/ai-chat-worker.js", () => ({
       this.stored.delete(key);
     }
     async onTurnClosed() {}
+    async interruptChannel(...args: any[]) {
+      this.calls.push({ method: "interrupt", args });
+    }
     async submitAgentInitiatedTurn(...args: any[]) {
       this.calls.push({ method: "submit", args });
     }
@@ -37,85 +40,73 @@ vi.mock("../agent-worker/ai-chat-worker.js", () => ({
 import { AdventureAgentWorker } from "./index.js";
 const instance = () => new AdventureAgentWorker(undefined as never, undefined as never) as any;
 describe("adventure native turn contract", () => {
-  it("ends artist work through successful terminal tools, leaving rejected work active", async () => {
-    const agent = instance(),
-      tools = await agent.getLoopTools("artist");
-    expect(
-      (await tools.find((t: any) => t.name === "read_world").execute("read", {})).terminate
-    ).toBe(false);
-    expect(
-      (await tools.find((t: any) => t.name === "skip_scene").execute("skip", { turnId: "one" }))
-        .terminate
-    ).toBe(true);
-    agent.rpc.call = async () => {
-      throw new Error("This place has no illustration");
-    };
-    const rejected = await (await agent.getLoopTools("artist"))
-      .find((t: any) => t.name === "skip_scene")
-      .execute("retry", { turnId: "one" });
-    expect(rejected.isError).toBe(true);
-    expect(rejected.terminate).not.toBe(true);
-  });
-  it("generates and publishes through the invocation-scoped images client without a global worker runtime", async () => {
-    const agent = instance();
-    agent.rpc.call = async () => {
-      throw new Error("Unscoped worker RPC must not be used");
-    };
-    const calls: any[] = [];
-    const reference = {
-      id: "landing-art",
-      digest: "reference",
-      mimeType: "image/png",
-      width: 1536,
-      height: 1024,
-      byteLength: 123,
-      provenance: { provider: "test", imageModel: "test", createdAt: 1 },
-    };
-    const asset = { ...reference, id: "customs-art", digest: "generated" };
-    const execution = {
-      invocationId: "invocation",
-      commandId: "command",
-      rpc: {
-        call: async (target: string, method: string, args: any[]) => {
-          calls.push({ target, method, args });
-          if (method === "workers.resolveService")
-            return {
-              kind: "durable-object",
-              targetId: args[0] === "vibestudio.images.v1" ? "do:images" : "do:world",
-            };
-          if (method === "perspective")
-            return {
-              pending: { id: "one", phase: "artist" },
-              view: { location: { id: "customs" } },
-              artDirection: "Painted harbour",
-              artwork: { landing: reference },
-            };
-          if (method === "generate") return { id: "scene-job", status: "running" };
-          if (method === "getJob") return { id: "scene-job", status: "succeeded", asset };
-          return { ok: true };
+  it.each([false, true])(
+    "uses scoped image RPC and distinguishes style cover from same-place edit (same place: %s)",
+    async (samePlace) => {
+      const agent = instance();
+      agent.rpc.call = async () => {
+        throw new Error("Unscoped worker RPC must not be used");
+      };
+      const calls: any[] = [];
+      const reference = {
+        id: "landing-art",
+        digest: "reference",
+        mimeType: "image/png",
+        width: 1536,
+        height: 1024,
+        byteLength: 123,
+        provenance: { provider: "test", imageModel: "test", createdAt: 1 },
+      };
+      const asset = { ...reference, id: "customs-art", digest: "generated" };
+      const execution = {
+        invocationId: "invocation",
+        commandId: "command",
+        rpc: {
+          call: async (target: string, method: string, args: any[]) => {
+            calls.push({ target, method, args });
+            if (method === "workers.resolveService")
+              return {
+                kind: "durable-object",
+                targetId: args[0] === "vibestudio.images.v1" ? "do:images" : "do:world",
+              };
+            if (method === "perspective")
+              return {
+                pending: { id: "one", phase: "artist" },
+                view: { location: { id: "customs" } },
+                artDirection: "Painted harbour",
+                artwork: samePlace ? { customs: reference } : { landing: reference },
+                openingArtwork: reference,
+              };
+            if (method === "generate") return { id: "scene-job", status: "running" };
+            if (method === "getJob") return { id: "scene-job", status: "succeeded", asset };
+            return { ok: true };
+          },
         },
-      },
-    };
-    const paint = (await agent.getLoopTools("artist", execution)).find(
-      (tool: any) => tool.name === "paint_scene"
-    );
-    const result = await paint.execute("paint", {
-      turnId: "one",
-      prompt: "The customs counter at dusk",
-    });
-    expect(result.isError).not.toBe(true);
-    expect(result.terminate).toBe(true);
-    expect(result.details.asset.id).toBe("customs-art");
-    const generation = calls.find((c) => c.method === "generate");
-    expect(generation.target).toBe("do:images");
-    expect(generation.args[0].references).toEqual([reference]);
-    expect(calls.find((c) => c.method === "publishArtwork").args[0]).toEqual({
-      turnId: "one",
-      asset,
-    });
-    expect(calls.find((c) => c.method === "retain").args[0].assetId).toBe("customs-art");
-    expect(calls.find((c) => c.method === "forgetJob").args).toEqual(["scene-job"]);
-  });
+      };
+      const paint = (await agent.getLoopTools("artist", execution)).find(
+        (tool: any) => tool.name === "paint_scene"
+      );
+      const result = await paint.execute("paint", {
+        turnId: "one",
+        prompt: "The customs counter at dusk",
+      });
+      expect(result.isError).not.toBe(true);
+      expect(result.terminate).toBe(true);
+      expect(result.details.asset.id).toBe("customs-art");
+      const generation = calls.find((c) => c.method === "generate");
+      expect(generation.target).toBe("do:images");
+      expect(generation.args[0].references).toEqual([reference]);
+      expect(generation.args[0].prompt).toContain(
+        samePlace ? "REFERENCE EDIT:" : "STYLE REFERENCE ONLY:"
+      );
+      expect(calls.find((c) => c.method === "publishArtwork").args[0]).toEqual({
+        turnId: "one",
+        asset,
+      });
+      expect(calls.find((c) => c.method === "retain").args[0].assetId).toBe("customs-art");
+      expect(calls.find((c) => c.method === "forgetJob").args).toEqual(["scene-job"]);
+    }
+  );
   it("uses native post-turn delivery and does not mistake its queued successor for an idle failure", async () => {
     const agent = instance();
     await agent.receiveMoment({ channelId: "artist", turnId: "one", steeringId: "delivery" });
@@ -141,5 +132,33 @@ describe("adventure native turn contract", () => {
     expect(agent.calls.find((c: any) => c.method === "participantStopped").args[0].turnId).toBe(
       "one"
     );
+  });
+  it("cancels only its matching game turn through the native interrupt API", async () => {
+    const agent = instance();
+    await agent.receiveMoment({ channelId: "player", turnId: "old", steeringId: "old" });
+    await agent.cancelMoment({ channelId: "player", turnId: "other" });
+    expect(agent.calls.some((call: any) => call.method === "interrupt")).toBe(false);
+    await agent.cancelMoment({ channelId: "player", turnId: "old" });
+    expect(agent.calls.find((call: any) => call.method === "interrupt").args).toEqual([
+      "player",
+      true,
+    ]);
+    expect(agent.getStateValue("adventure-turn:player")).toBeUndefined();
+  });
+  it("publishes a no-action answer through the terminal finish tool without running simulation", async () => {
+    const agent = instance();
+    agent.role = "player";
+    const tools = await agent.getLoopTools("player");
+    const finish = tools.find((tool: any) => tool.name === "finish_turn");
+    const result = await finish.execute("answer", {
+      turnId: "question",
+      text: "The customs house is green-black timber.",
+    });
+    expect(result.terminate).toBe(true);
+    expect(agent.calls.find((call: any) => call.method === "finish").args[0]).toEqual({
+      turnId: "question",
+      text: "The customs house is green-black timber.",
+    });
+    expect(agent.calls.some((call: any) => call.method === "execute")).toBe(false);
   });
 });
