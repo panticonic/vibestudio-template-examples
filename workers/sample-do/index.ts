@@ -33,6 +33,11 @@ export class SampleDO extends DurableObjectBase {
   }
 
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -48,6 +53,11 @@ export class SampleDO extends DurableObjectBase {
   }
 
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",

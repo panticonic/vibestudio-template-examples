@@ -76,6 +76,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     );
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -94,6 +99,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     );
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -123,6 +133,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     return Object.fromEntries(entries);
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -174,6 +189,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     return { ok: true };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -189,6 +209,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     return { ok: true };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -228,6 +253,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     return { garden, events: result.events };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -281,6 +311,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     return this.getGame();
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -331,6 +366,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
       throw new Error("Only the player may begin or cancel a turn.");
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -347,6 +387,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -365,6 +410,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     this.save(s);
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -437,6 +487,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     }
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -465,6 +520,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -493,6 +553,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     return { ok: true };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -511,6 +576,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     return this.getGame();
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -524,6 +594,11 @@ export class GrimoireWorldDO extends DurableObjectBase {
     return this.getGame();
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",

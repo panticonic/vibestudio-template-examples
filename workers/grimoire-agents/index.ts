@@ -133,6 +133,11 @@ export class GrimoireAgentWorker extends AiChatWorker {
     ];
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",

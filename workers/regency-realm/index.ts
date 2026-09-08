@@ -73,6 +73,11 @@ export class RegencyGameDO extends DurableObjectBase {
     );
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -91,6 +96,11 @@ export class RegencyGameDO extends DurableObjectBase {
     );
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -120,6 +130,11 @@ export class RegencyGameDO extends DurableObjectBase {
     return Object.fromEntries(entries);
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -178,6 +193,11 @@ export class RegencyGameDO extends DurableObjectBase {
       throw new Error("Only the player may begin or cancel a turn.");
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -202,6 +222,11 @@ export class RegencyGameDO extends DurableObjectBase {
     };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -231,6 +256,11 @@ export class RegencyGameDO extends DurableObjectBase {
     if (s.pending) await this.deliver();
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -299,6 +329,11 @@ export class RegencyGameDO extends DurableObjectBase {
     return true;
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -313,6 +348,11 @@ export class RegencyGameDO extends DurableObjectBase {
     );
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -428,6 +468,11 @@ export class RegencyGameDO extends DurableObjectBase {
     }
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -537,6 +582,11 @@ export class RegencyGameDO extends DurableObjectBase {
     };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -589,6 +639,11 @@ export class RegencyGameDO extends DurableObjectBase {
     return result;
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -625,6 +680,11 @@ export class RegencyGameDO extends DurableObjectBase {
     };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -662,6 +722,11 @@ export class RegencyGameDO extends DurableObjectBase {
       throw new Error("Only an advisor in this conversation may act.");
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -684,6 +749,11 @@ export class RegencyGameDO extends DurableObjectBase {
     return { ok: true };
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -717,6 +787,11 @@ export class RegencyGameDO extends DurableObjectBase {
       throw new Error("Only the registered agent for this role may write it.");
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -736,6 +811,11 @@ export class RegencyGameDO extends DurableObjectBase {
     return this.getGame();
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",
@@ -749,6 +829,11 @@ export class RegencyGameDO extends DurableObjectBase {
     return this.getGame();
   }
   @rpc({
+    website: {
+      kind: "closed",
+      reason:
+        "This receiver serves installed workspace applications and their agents.",
+    },
     principals: ["host", "user", "code"],
     effect: { kind: "open" },
     tier: "open",

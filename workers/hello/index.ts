@@ -23,7 +23,10 @@ export default {
 
     // Expose one fixed safe value so callers can distinguish "the host accepted
     // env configuration" from "the running worker actually observed it".
-    runtime.rpc.expose("readNonSecretProbe", () => readNonSecretProbe(env));
+    runtime.rpc.expose("readNonSecretProbe", () => readNonSecretProbe(env), {
+      kind: "closed",
+      reason: "This diagnostic serves installed workspace applications and their agents.",
+    });
 
     // Handle incoming RPC calls
     const rpcResponse = await handleWorkerRpc(runtime, request);
