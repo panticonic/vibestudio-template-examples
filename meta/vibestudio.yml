@@ -313,6 +313,7 @@ template:
     - packages/regency-engine
     - packages/runtime
     - packages/svelte
+    - packages/template-management
     - packages/template-registry
     - packages/test-runtime
     - packages/testkit
