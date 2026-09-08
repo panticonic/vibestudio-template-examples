@@ -996,7 +996,7 @@ export class GadWorkspaceDO extends DurableObjectBase {
       : { wakeAt: Math.max(recoveryAt, Date.now() + 100) };
   }
 
-  @rpc({
+  @rpc({ website: {"kind":"closed","reason":"This receiver owns workspace orchestration or retained workspace data; websites require a reviewed bounded operation."},
     principals: ["host"],
     effect: { kind: "open" },
     tier: "open",
@@ -1009,7 +1009,7 @@ export class GadWorkspaceDO extends DurableObjectBase {
     return this.adoptDurableWorkWorkerGeneration(workerId);
   }
 
-  @rpc({
+  @rpc({ website: {"kind":"closed","reason":"This receiver owns workspace orchestration or retained workspace data; websites require a reviewed bounded operation."},
     principals: ["host"],
     effect: { kind: "open" },
     tier: "open",
@@ -1070,7 +1070,7 @@ export class GadWorkspaceDO extends DurableObjectBase {
     return claims;
   }
 
-  @rpc({
+  @rpc({ website: {"kind":"closed","reason":"This receiver owns workspace orchestration or retained workspace data; websites require a reviewed bounded operation."},
     principals: ["host"],
     effect: { kind: "open" },
     tier: "open",
@@ -1110,7 +1110,7 @@ export class GadWorkspaceDO extends DurableObjectBase {
     });
   }
 
-  @rpc({
+  @rpc({ website: {"kind":"closed","reason":"This receiver owns workspace orchestration or retained workspace data; websites require a reviewed bounded operation."},
     principals: ["host"],
     effect: { kind: "open" },
     tier: "open",
@@ -1156,7 +1156,7 @@ export class GadWorkspaceDO extends DurableObjectBase {
     return result;
   }
 
-  @rpc({
+  @rpc({ website: {"kind":"closed","reason":"This receiver owns workspace orchestration or retained workspace data; websites require a reviewed bounded operation."},
     principals: ["host"],
     effect: { kind: "open" },
     tier: "open",
@@ -6887,8 +6887,12 @@ export class GadWorkspaceDO extends DurableObjectBase {
       "putChannelMembership",
     );
     const channelTargetId =
-      typeof input?.channelTargetId === "string" ? input.channelTargetId.trim() : "";
-    if (!channelTargetId) throw new Error("putChannelMembership: channelTargetId is required");
+      typeof input?.channelTargetId === "string"
+        ? input.channelTargetId.trim()
+        : "";
+    if (!channelTargetId) {
+      throw new Error("putChannelMembership: channelTargetId is required");
+    }
     this.assertInviteChannelAuthority(channelId, "putChannelMembership");
     const memberId = `user:${userId}`;
     if (input?.memberId !== memberId) {

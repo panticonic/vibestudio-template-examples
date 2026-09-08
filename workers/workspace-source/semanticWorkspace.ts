@@ -8648,7 +8648,10 @@ export class SemanticWorkspace {
             }
           }
           start = index;
-        } else if (!this.sameAspectValue(aspect, before, current)) {
+        } else if (
+          !this.sameAspectValue(aspect, before, current) &&
+          !this.isDecisionAccountedIntroduction(change, coordinate, aspect, current)
+        ) {
           throw new SemanticVcsError(
             "IntegrityFailure",
             `Provenance discontinuity at ${coordinate.kind} ${coordinate.id}/${aspect}`,
@@ -8681,6 +8684,29 @@ export class SemanticWorkspace {
     aspect: MergeAspectName,
     expectedSourceValue: unknown
   ): boolean {
+    const decision = this.deps.sql
+      .exec(
+        `SELECT decision.decision_id
+           FROM gad_merge_decision_entries entry
+           JOIN gad_integration_decisions decision ON decision.decision_id = entry.decision_id
+          WHERE entry.result_change_id = ?
+            AND entry.coordinate_kind = ?
+            AND entry.coordinate_id = ?
+          LIMIT 1`,
+        change.changeId,
+        coordinate.kind,
+        coordinate.id
+      )
+      .toArray()[0] as Row | undefined;
+    if (decision) {
+      const target = this.decisionTargetState(String(decision["decision_id"]));
+      const endpoint = this.coordinateEndpoint(this.deps.store.stateRoot(target), coordinate);
+      if (
+        this.sameAspectValue(aspect, this.aspectValue(endpoint, aspect), expectedSourceValue)
+      ) {
+        return true;
+      }
+    }
     const rows = this.deps.sql
       .exec(
         `SELECT source.change_id
