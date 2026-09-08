@@ -48,7 +48,9 @@ async function run(code: string) {
     { scope, structuredClone },
     { timeout: 100 }
   );
-  return JSON.parse(scope.output);
+  const parsed = JSON.parse(scope.output);
+  if (parsed.failure) throw new Error(parsed.failure.message);
+  return parsed;
 }
 it("runs bespoke behavior through the same finite-eval source as production", async () => {
   const result = await run('world.act("clock","wind"); return world.inspect("clock").description');
@@ -76,7 +78,9 @@ async function runCampaign(campaign: Campaign, code: string) {
     { scope, structuredClone },
     { timeout: 100 }
   );
-  return JSON.parse(scope.output);
+  const parsed = JSON.parse(scope.output);
+  if (parsed.failure) throw new Error(parsed.failure.message);
+  return parsed;
 }
 it("executes the postal cabinet and ferry release as causal authored behaviors", async () => {
   const result = await runCampaign(
@@ -85,24 +89,81 @@ it("executes the postal cabinet and ferry release as causal authored behaviors",
   );
   expect(result.world.entities.find((e: any) => e.id === "ferry").components.locked).toBe(false);
   expect(result.world.entities.find((e: any) => e.id === "mara-letter").location).toBe(
-    "sorting-cabinet"
+    "salt-street-drawer"
   );
   expect(result.world.relations.some((r: any) => r.kind === "postal-route")).toBe(true);
   expect(result.world.relations.some((r: any) => r.kind === "promised-passage")).toBe(true);
 });
-it("inserts a carried letter into the closed cabinet through its discoverable action in one tick", async () => {
+it("routes a carried letter through the sorting slot and opens only its addressed drawer in one tick", async () => {
   const result = await runCampaign(
     deadLetterOffice,
     'world.move("customs");world.act("sorting-cabinet","Insert a letter");return world.observe();'
   );
   expect(result.world.tick).toBe(2);
   expect(result.world.entities.find((entity: any) => entity.id === "mara-letter").location).toBe(
-    "sorting-cabinet"
+    "salt-street-drawer"
   );
   expect(
-    result.world.entities.find((entity: any) => entity.id === "sorting-cabinet").components.open
-  ).not.toBe(true);
+    result.world.entities.find((entity: any) => entity.id === "salt-street-drawer").components.open
+  ).toBe(true);
+  expect(
+    result.world.entities.find((entity: any) => entity.id === "current-post-drawer").components.open
+  ).toBe(false);
+  expect(
+    result.world.relations.find((relation: any) => relation.id === "route-mara-letter")
+  ).toMatchObject({
+    to: "drowned-quarter",
+    data: { drawer: "salt-street-drawer", addressee: "Mara Vale" },
+  });
 });
+it.each([
+  {
+    label: "alternative addressed mail",
+    preparation:
+      'world.take("salt-street-circular");world.give("salt-street-circular","sorting-cabinet");world.take("permit");',
+    document: "permit",
+  },
+  {
+    label: "an independently valid warrant",
+    preparation: 'world.take("relief-warrant");',
+    document: "relief-warrant",
+  },
+])(
+  "recognizes ferry authority through $label without using Mara's letter",
+  async ({ preparation, document }) => {
+    const result = await runCampaign(
+      deadLetterOffice,
+      'world.move("customs");' +
+        preparation +
+        'world.move("landing");world.move("quay");world.give(' +
+        JSON.stringify(document) +
+        ',"tomas");'
+    );
+    expect(
+      result.world.entities.find((entity: any) => entity.id === "ferry").components.locked
+    ).toBe(false);
+    expect(result.world.entities.find((entity: any) => entity.id === "mara-letter").location).toBe(
+      deadLetterOffice.playerId
+    );
+    expect(
+      result.world.relations.find((relation: any) => relation.id === "recognized-tomas-" + document)
+    ).toMatchObject({ kind: "recognized-authority", to: document, data: { resource: "ferry" } });
+    if (document === "permit") {
+      expect(
+        result.world.entities.find((entity: any) => entity.id === "salt-street-circular").location
+      ).toBe("salt-street-drawer");
+      expect(
+        result.world.relations.find((relation: any) => relation.id === "route-salt-street-circular")
+          .to
+      ).toBe("drowned-quarter");
+    } else {
+      expect(
+        result.world.entities.find((entity: any) => entity.id === "salt-street-drawer").components
+          .locked
+      ).toBe(true);
+    }
+  }
+);
 it("repaints the actual harbour tide change using the same visible facts sent to its artist", async () => {
   const before = initialWorld(deadLetterOffice);
   const initial = sceneSnapshot(before);
@@ -126,6 +187,37 @@ it("repaints the actual harbour tide change using the same visible facts sent to
     "A private recollection",
   ];
   expect(sceneSnapshot(before).signature).toBe(initial.signature);
+});
+it("changes the illustration facts when an in-place physical cover blocks an existing light", async () => {
+  const c = structuredClone(campaign);
+  c.entities.push(
+    {
+      id: "cloth",
+      kind: "object",
+      name: "Opaque cloth",
+      description: "",
+      location: "room",
+      components: { portable: true, opaque: true },
+    },
+    {
+      id: "lamp",
+      kind: "object",
+      name: "Lamp",
+      description: "",
+      location: "room",
+      components: { light: true },
+    }
+  );
+  const before = sceneSnapshot(initialWorld(c));
+  const covered = await runCampaign(c, 'world.link("cloth","lamp","covers");');
+  const after = sceneSnapshot(covered.world);
+  expect(after.signature).not.toBe(before.signature);
+  expect(
+    after.view.entities.find((entity) => entity.id === "lamp")!.components["effectiveLight"]
+  ).toBe(false);
+  expect(covered.world.entities.find((entity: any) => entity.id === "lamp").components.light).toBe(
+    true
+  );
 });
 it("offers asylum without inventing a refugees consent", async () => {
   const result = await runCampaign(
@@ -170,7 +262,9 @@ it("moves the hotel between real stops, closes transit routes, and preserves cab
       { scope, structuredClone },
       { timeout: 100 }
     );
-    return JSON.parse(scope.output);
+    const parsed = JSON.parse(scope.output);
+    if (parsed.failure) throw new Error(parsed.failure.message);
+    return parsed;
   };
   let world = initialWorld(c);
   await expect(step(world, "guest", 'world.move("outside")')).rejects.toThrow("no known route");

@@ -255,9 +255,9 @@ export function AdventurePanel({
   const waiting = !story.game
     ? "Opening your journal…"
     : pending?.phase === "builder"
-      ? diagnostic.startsWith("FRONTIER:")
+      ? pending.purpose === "frontier" || diagnostic.startsWith("FRONTIER:")
         ? `Exploring ${frontierName ?? "a new place"} for the first time; new places take a little longer…`
-        : diagnostic.startsWith("UNMODELED:")
+        : pending.purpose === "extension" || diagnostic.startsWith("UNMODELED:")
           ? "Making room for your idea…"
           : "The world keeper is repairing an unexpected turn…"
       : pending?.phase === "participants"
@@ -574,6 +574,18 @@ export function AdventurePanel({
                 </button>
               </div>
               <p>{item.description}</p>
+              {typeof item.components["effectiveLight"] === "boolean" && (
+                <p aria-label="Light condition">
+                  {item.components["effectiveLight"]
+                    ? "Its light is shining."
+                    : item.components["light"]
+                      ? "Its light is blocked by a covering."
+                      : "Its light is off."}
+                </p>
+              )}
+              {typeof item.components["capacity"] === "number" && (
+                <p>Capacity: {item.components["capacity"]} volume units.</p>
+              )}
               {typeof item.components.readable === "string" && (
                 <blockquote className="adventure-readable" aria-label={`Text of ${item.name}`}>
                   {item.components.readable}

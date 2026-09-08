@@ -8,7 +8,12 @@ import {
   type PendingTurn,
   type ServiceView,
 } from "@workspace/adventure-engine";
-import { evaluate, defaultEngineSource } from "./evaluate.js";
+import {
+  evaluate,
+  defaultEngineSource,
+  AgentProgramError,
+  WorldActionRefusal,
+} from "./evaluate.js";
 import { sceneSnapshot } from "./scene.js";
 type SceneTask = ReturnType<typeof sceneSnapshot> & {
   id: string;
@@ -639,7 +644,34 @@ export class AdventureWorldDO extends DurableObjectBase {
         fresh.pending.phase === s.pending.phase &&
         fresh.world.revision === revision
       ) {
+        if (
+          error instanceof AgentProgramError ||
+          error instanceof WorldActionRefusal
+        ) {
+          fresh.trajectory.push({
+            turnId,
+            role: seat.role,
+            code,
+            error: String(error),
+            origin: error instanceof WorldActionRefusal ? "action" : "program",
+          });
+          this.save(fresh);
+          return {
+            ...(error instanceof WorldActionRefusal
+              ? { actionError: String(error) }
+              : { programError: String(error) }),
+            message:
+              error instanceof WorldActionRefusal
+                ? "A world prerequisite refused this action; this call committed no effects. Respect the constraint and revise your program using the current perspective and already completed actions."
+                : "Your JavaScript failed; this call committed no effects. Correct the program using your current perspective and already completed actions, then call eval_world again.",
+          };
+        }
         fresh.pending.diagnostic = String(error);
+        fresh.pending.purpose = /\bFRONTIER:/.test(String(error))
+          ? "frontier"
+          : /\bUNMODELED:/.test(String(error))
+            ? "extension"
+            : "repair";
         delete fresh.pending.error;
         delete fresh.pending.continuationCode;
         fresh.pending.failedRole = seat.role;
@@ -797,6 +829,7 @@ export class AdventureWorldDO extends DurableObjectBase {
       : "player";
     delete fresh.pending.failedRole;
     delete fresh.pending.diagnostic;
+    delete fresh.pending.purpose;
     fresh.pending.attempt++;
     delete fresh.pending.error;
     this.save(fresh);

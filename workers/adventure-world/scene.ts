@@ -1,4 +1,10 @@
-import { createWorldAPI, type Entity, type World, type View } from "@workspace/adventure-engine";
+import {
+  createWorldAPI,
+  type Entity,
+  type World,
+  type View,
+  type Relation,
+} from "@workspace/adventure-engine";
 
 /** Authors opt physical component facts into both the scene brief and its freshness key. */
 export function sceneSnapshot(world: World) {
@@ -11,19 +17,37 @@ export function sceneSnapshot(world: World) {
     location: entity.location,
     components: {
       open: entity.components.open,
+      effectiveLight: entity.components["effectiveLight"],
       appearance: entity.components["appearance"],
       visualAnchors: entity.components["visualAnchors"],
       visual: Object.fromEntries(
         [...((entity.components["visualFields"] as string[] | undefined) ?? [])]
           .sort()
-          .map((key) => [key, entity.components[key]])
+          .map((key) => [key, entity.components[key]]),
       ),
     },
   });
-  const view: View = {
+  const visibleIds = new Set([
+    observed.location.id,
+    ...observed.entities.map((e) => e.id),
+    ...observed.inventory.map((e) => e.id),
+  ]);
+  const view: View & { relations: Relation[] } = {
+    relations: structuredClone(
+      world.relations.filter(
+        (r) =>
+          r.data?.["physical"] === true &&
+          visibleIds.has(r.from) &&
+          visibleIds.has(r.to),
+      ),
+    ).sort((a, b) => a.id.localeCompare(b.id)),
     location: physical(observed.location),
-    entities: observed.entities.map(physical).sort((a, b) => a.id.localeCompare(b.id)),
-    inventory: observed.inventory.map(physical).sort((a, b) => a.id.localeCompare(b.id)),
+    entities: observed.entities
+      .map(physical)
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    inventory: observed.inventory
+      .map(physical)
+      .sort((a, b) => a.id.localeCompare(b.id)),
     exits: observed.exits,
     events: [],
   };
@@ -35,8 +59,13 @@ export function sceneSnapshot(world: World) {
         ? Object.fromEntries(
             Object.keys(value)
               .sort()
-              .map((key) => [key, stable(value[key])])
+              .map((key) => [key, stable(value[key])]),
           )
         : value;
-  return { view, signature: JSON.stringify(stable({ view, artDirection: world.artDirection })) };
+  return {
+    view,
+    signature: JSON.stringify(
+      stable({ view, artDirection: world.artDirection }),
+    ),
+  };
 }

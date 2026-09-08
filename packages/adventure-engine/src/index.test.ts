@@ -218,6 +218,189 @@ describe("composable adventure world", () => {
     expect(npc.observe().events.at(-1)!.text).toBe("The courier: Hello");
     expect(player.observe().events.at(-1)!.text).toBe("You: Hello");
   });
+  it("composes unscripted JSON edits, transfers and physical links while preserving private state", () => {
+    const w = initialWorld(campaign);
+    w.entities.push(
+      {
+        id: "cloth",
+        name: "Cloth",
+        kind: "object",
+        location: "hall",
+        description: "",
+        components: { portable: true, opaque: true },
+      },
+      {
+        id: "lamp",
+        name: "Lamp",
+        kind: "object",
+        location: "hall",
+        description: "",
+        components: { light: true },
+      }
+    );
+    const api = createWorldAPI(w, "player");
+    api.setComponent("hall", "decoration", { ribbons: ["blue", "gold"] });
+    expect(api.getComponent("hall", "decoration")).toEqual({ ribbons: ["blue", "gold"] });
+    const decoration = api.getComponent("hall", "decoration");
+    decoration.ribbons.push("red");
+    expect(api.getComponent("hall", "decoration").ribbons).toHaveLength(2);
+    const opaque = api.observe().entities.find((e) => e.components.opaque)!;
+    api.transfer(opaque.id, "player");
+    api.transfer(opaque.id, "hall");
+    const cover = api.link(opaque.id, "lamp", "covers");
+    expect(api.inspect("lamp").components.effectiveLight).toBe(false);
+    api.unlink(cover.id);
+    expect(api.inspect("lamp").components.effectiveLight).toBe(true);
+    const marker = api.link("cloth", "lamp", "points-toward", { angle: 45 });
+    expect(marker.data).toEqual({ angle: 45, physical: true });
+    expect(() => api.setComponent("clerk", "knowledge", ["Forged knowledge"])).toThrow("mechanism");
+    expect(() => api.setComponent("hall", "exits", { shortcut: "road" })).toThrow("mechanism");
+    expect(() => api.getComponent("letter", "readable")).toThrow("perceive");
+    expect(api.getComponent("clerk", "knowledge")).toBeUndefined();
+  });
+  it("applies shared capacity and slot geometry to direct transfers and convenience verbs", () => {
+    const w = initialWorld(campaign);
+    const box = w.entities.find((e) => e.id === "box")!;
+    box.components.capacity = 1;
+    box.components.insertionSlot = { maxVolume: 0.5 };
+    w.entities.find((e) => e.id === "letter")!.location = "player";
+    const api = createWorldAPI(w, "player");
+    expect(() => api.give("letter", "box")).toThrow("slot");
+    api.setComponent("letter", "volume", 0.5);
+    api.transfer("letter", "box");
+    expect(() => api.take("letter")).toThrow("perceive");
+    w.entities.push({
+      id: "parcel",
+      name: "Parcel",
+      kind: "object",
+      location: "player",
+      description: "",
+      components: { portable: true, volume: 0.75 },
+    });
+    api.open("box");
+    expect(() => api.transfer("parcel", "box")).toThrow("capacity");
+    expect(w.entities.find((e) => e.id === "parcel")!.location).toBe("player");
+    expect(() => api.transfer("box", "box")).toThrow();
+  });
+  it("lets authored change and link hooks own causal constraints", () => {
+    const w = initialWorld(campaign);
+    w.behaviors.push(
+      { id: "dial", entityId: "box", trigger: "change", code: "", state: {} },
+      { id: "attachment", entityId: "box", trigger: "link", code: "", state: {} }
+    );
+    const api = createWorldAPI(w, "player", false, {
+      dial: (world: any, _state: any, event: any) => {
+        if (event.key === "angle") world.emit("The dial turns to " + event.value);
+      },
+      attachment: (_world: any, _state: any, event: any) => {
+        if (event.relation.kind === "balances-on")
+          throw new Error("The lid cannot bear that weight");
+      },
+    });
+    api.setComponent("box", "angle", 45);
+    expect(api.observe().events.some((e) => e.text === "The dial turns to 45")).toBe(true);
+    expect(() => api.link("player", "box", "balances-on")).toThrow("weight");
+    expect(w.relations).toEqual([]);
+    expect(api.inspect("box").actions).toEqual([]);
+  });
+  it("uses the same lock, seal and opening consequences through components and convenience verbs", () => {
+    const w = initialWorld(campaign);
+    const box = w.entities.find((e) => e.id === "box")!;
+    box.components.locked = true;
+    w.behaviors.push({ id: "opened", entityId: "box", trigger: "open", code: "", state: {} });
+    let openings = 0;
+    const api = createWorldAPI(w, "player", false, { opened: () => openings++ });
+    expect(() => api.setComponent("box", "open", true)).toThrow("locked");
+    expect(box.components.open).toBe(false);
+    expect(w.tick).toBe(0);
+    api.setComponent("box", "locked", false);
+    api.setComponent("box", "open", true);
+    expect(openings).toBe(1);
+    expect(w.tick).toBe(2);
+    api.setComponent("box", "open", false);
+    api.open("box");
+    expect(openings).toBe(2);
+    expect(w.tick).toBe(4);
+    expect(api.inspect("letter").components.readable).toBeUndefined();
+    api.setComponent("letter", "open", true);
+    expect(api.read("letter")).toBe("A secret");
+    expect(w.tick).toBe(5);
+  });
+  it("rejects invalid capacity and inlet measurements when applying transfers", () => {
+    const w = initialWorld(campaign);
+    w.entities.find((e) => e.id === "letter")!.location = "player";
+    const api = createWorldAPI(w, "player");
+    api.open("box");
+    for (const capacity of [-1, NaN, null]) {
+      api.setComponent("box", "capacity", capacity);
+      expect(() => api.transfer("letter", "box")).toThrow("capacity is invalid");
+      expect(w.entities.find((e) => e.id === "letter")!.location).toBe("player");
+    }
+    api.setComponent("box", "capacity", 2);
+    api.setComponent("box", "open", false);
+    api.setComponent("box", "insertionSlot", { maxVolume: -1 });
+    expect(() => api.transfer("letter", "box")).toThrow("Slot volume is invalid");
+  });
+  it("distinguishes ordinary action refusals from missing mechanisms and engine defects", () => {
+    const w = initialWorld(campaign);
+    w.entities.push(
+      {
+        id: "cloth",
+        name: "Cloth",
+        kind: "object",
+        location: "player",
+        description: "",
+        components: { opaque: true, portable: true },
+      },
+      {
+        id: "lamp",
+        name: "Lamp",
+        kind: "object",
+        location: "hall",
+        description: "",
+        components: { light: true },
+      }
+    );
+    const api = createWorldAPI(w, "player");
+    const refused = (action: () => unknown) => {
+      try {
+        action();
+        throw new Error("Expected a refusal");
+      } catch (error) {
+        expect(error).toMatchObject({ name: "WorldActionError", code: "WORLD_ACTION_REFUSED" });
+      }
+    };
+    refused(() => api.inspect("unknown-id"));
+    refused(() => api.give("unknown-id", "clerk"));
+    refused(() => api.take("letter"));
+    refused(() => api.link("cloth", "lamp", "covers"));
+    refused(() => api.wait(-1));
+    expect(w.tick).toBe(0);
+    expect(() => api.move("road")).toThrow("FRONTIER:");
+    try {
+      api.move("road");
+    } catch (error) {
+      expect((error as Error).name).toBe("Error");
+      expect((error as Error).message).toContain("FRONTIER:");
+    }
+    w.behaviors.push({ id: "missing-hook", entityId: "box", trigger: "turn", code: "", state: {} });
+    expect(() => api.act("box", "turn")).toThrow("Behavior is unavailable");
+    try {
+      api.act("box", "turn");
+    } catch (error) {
+      expect((error as Error).name).toBe("Error");
+      expect((error as Error).message).toContain("Behavior is unavailable");
+    }
+    const privileged = createWorldAPI(w, "player", true);
+    expect(() => (privileged as any).entity("missing-internal-reference")).toThrow(
+      "Unknown entity"
+    );
+    try {
+      (privileged as any).entity("missing-internal-reference");
+    } catch (error) {
+      expect((error as Error).name).toBe("Error");
+    }
+  });
   it("rejects broken references and containment cycles", () => {
     const w = initialWorld(campaign);
     w.entities.find((e) => e.id === "box")!.location = "letter";

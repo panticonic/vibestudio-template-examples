@@ -12,7 +12,13 @@ export interface Components extends Record<string, any> {
   portable?: boolean;
   container?: boolean;
   /** An inlet permits deposits while the container remains closed. */
-  insertionSlot?: boolean;
+  insertionSlot?: boolean | { maxVolume: number };
+  capacity?: number;
+  volume?: number;
+  opaque?: boolean;
+  light?: boolean;
+  /** Derived public light output after physical occlusion. */
+  effectiveLight?: boolean;
   /** How other participants address the player, whose UI name may be “You”. */
   roleName?: string;
   locked?: boolean;
@@ -177,6 +183,10 @@ export function createWorldAPI(
   privileged = false,
   hooks: Record<string, Function> = {}
 ) {
+  class WorldActionError extends Error {
+    override name = "WorldActionError";
+    readonly code = "WORLD_ACTION_REFUSED";
+  }
   const entity = (id: string) => {
     const e = world.entities.find((e) => e.id === id);
     if (!e) throw new Error("Unknown entity " + id);
@@ -207,6 +217,16 @@ export function createWorldAPI(
       : e.name;
   const publicEntity = (e: Entity) => {
     const copy = structuredClone(e);
+    if (typeof e.components.light === "boolean")
+      copy.components.effectiveLight =
+        e.components.light &&
+        !world.relations.some(
+          (r) =>
+            r.kind === "covers" &&
+            r.to === e.id &&
+            entity(r.from).components.opaque === true &&
+            entity(r.from).location === e.location
+        );
     if (actorId !== world.playerId) copy.name = participantName(e);
     const lifecycle = new Set([
       "enter",
@@ -217,6 +237,10 @@ export function createWorldAPI(
       "speak",
       "tick",
       "open",
+      "change",
+      "link",
+      "unlink",
+      "transfer",
     ]);
     copy.actions = [
       ...new Set([
@@ -236,8 +260,11 @@ export function createWorldAPI(
     return copy;
   };
   const accessible = (id: string) => {
+    if (!world.entities.some((e) => e.id === id))
+      throw new WorldActionError("Unknown entity " + id);
     const e = entity(id);
-    if (!privileged && !visible(e)) throw new Error("You cannot perceive " + id + " here");
+    if (!privileged && !visible(e))
+      throw new WorldActionError("You cannot perceive " + id + " here");
     return e;
   };
   let eventSourceId: string | undefined;
@@ -299,7 +326,7 @@ export function createWorldAPI(
   };
   const advance = (ticks = 1) => {
     if (!Number.isInteger(ticks) || ticks < 0 || ticks > 24)
-      throw new Error("Wait between zero and 24 moments");
+      throw new WorldActionError("Wait between zero and 24 moments");
     for (let i = 0; i < ticks; i++) {
       world.tick++;
       for (const due of world.schedule.filter((s) => s.at <= world.tick)) {
@@ -312,6 +339,121 @@ export function createWorldAPI(
         invoke(entityId, "tick", { tick: world.tick });
     }
     return world.tick;
+  };
+  const transfer = (id: string, to: string, verb = "transfer") => {
+    const e = accessible(id),
+      receiver = accessible(to);
+    if (e.kind !== "object" || !e.components.portable)
+      throw new WorldActionError(e.name + " cannot be carried");
+    if (e.location === to) return publicEntity(e);
+    if (
+      receiver.kind !== "person" &&
+      receiver.kind !== "place" &&
+      receiver.components.container !== true
+    )
+      throw new WorldActionError("Choose a person, place or container");
+    let parent: Entity | undefined = receiver;
+    while (parent) {
+      if (parent.id === id) throw new WorldActionError("An object cannot contain itself");
+      parent = parent.location ? entity(parent.location) : undefined;
+    }
+    const volume = e.components.volume ?? 1;
+    if (!Number.isFinite(volume) || volume < 0) throw new Error("Object volume is invalid");
+    const slot = receiver.components.insertionSlot;
+    if (receiver.components.container && receiver.components.open !== true) {
+      if (!slot) throw new WorldActionError("The container is closed");
+      if (typeof slot === "object") {
+        if (!Number.isFinite(slot.maxVolume) || slot.maxVolume < 0)
+          throw new Error("Slot volume is invalid");
+        if (volume > slot.maxVolume)
+          throw new WorldActionError("The object does not fit through the slot");
+      }
+    }
+    if (receiver.components.capacity !== undefined) {
+      if (
+        typeof receiver.components.capacity !== "number" ||
+        !Number.isFinite(receiver.components.capacity) ||
+        receiver.components.capacity < 0
+      )
+        throw new Error("Container capacity is invalid");
+      const used = world.entities
+        .filter((item) => item.location === to)
+        .reduce((sum, item) => {
+          const occupied = item.components.volume ?? 1;
+          if (!Number.isFinite(occupied) || occupied < 0)
+            throw new Error("Object volume is invalid");
+          return sum + occupied;
+        }, 0);
+      if (used + volume > receiver.components.capacity)
+        throw new WorldActionError("There is not enough capacity");
+    }
+    const from = e.location;
+    e.location = to;
+    // Physical attachments cease when an endpoint is moved; story relationships persist.
+    world.relations = world.relations.filter(
+      (r) => !(r.data?.["physical"] === true && (r.from === id || r.to === id))
+    );
+    const startedAt = world.tick;
+    emit(actionText(verb) + " " + e.name + (to === actorId ? "" : " to " + receiver.name));
+    invoke(id, "transfer", { actorId, from, to });
+    if (to === actorId) invoke(id, "take", { actorId });
+    else {
+      invoke(id, "give", { actorId, to });
+      invoke(to, "receive", { actorId, itemId: id });
+    }
+    if (world.tick === startedAt) advance();
+    return publicEntity(e);
+  };
+  const changeComponent = (id: string, key: string, value: any) => {
+    const e = accessible(id);
+    const protectedKeys = [
+      "private",
+      "secret",
+      "knowledge",
+      "memory",
+      "goals",
+      "hidden",
+      "exits",
+      "frontier",
+      "privateCorrespondence",
+      "visualFields",
+      "effectiveLight",
+    ];
+    const exposed = publicEntity(e).components;
+    if (
+      protectedKeys.includes(key) ||
+      ["__proto__", "constructor", "prototype"].includes(key) ||
+      (Object.hasOwn(e.components, key) && !Object.hasOwn(exposed, key))
+    )
+      throw new WorldActionError("This component belongs to the world mechanism");
+    const previous = e.components[key];
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) throw new WorldActionError("Use a JSON value");
+    value = JSON.parse(encoded);
+    const opening =
+      (key === "open" && value === true && e.components.open !== true) ||
+      (key === "sealed" && value === false && e.components.sealed === true);
+    if (opening && e.components.locked) throw new WorldActionError("It is locked");
+    e.components[key] = value;
+    if (opening) {
+      e.components.open = true;
+      e.components.sealed = false;
+    }
+    const startedAt = world.tick;
+    invoke(id, "change", {
+      actorId,
+      key,
+      previous: structuredClone(previous),
+      value: structuredClone(value),
+    });
+    if (opening) invoke(id, "open", { actorId });
+    emit(
+      opening
+        ? actionText("open") + " " + e.name
+        : actionText("adjust") + " " + e.name + " (" + key + ")"
+    );
+    if (world.tick === startedAt) advance();
+    return publicEntity(e);
   };
   const api = {
     observe,
@@ -328,9 +470,9 @@ export function createWorldAPI(
     move: (destination: string) => {
       const exits = place().components.exits ?? {};
       if (!Object.values(exits).includes(destination) && !privileged)
-        throw new Error("There is no known route there");
+        throw new WorldActionError("There is no known route there");
       const target = entity(destination);
-      if (target.kind !== "place") throw new Error("Destination is not a place");
+      if (target.kind !== "place") throw new WorldActionError("Destination is not a place");
       if (target.components.frontier) throw new Error("FRONTIER:" + destination);
       const origin = place();
       const departureWitnesses = world.entities
@@ -344,47 +486,74 @@ export function createWorldAPI(
       advance();
       return observe();
     },
-    take: (id: string) => {
-      const e = accessible(id);
-      if (!e.components.portable) throw new Error(e.name + " cannot be carried");
-      if (e.location === actorId) return publicEntity(e);
-      e.location = actorId;
-      emit(actionText("take") + " " + e.name);
-      invoke(id, "take", { actorId });
-      advance();
-      return publicEntity(e);
-    },
+    transfer: (id: string, to: string) => transfer(id, to),
+    take: (id: string) => transfer(id, actorId, "take"),
     give: (id: string, to: string) => {
-      const e = entity(id);
-      const receiver = accessible(to);
-      if (receiver.kind !== "person" && receiver.components.container !== true)
-        throw new Error("Choose a person or container");
-      if (
-        receiver.components.container &&
-        receiver.components.open !== true &&
-        !receiver.components.insertionSlot
-      )
-        throw new Error("The container is closed");
-      if (e.location !== actorId) throw new Error("You are not carrying " + e.name);
-      e.location = to;
-      emit(actionText("give") + " " + e.name + " to " + entity(to).name);
-      invoke(id, "give", { actorId, to });
-      invoke(to, "receive", { actorId, itemId: id });
-      advance();
-      return publicEntity(e);
+      const item = accessible(id);
+      if (item.location !== actorId)
+        throw new WorldActionError("You are not carrying " + item.name);
+      return transfer(id, to, "give");
+    },
+    getComponent: (id: string, key: string) =>
+      structuredClone(publicEntity(accessible(id)).components[key]),
+    setComponent: changeComponent,
+    link: (from: string, to: string, kind: string, data: Record<string, any> = {}) => {
+      const source = accessible(from),
+        target = accessible(to);
+      if (from === to) throw new WorldActionError("Choose two different objects");
+      if (kind === "covers") {
+        if (
+          source.kind !== "object" ||
+          source.components.opaque !== true ||
+          target.kind !== "object" ||
+          typeof target.components.light !== "boolean"
+        )
+          throw new WorldActionError("An opaque object can cover a light source");
+        if (source.location !== target.location)
+          throw new WorldActionError("Place the cover alongside the light first");
+      }
+      const relation = {
+        id: "physical-" + world.revision + "-" + world.tick + "-" + world.relations.length,
+        from,
+        to,
+        kind,
+        data: { ...structuredClone(data), physical: true },
+      };
+      const startedAt = world.tick;
+      // Handlers validate the proposed connection before it becomes a fact.
+      invoke(from, "link", { actorId, relation: structuredClone(relation) });
+      invoke(to, "link", { actorId, relation: structuredClone(relation) });
+      world.relations.push(relation);
+      emit(actionText("connect") + " " + source.name + " to " + target.name + " (" + kind + ")");
+      if (world.tick === startedAt) advance();
+      return structuredClone(relation);
+    },
+    unlink: (id: string) => {
+      const r = world.relations.find((r) => r.id === id);
+      if (!r || r.data?.["physical"] !== true)
+        throw new WorldActionError("Choose a physical connection");
+      accessible(r.from);
+      accessible(r.to);
+      const startedAt = world.tick;
+      invoke(r.from, "unlink", { actorId, relation: structuredClone(r) });
+      invoke(r.to, "unlink", { actorId, relation: structuredClone(r) });
+      world.relations = world.relations.filter((r) => r.id !== id);
+      emit(actionText("disconnect") + " " + entity(r.from).name + " from " + entity(r.to).name);
+      if (world.tick === startedAt) advance();
     },
     read: (id: string) => {
       const e = accessible(id);
-      if (e.components.sealed) throw new Error("The seal must be opened first");
+      if (e.components.sealed) throw new WorldActionError("The seal must be opened first");
       if (e.components.privateCorrespondence && e.location !== actorId)
-        throw new Error("You need custody to read this correspondence");
-      if (typeof e.components.readable !== "string") throw new Error("Nothing legible here");
+        throw new WorldActionError("You need custody to read this correspondence");
+      if (typeof e.components.readable !== "string")
+        throw new WorldActionError("Nothing legible here");
       emit(actionText("read") + " " + e.name, "observation", [actorId]);
       return e.components.readable;
     },
     say: (to: string, text: string) => {
       const receiver = accessible(to);
-      if (receiver.kind !== "person") throw new Error("They cannot answer");
+      if (receiver.kind !== "person") throw new WorldActionError("They cannot answer");
       const message = emit(actor().name + ": " + text, "speech", [actorId, to]);
       receiver.components.memory = [
         ...(receiver.components.memory ?? []),
@@ -396,15 +565,10 @@ export function createWorldAPI(
     },
     open: (id: string) => {
       const e = accessible(id);
-      if (e.components.locked) throw new Error("It is locked");
+      if (e.components.locked) throw new WorldActionError("It is locked");
       if (!e.components.container && !e.components.sealed)
-        throw new Error("There is nothing to open");
-      e.components.open = true;
-      e.components.sealed = false;
-      invoke(id, "open", { actorId });
-      emit(actionText("open") + " " + e.name);
-      advance();
-      return publicEntity(e);
+        throw new WorldActionError("There is nothing to open");
+      return changeComponent(id, "open", true);
     },
     act: (id: string, action: string, payload: any = {}) => {
       accessible(id);
@@ -453,7 +617,24 @@ export function createWorldAPI(
   } = api;
   return scoped;
 }
-export const WORLD_API_GUIDE = `Write JavaScript using the supplied world object. Every method must be qualified: world.observe(), world.inspect(id), world.recall(), world.relations(id?), world.move(placeId), world.take(id), world.give(itemId,personId), world.read(id), world.say(personId,text), world.open(id), world.act(entityId,action,payload?), world.wait(0..24), world.remember(text), world.narrate(text). Example: const before = world.observe(); world.move(before.exits["north"]); return world.observe(); There are no standalone move(), inspect(), or other action functions. Methods are synchronous. world.say records speech; the other person's agent responds only AFTER you call finish_turn. After asking a question, finish your contribution rather than polling, waiting, or simulating their answer. world.wait advances fictional time; it does not run another agent immediately. Observing/reading is free; actions advance fictional time. Return a concise result. Only narrate outcomes the API actually establishes. An UNMODELED or FRONTIER error calls for the builder, not an invented success.`;
+export const WORLD_API_GUIDE = `Write JavaScript using the supplied world object. Compose entity, component and physical-relation operations for open-ended intentions; named verbs are conveniences. All methods are synchronous and must be qualified as world.method(...).
+
+Data shapes:
+- world.observe() returns {location, entities, inventory, exits, events}. location is the current place Entity. entities contains other visible entities nearby; it excludes the actor, current place and directly carried inventory. inventory is a separate Entity[] of directly carried items. exits maps route labels to destination IDs. events contains recent events witnessed by this actor. There is no self or actor field inside observe(); the caller supplies the actor identity separately.
+- Entity is {id, name, kind, description, location?, components, actions?}. location on an Entity is a container/person/place ID, not another Entity. Component fields live under entity.components. Projections are detached copies with private/unreadable content omitted; editing these copies does not change the world.
+- world.inspect(id) returns one accessible Entity by its exact ID, including carried items. Find available objects in [...world.observe().entities, ...world.observe().inventory], or inspect a known ID directly. Check a search result before using its id. world.getComponent(id,key) returns the public component value or undefined, as a detached copy.
+
+Manipulation:
+- world.transfer(itemId,toId), world.take(itemId), world.give(itemId,toId) return the moved Entity. Transfer moves accessible portable objects to reachable people, places or containers using shared volume/capacity/slot checks. Take moves into the actor's inventory; give requires the item already be carried.
+- world.setComponent(id,key,value) changes public components of accessible entities, including new JSON values, runs authored change behavior, and returns the updated Entity. Private/structural fields remain mechanism-owned. Opening obeys the same lock, seal and open-hook rules as world.open(id), which also returns the opened Entity.
+- world.link(fromId,toId,kind,data?) returns {id,from,to,kind,data}. Physical/descriptive link kinds are open-ended; optional link handlers constrain effects. The covers relation connects an opaque object alongside a light at the same location and changes its public effectiveLight. Public links carry data.physical:true and never grant institutional authority. world.unlink(relationId) removes a physical connection and returns undefined; authored story relationships remain mechanism-owned.
+- world.move(placeId) and world.act(entityId,action,payload?) return the updated observe() view. act invokes an existing authored mechanism; its available custom triggers appear in Entity.actions. world.wait(0..24) advances fictional time and returns the resulting tick.
+
+Information and conversation:
+- world.read(id) returns readable text and records an observation without advancing time; sealed/private correspondence must be accessible under its reading rules. world.relations(id?) returns public Relation[] touching the supplied ID, defaulting to the actor. world.recall() returns the actor's memory string[]. world.remember(text) records personal memory and returns undefined.
+- world.say(personId,text) returns the speech JournalEntry; world.narrate(text) returns a narration JournalEntry. Entries contain id,tick,actor,text,kind,audience. Say records speech; the other person's agent responds only AFTER you call finish_turn. After asking a question, finish your contribution rather than polling, waiting or simulating their answer. world.wait advances fictional time; it does not run another agent immediately.
+
+Observing, inspecting and reading are free; physical actions advance fictional time. Return a concise result and narrate only outcomes the API establishes. UNMODELED or FRONTIER means the builder must extend the world, not that an outcome may be invented. Example: const view = world.observe(); const destination = Object.values(view.exits)[0]; if (destination) world.move(destination); return world.observe();`;
 export type AdventureRole = "player" | "builder" | "artist" | `person:${string}`;
 export type PendingTurn = {
   id: string;
@@ -465,6 +646,7 @@ export type PendingTurn = {
   attempt: number;
   failedRole?: AdventureRole;
   diagnostic?: string;
+  purpose?: "frontier" | "extension" | "repair";
   continuationCode?: string;
 };
 export type ServiceView = {

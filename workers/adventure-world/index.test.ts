@@ -129,6 +129,8 @@ describe("durable adventure orchestration", () => {
     ).rejects.toThrow();
     const state = await t.agent("builder", "perspective");
     expect(state.pending.failedRole).toBe("person:clerk");
+    expect(state.pending.purpose).toBe("extension");
+    expect(state.pending.error).toBeUndefined();
     state.world.behaviors.push({
       id: "clockwork",
       entityId: "clock",
@@ -146,40 +148,57 @@ describe("durable adventure orchestration", () => {
     await t.agent("person:clerk", "execute", { turnId: "one", code: 'world.act("clock","wind")' });
     expect((await t.user("getGame")).world.tick).toBe(2);
   });
-  it("corrects a faulty agent program without changing the engine or replaying successful work", async () => {
-    const t = await boot();
-    await t.user("play", { id: "one", text: "Greet the clerk and inspect the clock" });
-    await t.agent("player", "execute", { turnId: "one", code: 'world.say("clerk","Hello")' });
+  it.each([
+    'world.say("clerk","Uncommitted"); const absent=world.observe().entities.find(entity=>entity.id==="not-here");return absent.id;',
+    'inspect("clock")',
+    "const =",
+  ])(
+    "returns the participant's coding mistake for correction without builder or replay: %s",
+    async (code) => {
+      const t = await boot();
+      await t.user("play", { id: "one", text: "Greet the clerk and inspect the clock" });
+      await t.agent("player", "execute", { turnId: "one", code: 'world.say("clerk","Hello")' });
+      const engine = (await t.agent("builder", "perspective")).engineSource;
+      const rejected = await t.agent("player", "execute", { turnId: "one", code });
+      expect(rejected.programError).toBeTruthy();
+      const resumed = await t.agent("player", "perspective");
+      expect(resumed.pending.phase).toBe("player");
+      expect(resumed.pending.purpose).toBeUndefined();
+      expect(resumed.completedActions).toHaveLength(1);
+      expect(t.deliveries).not.toContain("do:builder");
+      await t.agent("player", "execute", { turnId: "one", code: 'return world.inspect("clock")' });
+      await t.agent("player", "finish", {
+        turnId: "one",
+        text: "You greet the clerk and inspect the clock.",
+      });
+      const game = await t.user("getGame");
+      expect(game.world.tick).toBe(1);
+      expect(game.world.journal.some((entry: any) => entry.text.includes("Uncommitted"))).toBe(
+        false
+      );
+      expect((await t.agent("builder", "perspective")).engineSource).toBe(engine);
+    }
+  );
+  it("keeps JavaScript faults inside authored world behavior under builder ownership", async () => {
+    const c = structuredClone(campaign);
+    c.behaviors = [
+      {
+        id: "fault",
+        entityId: "clock",
+        trigger: "wind",
+        state: {},
+        code: "const broken=undefined; return broken.id;",
+      },
+    ];
+    const t = await boot(c);
+    await t.user("play", { id: "one", text: "Wind the clock" });
     await expect(
-      t.agent("player", "execute", { turnId: "one", code: 'inspect("clock")' })
+      t.agent("player", "execute", { turnId: "one", code: 'world.act("clock","wind")' })
     ).rejects.toThrow();
-    const broken = await t.agent("builder", "perspective");
-    expect(broken.pending.phase).toBe("builder");
-    expect(broken.pending.error).toBeUndefined();
-    expect(broken.pending.diagnostic).toContain("inspect");
-    const continuationCode = 'return world.inspect("clock")';
-    await t.agent("builder", "repair", {
-      turnId: "one",
-      continuationCode,
-      code: "return null;",
-      note: "Qualify the method on the supplied world object",
-    });
-    const repaired = await t.agent("builder", "perspective");
-    expect(repaired.engineSource).toBe(broken.engineSource);
-    expect(repaired.world.tick).toBe(1);
-    const resumed = await t.agent("player", "perspective");
-    expect(resumed.completedActions).toHaveLength(1);
-    expect(resumed.pending.continuationCode).toBe(continuationCode);
-    await expect(t.agent("player", "finish", { turnId: "one", text: "Done" })).rejects.toThrow(
-      "continuation"
-    );
-    await t.agent("player", "execute", { turnId: "one", code: continuationCode });
-    expect((await t.user("getGame")).pending.continuationCode).toBeUndefined();
-    await t.agent("player", "finish", {
-      turnId: "one",
-      text: "You greet the clerk and study the clock.",
-    });
-    expect((await t.user("getGame")).world.tick).toBe(1);
+    const state = await t.agent("builder", "perspective");
+    expect(state.pending.phase).toBe("builder");
+    expect(state.pending.purpose).toBe("repair");
+    expect(state.world.tick).toBe(0);
   });
   it("materializes a frontier with code while keeping the current resident roster stable", async () => {
     const c = structuredClone(campaign);
@@ -196,6 +215,7 @@ describe("durable adventure orchestration", () => {
     await expect(
       t.agent("player", "execute", { turnId: "one", code: 'world.move("inn")' })
     ).rejects.toThrow("FRONTIER");
+    expect((await t.user("getGame")).pending.purpose).toBe("frontier");
     await t.agent("builder", "repair", {
       turnId: "one",
       note: "Materialize the established inn",
@@ -510,5 +530,133 @@ describe("durable adventure orchestration", () => {
     expect(migrated.world).toEqual(stored.world);
     expect(migrated.engineSource).toBe(stored.engineSource);
     expect(migrated.receipts).toEqual(["finished"]);
+  });
+  it("commits an agent-written component/transfer/relation program without inventing a named action or invoking the builder", async () => {
+    const c = structuredClone(campaign);
+    c.entities.push(
+      {
+        id: "coat",
+        kind: "object",
+        name: "Waxed coat",
+        description: "A dark coat",
+        location: "player",
+        components: { portable: true, opaque: true },
+      },
+      {
+        id: "lamp",
+        kind: "object",
+        name: "Counter lamp",
+        description: "A shining lamp",
+        location: "room",
+        components: { light: true },
+      }
+    );
+    c.behaviors = [
+      {
+        id: "folding",
+        entityId: "coat",
+        trigger: "change",
+        state: { folds: 0 },
+        code: 'if(event.key === "fold"){state.folds++;world.patch(self.id,{description:"A carefully folded coat"});}',
+      },
+    ];
+    const t = await boot(c);
+    await t.user("play", {
+      id: "improvise",
+      text: "Fold the coat and use it to shade the counter lamp.",
+    });
+    const result = await t.agent("player", "execute", {
+      turnId: "improvise",
+      code: `
+      const lamp = world.inspect("lamp");
+      world.setComponent("coat", "fold", {layers:2, orientation:"lengthwise"});
+      world.transfer("coat", lamp.location);
+      const cover = world.link("coat", lamp.id, "covers", {purpose:"shade"});
+      return {fold:world.getComponent("coat","fold"),light:world.getComponent(lamp.id,"effectiveLight"),cover};
+    `,
+    });
+    expect(result.fold).toEqual({ layers: 2, orientation: "lengthwise" });
+    expect(result.light).toBe(false);
+    expect(result.cover.kind).toBe("covers");
+    await t.agent("player", "finish", {
+      turnId: "improvise",
+      text: "You fold the coat and cover the lamp.",
+    });
+    const game = await t.user("getGame");
+    expect(game.world.tick).toBe(3);
+    expect(game.pending.phase).toBe("participants");
+    expect(game.view.entities.find((entity: any) => entity.id === "coat").description).toBe(
+      "A carefully folded coat"
+    );
+    const keeper = await t.agent("builder", "perspective");
+    expect(
+      keeper.world.behaviors.find((behavior: any) => behavior.id === "folding").state.folds
+    ).toBe(1);
+    expect(keeper.trajectory.filter((entry: any) => entry.code)).toHaveLength(1);
+    expect(t.deliveries).not.toContain("do:builder");
+    expect(
+      game.world.journal
+        .filter((entry: any) => entry.kind === "action")
+        .every((entry: any) => entry.audience.includes("clerk"))
+    ).toBe(true);
+  });
+  it("returns ordinary physical and protected-field refusals to the participant without committing partial effects", async () => {
+    const c = structuredClone(campaign);
+    c.entities.push(
+      {
+        id: "coat",
+        kind: "object",
+        name: "Coat",
+        description: "",
+        location: "player",
+        components: { portable: true, opaque: true },
+      },
+      {
+        id: "lamp",
+        kind: "object",
+        name: "Lamp",
+        description: "",
+        location: "room",
+        components: { light: true },
+      }
+    );
+    const t = await boot(c);
+    await t.user("play", { id: "shade", text: "Use the coat to shade the lamp" });
+    const refused = await t.agent("player", "execute", {
+      turnId: "shade",
+      code: 'world.setComponent("coat","folded",true);world.link("coat","lamp","covers");',
+    });
+    expect(refused.actionError).toBeTruthy();
+    expect((await t.user("getGame")).pending.phase).toBe("player");
+    let state = await t.agent("builder", "perspective");
+    expect(state.world.tick).toBe(0);
+    expect(
+      state.world.entities.find((entity: any) => entity.id === "coat").components.folded
+    ).toBeUndefined();
+    expect(state.world.relations).toEqual([]);
+    const corrected = await t.agent("player", "execute", {
+      turnId: "shade",
+      code: 'world.transfer("coat","room");world.link("coat","lamp","covers");return world.getComponent("lamp","effectiveLight");',
+    });
+    expect(corrected).toBe(false);
+    const derived = await t.agent("player", "execute", {
+      turnId: "shade",
+      code: 'world.setComponent("lamp","effectiveLight",false);',
+    });
+    expect(derived.actionError).toBeTruthy();
+    state = await t.agent("builder", "perspective");
+    expect(state.world.tick).toBe(2);
+    expect(state.world.entities.find((entity: any) => entity.id === "lamp").components.light).toBe(
+      true
+    );
+    expect(
+      state.world.relations.filter((relation: any) => relation.kind === "covers")
+    ).toHaveLength(1);
+    expect(t.deliveries).not.toContain("do:builder");
+    await t.agent("player", "finish", {
+      turnId: "shade",
+      text: "You place the coat over the lamp; its light is screened.",
+    });
+    expect((await t.user("getGame")).pending.phase).toBe("participants");
   });
 });

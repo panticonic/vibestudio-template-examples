@@ -1,4 +1,4 @@
-import type { Campaign, Entity } from "@workspace/adventure-engine";
+import type { Campaign, Entity, Relation, View, World } from "@workspace/adventure-engine";
 
 const place = (
   id: string,
@@ -150,11 +150,35 @@ export const deadLetterOffice: Campaign = {
       "Tomas Reed",
       "quay",
       "A ferryman with a patched ochre coat and a boat he cannot legally move.",
-      ["Recover the ferry permit.", "Take one last message to his brother in the drowned quarter."],
+      [
+        "Recover the ferry permit or obtain another lawful authorization.",
+        "Take one last message to his brother in the drowned quarter.",
+      ],
       [
         "The tide steps become walkable after two harbour bells.",
-        "Elin can lift the impound; the missing permit is in the cabinet.",
+        "The missing permit is in the cabinet's Salt Street drawer. A current relief warrant is also valid harbour authority.",
       ]
+    ),
+    object(
+      "harbour-lamp",
+      "The harbour lamp",
+      "landing",
+      "A hooded amber lamp stands beside the tide steps, casting a bright reflection over the dark water. Its cool outer hood can safely take a cloth cover.",
+      { light: true, visualFields: ["light", "effectiveLight"] }
+    ),
+    object(
+      "oilskin-wrap",
+      "The oilskin wrap",
+      "courier",
+      "A folded square of opaque oiled canvas, used to keep the post dry. It is broad enough to cover a lamp's hood.",
+      { portable: true, opaque: true, material: "oiled canvas", volume: 1 }
+    ),
+    object(
+      "canvas-cover",
+      "The canvas cover",
+      "landing",
+      "A spare square of thick, opaque sailcloth hangs on a dry hook beneath the bell canopy.",
+      { portable: true, opaque: true, material: "sailcloth", volume: 1 }
     ),
     object(
       "customs-window",
@@ -188,19 +212,78 @@ export const deadLetterOffice: Campaign = {
       "sorting-cabinet",
       "The sorting cabinet",
       "customs",
-      "Twelve brass pigeonholes and a blue glass tide dial. A narrow return slot accepts letters while the drawers remain closed. The blue dial indicates the tide; it is not a handle.",
-      { container: true, insertionSlot: true, slots: 12 }
+      "Twelve brass pigeonholes and a blue glass tide dial. The open frame holds closed drawers; a narrow sorting slot accepts addressed mail. Each address opens its proper drawer. The blue dial indicates the tide; it is not a handle.",
+      {
+        container: true,
+        open: true,
+        insertionSlot: { maxVolume: 1 },
+        slots: 12,
+        routingTable: {
+          "mara vale": { destination: "drowned-quarter", drawer: "salt-street-drawer" },
+          "salt street ferry office": {
+            destination: "drowned-quarter",
+            drawer: "salt-street-drawer",
+          },
+          "elin vale": { destination: "customs", drawer: "current-post-drawer" },
+        },
+      }
+    ),
+    object(
+      "salt-street-drawer",
+      "The Salt Street drawer",
+      "sorting-cabinet",
+      "A closed brass drawer marked with the old Salt Street delivery route. Its lock is connected to the cabinet's sorting mechanism.",
+      { container: true, locked: true, open: false, insertionSlot: { maxVolume: 1 }, capacity: 12 }
+    ),
+    object(
+      "current-post-drawer",
+      "The current-post drawer",
+      "sorting-cabinet",
+      "A separate brass drawer for present-day correspondence. It does not share the Salt Street clearance mechanism.",
+      { container: true, locked: true, open: false, insertionSlot: { maxVolume: 1 }, capacity: 12 }
     ),
     object(
       "permit",
       "The ferry permit",
-      "sorting-cabinet",
+      "salt-street-drawer",
       "A green official card trapped behind the returned-mail drawer.",
       {
         portable: true,
+        document: true,
         readable:
-          "Permit to navigate the harbour. Master: Tomas Reed. Status: impounded pending reconciliation.",
+          "Bellwether Harbour navigation permit. Master: Tomas Reed. Valid when the Salt Street returned-mail clearance is recorded. Issued by Elin Vale.",
       }
+    ),
+    object(
+      "relief-warrant",
+      "The harbour relief warrant",
+      "customs",
+      "A signed blue warrant clipped to the public counter. Emergency post and relief boats are exempt from the old returned-mail impound.",
+      {
+        portable: true,
+        document: true,
+        readable:
+          "Elin Vale authorizes Tomas Reed's ferry to carry relief and correspondence through Bellwether Harbour. This current warrant is valid independently of the older navigation permit.",
+      }
+    ),
+    object(
+      "salt-street-circular",
+      "The Salt Street circular",
+      "customs",
+      "A folded flood-watch circular addressed to the Salt Street Ferry Office. The address is old, but perfectly legible.",
+      {
+        portable: true,
+        addressee: "Salt Street Ferry Office",
+        readable:
+          "To the Salt Street Ferry Office: keep a lamp at the tide steps until every household has received the warning. —Harbour watch",
+      }
+    ),
+    object(
+      "blank-postcard",
+      "The blank postcard",
+      "customs",
+      "A sturdy piece of cream postal card lies beside the counter pencil. There is room to write an address of your own.",
+      { portable: true, material: "paper", readable: "" }
     ),
     object(
       "elin-letter",
@@ -209,6 +292,7 @@ export const deadLetterOffice: Campaign = {
       "A matching cream envelope, its seal already broken.",
       {
         portable: true,
+        addressee: "Elin Vale",
         readable:
           "My little wren, I heard you through the rain. I have kept a light for you. —Mother",
       }
@@ -632,79 +716,249 @@ export const wanderingHouse: Campaign = {
   ],
 };
 
+/** Authored programs are self-contained: the same functions become saved behavior source and test hooks. */
+export interface PostalBehaviorWorld {
+  world: World;
+  entity(id: string): Entity;
+  observe(): View;
+  transfer(itemId: string, destination: string): unknown;
+  patch(id: string, patch: Partial<Entity>): unknown;
+  relate(relation: Relation): unknown;
+  emit(text: string): unknown;
+}
+export const postalPrograms = {
+  window: function (
+    world: PostalBehaviorWorld,
+    _state: Record<string, any>,
+    _event: Record<string, any>,
+    self: Entity
+  ) {
+    const present = world.entity("elin").location === "customs";
+    world.patch(self.id, {
+      name: present ? "The woman at the customs-house window" : "The customs-house window",
+      description: present
+        ? "Through the lit window, a woman in a blue wool cardigan holds up a cream envelope with a red double-lighthouse seal. She gestures toward the customs-house door. You can meet her inside."
+        : "The lit customs-house window is empty now. The door below leads inside.",
+    });
+  },
+  tide: function (
+    world: PostalBehaviorWorld,
+    state: Record<string, any>,
+    _event: Record<string, any>,
+    self: Entity
+  ) {
+    state["rings"] += 1;
+    world.patch(self.id, { components: { ...self.components, rings: state["rings"] } });
+    world.emit(
+      "The harbour bell carries over the water. A second note answers from beneath the quay."
+    );
+    if (state["rings"] === 2) {
+      const landing = world.entity("landing"),
+        quarter = world.entity("drowned-quarter");
+      world.patch(landing.id, { components: { ...landing.components, tide: "low" } });
+      world.patch(quarter.id, { components: { ...quarter.components, requires: null } });
+      world.emit(
+        "The tide has drawn back from the old steps. A walkable path glitters between the drowned houses."
+      );
+    }
+  },
+  insert: function (
+    world: PostalBehaviorWorld,
+    _state: Record<string, any>,
+    event: Record<string, any>,
+    self: Entity
+  ) {
+    const letterId =
+      event["itemId"] || world.observe().inventory.find((item) => item.components["addressee"])?.id;
+    if (!letterId) throw new Error("Choose an addressed letter to put through the sorting slot.");
+    world.transfer(letterId, self.id);
+  },
+  route: function (
+    world: PostalBehaviorWorld,
+    state: Record<string, any>,
+    event: Record<string, any>,
+    self: Entity
+  ) {
+    const letter = world.entity(event["itemId"]);
+    const address = String(letter.components["addressee"] ?? "")
+      .trim()
+      .toLowerCase();
+    const routes = self.components["routingTable"] as Record<
+      string,
+      { destination: string; drawer: string }
+    >;
+    const route = routes[address];
+    if (!route) {
+      world.emit(
+        "The sorting slot holds " +
+          letter.name +
+          ", but no drawer answers its address. The other mail remains where it was."
+      );
+      return;
+    }
+    const drawer = world.entity(route.drawer);
+    world.transfer(letter.id, drawer.id);
+    state["sorted"] = { ...state["sorted"], [letter.id]: route.drawer };
+    world.patch(drawer.id, { components: { ...drawer.components, locked: false, open: true } });
+    world.relate({
+      id: "route-" + letter.id,
+      from: letter.id,
+      to: route.destination,
+      kind: "postal-route",
+      data: { addressee: letter.components["addressee"], drawer: drawer.id },
+    });
+    // Some old documents await a particular mail clearance, rather than a magic item identity.
+    for (const grant of [...world.world.relations]) {
+      if (
+        grant.kind !== "authorizes" ||
+        grant.data?.["physical"] === true ||
+        grant.data?.["reconciliationRoute"] !== route.destination
+      )
+        continue;
+      const document = world.entity(grant.from);
+      if (document.location !== drawer.id) continue;
+      world.relate({ ...grant, data: { ...grant.data, valid: true } });
+    }
+    const reachable = world.world.entities.filter(
+      (item) => item.location === drawer.id && item.id !== letter.id
+    );
+    world.emit(
+      drawer.name +
+        " clicks open. " +
+        letter.name +
+        " is routed toward " +
+        world.entity(route.destination).name +
+        "." +
+        (reachable.length
+          ? " " + reachable.map((item) => item.name).join(", ") + " can now be reached."
+          : "")
+    );
+  },
+  inspectAuthority: function (
+    world: PostalBehaviorWorld,
+    _state: Record<string, any>,
+    event: Record<string, any>,
+    self: Entity
+  ) {
+    const document = world.entity(event["itemId"]);
+    const inspection = self.components["recognizes"] as { issuer: string; permission: string };
+    if (!document.components["document"] || !inspection) return;
+    const grant = world.world.relations.find(
+      (relation) =>
+        relation.from === document.id &&
+        relation.kind === "authorizes" &&
+        relation.data?.["physical"] !== true &&
+        relation.data?.["valid"] === true &&
+        relation.data?.["issuer"] === inspection.issuer &&
+        relation.data?.["permission"] === inspection.permission
+    );
+    if (!grant) {
+      world.emit(
+        self.name + " checks " + document.name + ": it does not currently authorize this passage."
+      );
+      return;
+    }
+    const vessel = world.entity(grant.to);
+    world.patch(vessel.id, { components: { ...vessel.components, locked: false } });
+    world.relate({
+      id: "recognized-" + self.id + "-" + document.id,
+      from: self.id,
+      to: document.id,
+      kind: "recognized-authority",
+      data: { resource: vessel.id, permission: inspection.permission },
+    });
+    world.relate({
+      id: "passage-" + vessel.id + "-" + event["actorId"],
+      from: event["actorId"],
+      to: String(grant.data!["beneficiary"]),
+      kind: "promised-passage",
+      data: { destination: grant.data!["destination"] },
+    });
+    world.emit(
+      self.name +
+        " recognizes " +
+        document.name +
+        ". The impound on " +
+        vessel.name +
+        " is lifted; the passage can now be made lawfully."
+    );
+  },
+};
+
+const postalCode = (program: keyof typeof postalPrograms) =>
+  "(" + postalPrograms[program].toString() + ")(world, state, event, self);";
+
+deadLetterOffice.relations = [
+  {
+    id: "permit-authority",
+    from: "permit",
+    to: "ferry",
+    kind: "authorizes",
+    data: {
+      issuer: "elin",
+      beneficiary: "tomas",
+      permission: "navigate",
+      destination: "drowned-quarter",
+      valid: false,
+      reconciliationRoute: "drowned-quarter",
+    },
+  },
+  {
+    id: "relief-authority",
+    from: "relief-warrant",
+    to: "ferry",
+    kind: "authorizes",
+    data: {
+      issuer: "elin",
+      beneficiary: "tomas",
+      permission: "navigate",
+      destination: "drowned-quarter",
+      valid: true,
+    },
+  },
+];
+for (const inspector of ["elin", "tomas"]) {
+  deadLetterOffice.entities.find((entity) => entity.id === inspector)!.components["recognizes"] = {
+    issuer: "elin",
+    permission: "navigate",
+  };
+}
 deadLetterOffice.behaviors = [
   {
     id: "customs-window-presence",
     entityId: "customs-window",
     trigger: "tick",
     state: {},
-    code: `
-    const present = world.entity("elin").location === "customs";
-    world.patch(self.id, {
-      name: present ? "The woman at the customs-house window" : "The customs-house window",
-      description: present
-        ? "Through the lit window, a woman in a blue wool cardigan holds up a cream envelope with a red double-lighthouse seal. She gestures toward the customs-house door. You can meet her inside."
-        : "The lit customs-house window is empty now. The door below leads inside."
-    });
-    `,
+    code: postalCode("window"),
   },
   {
     id: "harbour-tide",
     entityId: "harbour-bell",
     trigger: "Ring the bell",
     state: { rings: 0 },
-    code: `
-    state.rings += 1;
-    world.patch(self.id,{components:{...self.components,rings:state.rings}});
-    world.emit("The harbour bell carries over the water. A second note answers from beneath the quay.");
-    if(state.rings === 2) {
-      const landing = world.entity("landing");
-      world.patch("landing",{components:{...landing.components,tide:"low"}});
-      const quarter = world.entity("drowned-quarter");
-      world.patch(quarter.id,{components:{...quarter.components,requires:null}});
-      world.emit("The tide has drawn back from the old steps. A walkable path glitters between the drowned houses.");
-    }
-  `,
+    code: postalCode("tide"),
   },
   {
     id: "cabinet-insertion",
     entityId: "sorting-cabinet",
     trigger: "Insert a letter",
     state: {},
-    code: `
-    const letterId = event.itemId || world.observe().inventory.find(item => item.components.addressee)?.id;
-    if (!letterId) throw new Error("Choose a letter you are carrying to put through the return slot.");
-    world.give(letterId, self.id);
-  `,
+    code: postalCode("insert"),
   },
   {
     id: "cabinet-delivery",
     entityId: "sorting-cabinet",
     trigger: "receive",
-    state: { sorted: [] },
-    code: `
-    const letter = world.entity(event.itemId);
-    if(!letter.components.addressee) {world.emit("The cabinet holds the object without a sound."); return;}
-    if(!state.sorted.includes(letter.id))state.sorted.push(letter.id);
-    const permit = world.entity("permit");
-    world.patch(permit.id,{location:"customs"});
-    world.emit("A brass pigeonhole clicks open. The ferry permit slides onto the counter, warm and dry. A second shadow briefly crosses the window.");
-    world.relate({id:"route-"+letter.id,from:letter.id,to:"drowned-quarter",kind:"postal-route",data:{addressee:letter.components.addressee}});
-  `,
+    state: { sorted: {} },
+    code: postalCode("route"),
   },
-  {
-    id: "ferry-release",
-    entityId: "tomas",
+  ...["elin", "tomas"].map((inspector) => ({
+    id: "authority-inspection-" + inspector,
+    entityId: inspector,
     trigger: "receive",
     state: {},
-    code: `
-    if(event.itemId!=="permit")return;
-    const ferry=world.entity("ferry");
-    world.patch(ferry.id,{components:{...ferry.components,locked:false}});
-    world.emit("Tomas fits the green permit into its brass holder and unlocks the bow chain. ‘There. Now we can go honestly.’");
-    world.relate({id:"ferry-passage",from:event.actorId,to:"tomas",kind:"promised-passage",data:{destination:"drowned-quarter"}});
-  `,
-  },
+    code: postalCode("inspectAuthority"),
+  })),
 ];
 
 missingCountry.behaviors = [
