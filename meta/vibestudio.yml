@@ -55,7 +55,8 @@ services:
         - code
         - session
         - mission
-    description: Access your workspace's conversations, including sending messages and reading replies.
+    description: Access your workspace's conversations, including sending messages
+      and reading replies.
     durableObject:
       className: PubSubChannel
       context: creator
@@ -88,6 +89,28 @@ services:
       - vibestudio.workspace-presentation.v1
     source: workers/workspace-presentation
     title: Workspace presentation
+  - action: generate and manage reusable image assets
+    authority:
+      binding: declared
+      principals:
+        - host
+        - user
+        - code
+        - session
+        - mission
+    description: Generate durable image assets, manage art direction, and read
+      retained image content.
+    durableObject:
+      className: ImagesDO
+    name: images
+    notability: everyday
+    presentation:
+      domain: automation
+      verb: manage
+    protocols:
+      - vibestudio.images.v1
+    source: workers/images
+    title: Generated image assets
   - action: read or change which AI models your workspace uses
     authority:
       binding: declared
@@ -135,7 +158,8 @@ services:
         - host
         - user
         - code
-    description: Launch automated tasks immediately, then inspect and control their running definitions.
+    description: Launch automated tasks immediately, then inspect and control their
+      running definitions.
     durableObject:
       className: MissionsDO
     name: missions
@@ -157,7 +181,8 @@ services:
         - host
         - user
         - code
-    description: Holds the realm, advisor memories, executable policies and observed consequences behind Regency’s living illustration.
+    description: Holds the realm, advisor memories, executable policies and observed
+      consequences behind Regency’s living illustration.
     durableObject:
       className: RegencyGameDO
     name: regency
@@ -179,7 +204,8 @@ services:
         - host
         - user
         - code
-    description: Holds the enchanted garden, wishes and their visible consequences so Moth and the player share one truth.
+    description: Holds the enchanted garden, wishes and their visible consequences
+      so Moth and the player share one truth.
     durableObject:
       className: GrimoireWorldDO
     name: grimoire
@@ -191,6 +217,31 @@ services:
       - examples.grimoire.v1
     source: workers/grimoire-world
     title: Grimoire estate
+  - name: adventure
+    source: workers/adventure-world
+    title: Adventure worlds
+    action: play and maintain illustrated adventure worlds
+    description: Persistent places, characters, story mechanisms and illustrated
+      player journeys.
+    notability: everyday
+    presentation:
+      domain: automation
+      verb: manage
+    protocols:
+      - examples.adventure.v1
+    authority:
+      binding:
+        declaredFor:
+          - panels/dead-letter-office
+          - panels/missing-country
+          - panels/wandering-house
+          - workers/adventure-agents
+      principals:
+        - host
+        - user
+        - code
+    durableObject:
+      className: AdventureWorldDO
 singletonObjects:
   - className: GadWorkspaceDO
     key: workspace
@@ -201,6 +252,9 @@ singletonObjects:
   - className: ModelSettingsDO
     key: workspace-model-settings
     source: workers/model-settings
+  - className: ImagesDO
+    key: workspace-images
+    source: workers/images
   - className: QuickfireSessionsDO
     key: workspace-quickfire
     source: workers/quickfire-service
@@ -209,7 +263,9 @@ singletonObjects:
     source: workers/missions
 systemEpoch: 0
 template:
-  description: Agent-driven playable examples. Grimoire is an enchanted garden that answers your wishes; Regency is a conversational strategy game where independent advisors author executable policy for a living realm.
+  description: Agent-driven playable worlds, from Grimoire and Regency to three
+    illustrated adventures sharing a programmable world engine, independent
+    characters, a world builder and a reference-based scene artist.
   files:
     - .gitattributes
     - .ignore
@@ -229,6 +285,9 @@ template:
     - extensions/templates
     - extensions/test-runner
     - packages/about-shared
+    - packages/adventure-campaigns
+    - packages/adventure-engine
+    - packages/adventure-ui
     - packages/agent-loop
     - packages/agentic-chat
     - packages/agentic-core
@@ -255,15 +314,19 @@ template:
     - packages/svelte
     - packages/template-registry
     - packages/testkit
+    - packages/test-runtime
     - packages/tool-ui
     - packages/ui
     - packages/vcs-engine
     - panels/chat
+    - panels/dead-letter-office
     - panels/grimoire
     - panels/hello-svelte
     - panels/hello-vanilla
+    - panels/missing-country
     - panels/regency
     - panels/terminal
+    - panels/wandering-house
     - projects/default
     - skills/agentic-development
     - skills/agents
@@ -283,10 +346,13 @@ template:
     - templates/default
     - templates/svelte
     - templates/vanilla
+    - workers/adventure-agents
+    - workers/adventure-world
     - workers/agent-worker
     - workers/grimoire-agents
     - workers/grimoire-world
     - workers/hello
+    - workers/images
     - workers/missions
     - workers/model-settings
     - workers/pubsub-channel

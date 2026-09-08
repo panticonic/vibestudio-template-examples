@@ -106,7 +106,7 @@ export class ChannelClient {
     private channelId: string,
     private protocol: string = DEFAULT_CHANNEL_SERVICE_PROTOCOL
   ) {}
-  private async target(): Promise<string> {
+  async resolveTarget(): Promise<string> {
     this.targetPromise ??= this.rpc
       .call<ResolvedService>("main", "workers.resolveService", [this.protocol, this.channelId])
       .then((service) => {
@@ -118,7 +118,7 @@ export class ChannelClient {
     return this.targetPromise;
   }
   private async call<T = unknown>(method: string, ...args: unknown[]): Promise<T> {
-    return this.rpc.call<T>(await this.target(), method, [...args]);
+    return this.rpc.call<T>(await this.resolveTarget(), method, [...args]);
   }
   async send(
     participantId: string,

@@ -4078,6 +4078,7 @@ export class PubSubChannel extends DurableObjectBase {
         }
         await this.inviteIndex.call<void>("putChannelMembership", {
           channelId: this.objectKey,
+          channelTargetId: this.rpcSelfId,
           userId,
           memberId,
           handle: String(row["handle"]),

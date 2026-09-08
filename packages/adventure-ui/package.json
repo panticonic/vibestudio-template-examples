@@ -1,0 +1,21 @@
+{
+  "name": "@workspace/adventure-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Composable illustrated adventures, native participant orchestration and durable player sessions.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "dependencies": {
+    "@workspace/adventure-engine": "workspace:*",
+    "@workspace/runtime": "workspace:*",
+    "@workspace/react": "workspace:*",
+    "@workspace/pubsub": "workspace:*",
+    "@workspace-skills/agents": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

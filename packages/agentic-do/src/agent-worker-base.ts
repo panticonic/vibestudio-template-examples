@@ -395,9 +395,6 @@ export abstract class AgentWorkerBase extends AgentVesselBase {
         context: mutationContext,
         visibility,
         observations: fileObservations,
-        // Image dispatch needs a vision-capable Responses model independently
-        // of the conversation route (which may be Spark or another provider).
-        resolveSession: (signal) => resolveCodexSession(signal, "gpt-5.5"),
       }),
       createReadTool(cwd, fs, {
         rpc: toolRpc,
@@ -723,8 +720,10 @@ export abstract class AgentWorkerBase extends AgentVesselBase {
     message: string;
   }): Promise<string> {
     const id = agentMessageNotificationId(input.messageId, input.userId);
+    const channelTargetId = await this.createChannelClient(input.channelId).resolveTarget();
     const data: AgentMessageNotificationData = {
       channelId: input.channelId,
+      channelTargetId,
       messageId: input.messageId,
       senderParticipantId: input.senderParticipantId,
       ...(input.senderHandle ? { senderHandle: input.senderHandle } : {}),

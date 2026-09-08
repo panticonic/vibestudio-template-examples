@@ -1,0 +1,26 @@
+{
+  "name": "@workspace/adventure-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  },
+  "vibestudio": {
+    "tests": [
+      {
+        "name": "world",
+        "runtime": "workerd",
+        "include": [
+          "**/*.test.ts"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "@workspace/test-runtime": "workspace:*"
+  }
+}

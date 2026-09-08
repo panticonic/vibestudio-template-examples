@@ -1,0 +1,155 @@
+{
+  "name": "@workspace-workers/adventure-agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Player interpreters, independent residents, world maintainers and scene artists.",
+  "vibestudio": {
+    "entry": "index.ts",
+    "tests": [
+      {
+        "name": "native",
+        "runtime": "native",
+        "include": [
+          "**/*.test.ts"
+        ]
+      }
+    ],
+    "durable": {
+      "classes": [
+        {
+          "className": "AdventureAgentWorker"
+        }
+      ]
+    },
+    "agent": {
+      "displayName": "Adventure participants",
+      "description": "Player interpreters, independent residents, world maintainers and scene artists."
+    },
+    "exposeModules": [
+      "@workspace/runtime",
+      "@workspace/pubsub",
+      "zod"
+    ],
+    "authority": {
+      "provides": [],
+      "serviceRequests": [
+        {
+          "protocol": "examples.adventure.v1",
+          "availability": "required"
+        },
+        {
+          "protocol": "vibestudio.images.v1",
+          "availability": "required"
+        }
+      ],
+      "requests": [
+        {
+          "capability": "workspace-service:adventure",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "accounts.connect",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "context.boundary",
+          "resource": {
+            "kind": "prefix",
+            "prefix": "context"
+          },
+          "tier": "critical",
+          "evidence": "bounded-dynamic"
+        },
+        {
+          "capability": "credential.use",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "internal-model-runtime.use",
+          "resource": {
+            "kind": "exact",
+            "key": "local-models"
+          },
+          "tier": "gated",
+          "evidence": "exact"
+        },
+        {
+          "capability": "workspace-service:channel",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:models",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:workspace.state",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace.runtime-state.manage",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:images",
+          "resource": {
+            "kind": "exact",
+            "key": "do:workers/images:ImagesDO:workspace"
+          },
+          "tier": "gated",
+          "evidence": "exact"
+        }
+      ]
+    },
+    "icon": "./assets/icon.svg"
+  },
+  "dependencies": {
+    "@workspace-workers/agent-worker": "workspace:*",
+    "@workspace/agentic-core": "workspace:*",
+    "@workspace/agentic-do": "workspace:*",
+    "@workspace/harness": "workspace:*",
+    "@workspace/pi-core": "workspace:*",
+    "@workspace/pubsub": "workspace:*",
+    "@workspace/runtime": "workspace:*",
+    "zod": "^3.25.76",
+    "@workspace/adventure-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}

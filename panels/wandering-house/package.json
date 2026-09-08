@@ -1,0 +1,111 @@
+{
+  "name": "@workspace-panels/wandering-house",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The House That Crosses the World — an illustrated, open-ended adventure in a living world.",
+  "vibestudio": {
+    "title": "The House That Crosses the World",
+    "icon": "./assets/icon.svg",
+    "entry": "index.tsx",
+    "stateArgs": {
+      "type": "object",
+      "properties": {
+        "gameKey": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "authority": {
+      "provides": [],
+      "serviceRequests": [
+        {
+          "protocol": "examples.adventure.v1",
+          "availability": "required"
+        },
+        {
+          "protocol": "vibestudio.channel.v1",
+          "availability": "required"
+        },
+        {
+          "protocol": "vibestudio.images.v1",
+          "availability": "required"
+        }
+      ],
+      "requests": [
+        {
+          "capability": "workspace-service:adventure",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:channel",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "context.boundary",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "critical",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "subagents.create",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace.runtime-state.manage",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace.runtime-state.inspect",
+          "resource": {
+            "kind": "prefix",
+            "prefix": ""
+          },
+          "tier": "gated",
+          "evidence": "intentional-broad"
+        },
+        {
+          "capability": "workspace-service:images",
+          "resource": {
+            "kind": "exact",
+            "key": "do:workers/images:ImagesDO:workspace"
+          },
+          "tier": "gated",
+          "evidence": "exact"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@workspace/adventure-ui": "workspace:*",
+    "@workspace/adventure-campaigns": "workspace:*",
+    "@workspace/runtime": "workspace:*",
+    "@workspace/react": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@workspace/adventure-campaigns",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@workspace/adventure-engine": "workspace:*",
+    "@workspace/test-runtime": "workspace:*"
+  },
+  "vibestudio": {
+    "tests": [
+      {
+        "name": "campaigns",
+        "runtime": "workerd",
+        "include": [
+          "src/**/*.test.ts"
+        ]
+      }
+    ]
+  }
+}
