@@ -9,13 +9,17 @@ import {
   type Program,
 } from "@workspace/regency-engine";
 import { parse } from "acorn";
+export type WorldInteraction = { processId: string; action: string; payload: Record<string, unknown> };
 export function policySource(
   world: World,
   programs: Program[],
   enact: string | undefined,
   months: number,
+  interaction?: WorldInteraction,
 ): string {
-  for (const program of programs) {
+  // Authored natural/institutional processes and decrees share one simulation timeline.
+  const processes = world.processes;
+  for (const program of [...programs, ...processes]) {
     const ast = parse(
       `function policy(realm,state,phase,months,events){\n${program.code}\n}`,
       { ecmaVersion: 2022 },
@@ -23,14 +27,18 @@ export function policySource(
     if (ast.body.length !== 1 || ast.body[0]?.type !== "FunctionDeclaration")
       throw new Error("Return only a policy function body.");
   }
-  const functions = programs
-    .map((p) => `function(realm,state,phase,months,events){\n${p.code}\n}`)
+  const allPrograms = [...programs, ...processes];
+  const functions = allPrograms
+    .map((p) => `function(realm,state,phase,months,events,event){\n${p.code}\n}`)
     .join(",");
-  return `const realm=${JSON.stringify(world)},states=${JSON.stringify(programs.map((p) => p.state))},events=[],policies=[${functions}];
-  const invoke=(i,phase)=>{const before={month:realm.month,time:realm.time,ledger:realm.ledger.filter(x=>['trust','grain'].includes(x.id)).map(x=>[x.id,x.amount]),opinions:realm.economy.regions.map(r=>[r.id,r.confidence,r.prosperity])};policies[i](realm,states[i],phase,phase==='tick'?1:0,events);if(realm.month!==before.month||realm.time!==before.time||before.ledger.some(([id,value])=>realm.ledger.find(x=>x.id===id)?.amount!==value)||before.opinions.some(([id,confidence,prosperity])=>{const r=realm.economy.regions.find(r=>r.id===id);return r&&(r.confidence!==confidence||r.prosperity!==prosperity)}))throw new Error('Time, confidence, prosperity and summary indicators arise from the shared simulation; change their causes instead.');};
+  if (interaction && !processes.some(p => p.id === interaction.processId)) throw new Error("The world-builder must establish this mechanism before it can be used.");
+  return `const realm=${JSON.stringify(world)},states=${JSON.stringify(allPrograms.map((p) => p.state))},events=[],policies=[${functions}],interaction=${JSON.stringify(interaction ?? null)};
+  const invoke=(i,phase)=>{const before={month:realm.month,time:realm.time,ledger:realm.ledger.filter(x=>['trust','grain'].includes(x.id)).map(x=>[x.id,x.amount]),opinions:realm.economy.regions.map(r=>[r.id,r.confidence,r.prosperity])};policies[i](realm,states[i],phase,phase==='tick'?1:0,events,interaction);if(realm.month!==before.month||realm.time!==before.time||before.ledger.some(([id,value])=>realm.ledger.find(x=>x.id===id)?.amount!==value)||before.opinions.some(([id,confidence,prosperity])=>{const r=realm.economy.regions.find(r=>r.id===id);return r&&(r.confidence!==confidence||r.prosperity!==prosperity)}))throw new Error('Time, confidence, prosperity and summary indicators arise from the shared simulation; change their causes instead.');};
   ${enact ? `invoke(${programs.findIndex((p) => p.id === enact)},'enact');` : ""}
-  for(let month=0;month<${months};month++){for(let i=0;i<policies.length;i++)invoke(i,'tick');(${settleRealmMonth.toString()})(realm,events);}
-  scope.policyResult=JSON.stringify({world:realm,states,events});return scope.policyResult.length;`;
+  ${interaction ? `invoke(${programs.length + processes.findIndex(p => p.id === interaction.processId)},'interact');` : ""}
+  for(let month=0;month<${months};month++){for(let i=${programs.length};i<policies.length;i++)invoke(i,'tick');for(let i=0;i<${programs.length};i++)invoke(i,'tick');(${settleRealmMonth.toString()})(realm,events);}
+  realm.processes.forEach((p,i)=>p.state=states[${programs.length}+i]);
+  scope.policyResult=JSON.stringify({world:realm,states:states.slice(0,${programs.length}),events});return scope.policyResult.length;`;
 }
 /** Native finite EvalDO, attenuated to no capabilities. Generated policy never gets game RPC authority. */
 export async function runPolicies(
@@ -39,6 +47,7 @@ export async function runPolicies(
   programs: Program[],
   enact: string | undefined,
   months: number,
+  interaction?: WorldInteraction,
 ) {
   const key = "regency-policy-" + crypto.randomUUID();
   const execute = createEvalExecutor(call);
@@ -49,7 +58,7 @@ export async function runPolicies(
       source: {
         kind: "inline",
         syntax: "javascript",
-        code: policySource(world, programs, enact, months),
+        code: policySource(world, programs, enact, months, interaction),
       },
       authority: {
         requests: [],

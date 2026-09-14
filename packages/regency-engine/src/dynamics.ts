@@ -12,6 +12,9 @@ export const EconomySchema = z
             x: z.number(),
             y: z.number(),
             population: amount,
+            health: z.number().min(0).max(100).default(75),
+            housing: amount.default(150),
+            unrest: z.number().min(0).max(100).default(10),
             grain: amount,
             yield: amount,
             consumption: amount,
@@ -70,10 +73,31 @@ export const EconomySchema = z
             relationship: z.number().min(-100).max(100),
             demand: z.string().max(500),
             leverage: z.string().max(400),
+            tension: z.number().min(0).max(100).default(20),
+            mobilization: amount.default(0),
+            tradeCapacity: amount.default(0),
+            grainPrice: amount.default(2),
+            borderRegion: id.optional(),
+            treaty: z.enum(["none", "trade", "nonaggression", "alliance"]).default("none"),
           })
           .strict(),
       )
       .max(12),
+    forces: z.array(z.object({
+      id, name: id, region: id, strength: amount,
+      readiness: z.number().min(0).max(100),
+      pay: amount, provision: amount,
+      posture: z.enum(["garrison", "patrol", "mobilized"]),
+    }).strict()).max(24).default([]),
+    factions: z.array(z.object({
+      id, name: id, region: id,
+      interest: z.enum(["livelihood", "commerce", "security", "autonomy"]),
+      influence: z.number().min(0).max(100),
+      support: z.number().min(0).max(100),
+      grievance: z.string().max(400),
+    }).strict()).max(24).default([]),
+    debt: amount.default(0),
+    interestRate: z.number().min(0).max(1).default(0.015),
     taxRate: z.number().min(0).max(1),
     standingExpense: amount,
     flows: z
@@ -99,7 +123,15 @@ export const EconomySchema = z
   .strict();
 export type Economy = z.infer<typeof EconomySchema>;
 export function initialEconomy(): Economy {
-  return {
+  return EconomySchema.parse({
+    forces: [
+      { id: "march-watch", name: "The March Watch", region: "northwood", strength: 3, readiness: 62, pay: 2, provision: 0.6, posture: "garrison" },
+    ],
+    factions: [
+      { id: "commons", name: "The river commons", region: "eastbank", interest: "livelihood", influence: 40, support: 48, grievance: "The flood stranded our grain; a hungry capital calls us hoarders." },
+      { id: "guilds", name: "The chartered houses", region: "harbor", interest: "commerce", influence: 55, support: 60, grievance: "We will risk ships, but not our fortunes on promises that die with a monarch." },
+      { id: "marchers", name: "The northern freeholders", region: "northwood", interest: "autonomy", influence: 45, support: 52, grievance: "A foreign toll and a royal levy leave little difference between two masters." },
+    ],
     regions: [
       {
         id: "crownlands",
@@ -245,6 +277,7 @@ export function initialEconomy(): Economy {
         relationship: -12,
         demand: "Recognition of its toll claim on the northern road.",
         leverage: "It controls the winter grain route beyond Northwood.",
+        tension: 38, mobilization: 5, borderRegion: "northwood", tradeCapacity: 8,
       },
     ],
     taxRate: 0.16,
@@ -261,7 +294,7 @@ export function initialEconomy(): Economy {
       standing: 0,
       closing: 120,
     },
-  };
+  });
 }
 /** One month of shared consequences. Self-contained so policy forecasts execute this same function. */
 export function settleRealmMonth(
@@ -285,6 +318,40 @@ export function settleRealmMonth(
   ];
   let services = 0,
     works = 0;
+  // Readiness has a material price: pay, local food and labour diverted from production.
+  for (const force of e.forces) {
+    const region = e.regions.find(r => r.id === force.region)!;
+    const required = force.strength * force.provision;
+    const supplied = Math.min(region.grain, required);
+    region.grain = round(region.grain - supplied);
+    const deployment = force.posture === "mobilized" ? 1 : force.posture === "patrol" ? .5 : .2;
+    labour[region.id] = Math.max(0, labour[region.id]! - force.strength * deployment);
+    const pay = force.strength * force.pay;
+    services += pay;
+    force.readiness = round(clamp(force.readiness + (supplied >= required && opening >= pay ? 2 : -8)));
+    if (supplied < required) reports.push(force.name + " is drawing down readiness because local food cannot supply it.");
+  }
+  // Foreign grain is purchased, never conjured; treaties and escalation affect access.
+  for (const neighbor of e.neighbors) {
+    const border = e.regions.find(r => r.id === neighbor.borderRegion);
+    const deployed = e.forces.filter(f => f.region === neighbor.borderRegion).reduce((n, f) => n + f.strength * f.readiness / 100, 0);
+    const mobilized = e.forces.some(f => f.region === neighbor.borderRegion && f.posture === "mobilized");
+    neighbor.tension = round(clamp(neighbor.tension + (mobilized ? 4 : -1) + (neighbor.relationship < -40 ? 3 : 0) - (neighbor.treaty === "nonaggression" || neighbor.treaty === "alliance" ? 3 : 0)));
+    neighbor.mobilization = round(Math.max(0, neighbor.mobilization + (neighbor.tension > 60 ? 1 : -.2)));
+    if (border && neighbor.treaty !== "none" && neighbor.tension < 70) {
+      const bought = Math.min(neighbor.tradeCapacity, Math.max(0, border.consumption * 2 - border.grain), Math.max(0, opening - services) / Math.max(.1, neighbor.grainPrice));
+      border.grain = round(border.grain + bought);
+      services += bought * neighbor.grainPrice;
+      if (bought > 0) reports.push(neighbor.name + " supplied " + round(bought) + " grain under treaty; the treasury paid " + round(bought * neighbor.grainPrice) + " crowns.");
+    }
+    if (border && neighbor.tension > 70 && neighbor.mobilization > deployed) {
+      const loss = Math.min(border.grain, (neighbor.mobilization - deployed) * .4);
+      border.grain = round(border.grain - loss);
+      border.unrest = clamp(border.unrest + 3);
+      reports.push(border.name + ": frontier seizures cost " + round(loss) + " grain; the rival's deployed strength exceeds the supplied watch.");
+    }
+  }
+  services += e.debt * e.interestRate;
   for (const office of e.institutions) {
     const used = Math.min(labour[office.region] ?? 0, office.workers);
     labour[office.region] = (labour[office.region] ?? 0) - used;
@@ -395,6 +462,10 @@ export function settleRealmMonth(
   for (const r of e.regions) {
     const missing = Math.max(0, r.consumption - r.grain);
     r.grain = round(Math.max(0, r.grain - r.consumption));
+    const hunger = missing / Math.max(1, r.consumption);
+    const crowding = Math.max(0, r.population / Math.max(1, r.housing) - 1);
+    r.health = round(clamp(r.health + (hunger ? -hunger * 10 : 1) - crowding * 3));
+    r.unrest = round(clamp(r.unrest + hunger * 12 + crowding * 3 + Math.max(0, e.taxRate - .2) * 10 - (hunger === 0 ? 1 : 0)));
     const trade = flows.reduce(
       (n, f, i) =>
         n +
@@ -432,6 +503,27 @@ export function settleRealmMonth(
           round(trade) +
           " grain; full stalls are rebuilding confidence.",
       );
+  }
+  // Internal migration conserves people and moves their food and labour demand with them.
+  const departures = e.regions.map(region => ({ region, amount: Math.min(region.population * .02, Math.max(0, region.unrest - 35) * .03) }));
+  for (const { region, amount } of departures) {
+    const reachable = new Set(e.routes.filter(r => r.condition > .3 && (r.from === region.id || r.to === region.id)).map(r => r.from === region.id ? r.to : r.from));
+    const destination = e.regions.filter(r => reachable.has(r.id) && r.unrest < region.unrest && r.housing > r.population).sort((a, b) => a.unrest - b.unrest)[0];
+    const moved = destination ? round(Math.min(amount, destination.housing - destination.population)) : 0;
+    if (!destination || moved <= 0) continue;
+    const food = region.consumption / Math.max(1, region.population) * moved;
+    const hands = region.labour / Math.max(1, region.population) * moved;
+    region.population -= moved; destination.population += moved;
+    region.consumption -= food; destination.consumption += food;
+    region.labour -= hands; destination.labour += hands;
+    reports.push(region.name + ": " + moved + " households moved to " + destination.name + ", taking their labour and food needs with them.");
+  }
+  for (const faction of e.factions) {
+    const region = e.regions.find(r => r.id === faction.region)!;
+    const security = e.forces.filter(f => f.region === region.id).reduce((n, f) => n + f.strength * f.readiness / 100, 0);
+    const pressure = e.neighbors.filter(n => n.borderRegion === region.id).reduce((n, x) => n + x.mobilization * x.tension / 100, 0);
+    const target = faction.interest === "commerce" ? region.prosperity : faction.interest === "security" ? clamp(60 + security * 5 - pressure * 5) : faction.interest === "autonomy" ? clamp(80 - e.taxRate * 100 - e.forces.filter(f => f.region === region.id && f.posture === "mobilized").length * 15) : region.confidence;
+    faction.support = round(clamp(faction.support + (target - faction.support) * .2));
   }
   const revenue = round(
     production * e.taxRate +

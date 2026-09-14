@@ -77,6 +77,9 @@ describe("open conversational kingdom", () => {
       },
     );
     expect(next.world.location).toBe("glasshouse");
+    expect(next.world.places.find(p => p.id === "glasshouse")?.scene?.description).toBe("A sea-glass observatory.");
+    expect(next.scene).toBe(g.scene);
+    expect(g.world.places.some(p => p.scene)).toBe(false);
     expect(next.people.at(-1)?.id).toBe("glassmaker");
     expect(g.people).toHaveLength(3);
   });

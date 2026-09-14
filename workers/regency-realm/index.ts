@@ -15,9 +15,13 @@ import {
   PersonSchema,
   type Proposal,
   type Game,
+  validateWorld,
+  validatePeople,
+  DevelopmentSchema,
+  type Development,
 } from "@workspace/regency-engine";
 
-type Role = "storyteller" | `person:${string}`;
+type Role = "storyteller" | "builder" | `person:${string}`;
 type Seat = { targetId: string; channelId: string; role: Role };
 type Pending = {
   id: string;
@@ -32,6 +36,8 @@ type Pending = {
   simulation: Awaited<ReturnType<typeof runPolicies>> | null;
   proposals: Proposal[];
   command: { proposalId?: string; months: number } | null;
+  development?: { request: string; requestedBy: string };
+  interactions?: Record<string, { request: string; events: string[] }>;
 };
 type Stored = {
   game: Game;
@@ -62,9 +68,10 @@ export class RegencyGameDO extends DurableObjectBase {
     const row = this.sql
       .exec<{ body: string }>("SELECT body FROM living_realm WHERE id=1")
       .toArray()[0];
-    return row
-      ? JSON.parse(row.body)
-      : { game: initialGame(), seats: [], pending: null, painting: null };
+    const state: Stored = row ? JSON.parse(row.body) : { game: initialGame(), seats: [], pending: null, painting: null };
+    state.game.world = validateWorld(state.game.world);
+    if (state.pending?.world) state.pending.world = validateWorld(state.pending.world);
+    return state;
   }
   private save(state: Stored) {
     this.sql.exec(
@@ -213,7 +220,7 @@ export class RegencyGameDO extends DurableObjectBase {
         s.seats.some((seat) => seat.role === role),
       ),
       neededSeats:
-        s.pending?.audience
+        s.pending?.development ? (s.seats.some(seat => seat.role === "builder") ? [] : [{ role: "builder", name: "The realm beyond the map" }]) : s.pending?.audience
           .filter((id) => !s.seats.some((seat) => seat.role === `person:${id}`))
           .map((id) => ({
             role: `person:${id}`,
@@ -237,6 +244,7 @@ export class RegencyGameDO extends DurableObjectBase {
     if (
       !(
         input.role === "storyteller" ||
+        input.role === "builder" ||
         /^person:[a-zA-Z0-9_-]+$/.test(input.role)
       ) ||
       !input.targetId ||
@@ -319,7 +327,7 @@ export class RegencyGameDO extends DurableObjectBase {
       cast: s.game.people,
       audience: addressed.length
         ? addressed.map((p) => p.id).slice(0, 3)
-        : [s.game.people[0]!.id],
+        : [(s.game.people.find(p => p.place === s.game.world.location) ?? s.game.people[0])!.id],
       voices: {},
       simulation: null,
       proposals: [],
@@ -440,7 +448,7 @@ export class RegencyGameDO extends DurableObjectBase {
     const s = this.load();
     if (!s.pending || s.pending.command) return;
     const { id, attempt } = s.pending;
-    const roles = s.pending.audience
+    const roles = s.pending.development ? ["builder"] : s.pending.audience
       .filter((id) => !s.pending!.voices[id])
       .map((id) => "person:" + id);
     const recipients = s.seats.filter((p) => roles.includes(p.role));
@@ -656,6 +664,7 @@ export class RegencyGameDO extends DurableObjectBase {
       throw new Error("Only a seated agent may read a perspective.");
     if (seat.role === "storyteller")
       return { game: s.game, pending: s.painting };
+    if (seat.role === "builder") return { world: s.pending?.world ?? s.game.world, people: s.pending?.cast ?? s.game.people, pending: s.pending?.development ? s.pending : null };
 
     const id = seat.role.slice(7),
       you = (s.pending?.cast.length ? s.pending.cast : s.game.people).find(
@@ -675,7 +684,7 @@ export class RegencyGameDO extends DurableObjectBase {
         text: voice.text,
       })),
       pending: s.pending?.audience.includes(id)
-        ? { id: s.pending.id, wish: s.pending.wish }
+        ? { id: s.pending.id, wish: s.pending.wish, development: s.pending.development, completedInteractions: s.pending.interactions ?? {} }
         : null,
     };
   }
@@ -701,10 +710,13 @@ export class RegencyGameDO extends DurableObjectBase {
       s.pending.id !== input.turnId ||
       !s.pending.audience.includes(id) ||
       s.pending.command
+      || s.pending.development
     )
       throw new Error("This is not your conversation.");
     if (s.pending.voices[id]) return { ok: true };
     s.pending.voices[id] = VoiceSchema.parse(input.voice);
+    const interaction = s.pending.voices[id]!.interaction;
+    if (interaction) s.pending.world!.places.find(place => place.id === s.pending!.world!.location)!.interaction = interaction;
     this.save(s);
     if (s.pending.audience.every((id) => s.pending!.voices[id]))
       await this.commitConversation(s);
@@ -718,8 +730,93 @@ export class RegencyGameDO extends DurableObjectBase {
       !seat?.role.startsWith("person:") ||
       s.pending?.id !== turnId ||
       !s.pending.audience.includes(seat.role.slice(7))
+      || s.pending?.development
     )
       throw new Error("Only an advisor in this conversation may act.");
+  }
+  @rpc({ website: { kind: "closed", reason: "Installed game interaction." }, principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  async requestDevelopment(input: { turnId: string; request: string }) {
+    const s = this.load();
+    this.advisor(s, input.turnId);
+    if (!input.request?.trim() || input.request.length > 1500) throw new Error("Describe the missing part of the world.");
+    if (Object.keys(s.pending!.voices).length) throw new Error("Develop the scene before speaking.");
+    s.pending!.development = { request: input.request, requestedBy: this.rpcCallerId! };
+    this.save(s);
+    await this.deliver();
+    return { waitingForBuilder: true };
+  }
+  @rpc({ website: { kind: "closed", reason: "Installed game interaction." }, principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  async developWorld(raw: Development) {
+    const input = DevelopmentSchema.parse(raw);
+    const s = this.load();
+    this.author(s, "builder");
+    if (s.pending?.id !== input.turnId || !s.pending.development) throw new Error("No development is pending.");
+    const base = s.pending.world!;
+    if (new Set(input.revisions.map(r => r.id)).size !== input.revisions.length) throw new Error("Revise each mechanism at most once.");
+    if (input.revisions.some(r => !base.processes.some(p => p.id === r.id))) throw new Error("Only existing mechanisms may be revised.");
+    if (Object.keys(input.systems).some(key => Object.hasOwn(base.systems, key))) throw new Error("Develop a new system without replacing an existing one.");
+    const economy = { ...base.economy };
+    for (const key of ["regions", "routes", "institutions", "neighbors", "forces", "factions"] as const)
+      Object.assign(economy, { [key]: [...base.economy[key], ...input[key]] });
+    const processes = base.processes.map(process => {
+      const revision = input.revisions.find(r => r.id === process.id);
+      return revision ? { ...process, code: revision.code } : process;
+    });
+    const world = validateWorld({ ...base, economy, systems: { ...base.systems, ...input.systems }, places: [...base.places, ...input.places], processes: [...processes, ...input.processes] });
+    for (const scene of input.scenes) {
+      const place = world.places.find(p => p.id === scene.placeId);
+      if (!place) throw new Error("A scene belongs to an established place.");
+      place.interaction = scene.interaction;
+    }
+    const cast = validatePeople({ people: [...s.pending.cast, ...input.people], dialogue: [] }, world);
+    // Validate prospective mechanisms without advancing committed time or changing old facts.
+    await runPolicies((method, args) => this.rpc.call("main", method, args), world, s.game.programs, undefined, 1);
+    const current = this.load();
+    if (current.pending?.id !== input.turnId || !current.pending.development || JSON.stringify(current.pending.world) !== JSON.stringify(base)) throw new Error("The world changed during development; reread it.");
+    current.pending.world = world;
+    current.pending.cast = cast.people;
+    delete current.pending.development;
+    this.save(current);
+    await this.deliver();
+    return { ok: true };
+  }
+  @rpc({ website: { kind: "closed", reason: "Installed game interaction." }, principals: ["host", "user", "code"], effect: { kind: "open" }, tier: "open", sensitivity: "write" })
+  async visitPlace(input: { turnId: string; placeId: string }) {
+    const s = this.load(); this.advisor(s, input.turnId);
+    const place = s.pending!.world!.places.find(p => p.id === input.placeId);
+    if (!place) throw new Error("Ask the world-builder to establish this place first.");
+    if (Object.keys(s.pending!.voices).length) throw new Error("Travel before speaking.");
+    s.pending!.world!.location = place.id;
+    const guideId = s.seats.find(seat => seat.targetId === this.rpcCallerId)!.role.slice(7);
+    const guide = s.pending!.cast.find(person => person.id === guideId)!;
+    guide.place = place.id;
+    const host = s.pending!.cast.find(p => p.place === place.id && p.id !== guideId);
+    if (host && !s.pending!.audience.includes(host.id)) s.pending!.audience = [...s.pending!.audience, host.id].slice(-3);
+    this.save(s); await this.deliver(); return { place };
+  }
+  @rpc({ website: {kind:"closed",reason:"Installed game interaction."}, principals:["host","user","code"], effect:{kind:"open"}, tier:"open", sensitivity:"write" })
+  async interactWorld(input: { turnId: string; actionId: string; processId: string; action: string; payload: Record<string, unknown> }) {
+    const s = this.load(); this.advisor(s, input.turnId);
+    if (Object.keys(s.pending!.voices).length) throw new Error("Interact before speaking.");
+    if (!input.actionId || input.actionId.length > 100) throw new Error("Use a stable identifier for this intended action.");
+    const request = JSON.stringify({ processId: input.processId, action: input.action, payload: input.payload });
+    const completed = s.pending!.interactions?.[input.actionId];
+    if (completed) {
+      if (completed.request !== request) throw new Error("That action identifier already belongs to a different intention.");
+      return { world: s.pending!.world, events: completed.events, alreadyApplied: true };
+    }
+    if (!input.action?.trim() || input.action.length > 120 || JSON.stringify(input.payload).length > 4000) throw new Error("Describe a bounded scene interaction.");
+    const base = s.pending!.world!;
+    const result = await runPolicies((method,args) => this.rpc.call("main",method,args), base, s.pending!.simulation?.programs ?? s.game.programs, undefined, 0, input);
+    const current = this.load();
+    if (current.pending?.id !== input.turnId || JSON.stringify(current.pending.world) !== JSON.stringify(base)) throw new Error("The world changed. Reread before acting.");
+    current.pending.world = result.world;
+    current.pending.simulation = result;
+    current.game.world = result.world;
+    current.game.programs = result.programs;
+    current.pending.interactions ??= {};
+    current.pending.interactions[input.actionId] = { request, events: result.events };
+    this.save(current); return result;
   }
   @rpc({
     website: {
@@ -824,6 +921,7 @@ export class RegencyGameDO extends DurableObjectBase {
   cancel() {
     this.player();
     const s = this.load();
+    if (s.pending) this.sql.exec("INSERT OR IGNORE INTO living_receipts(id,wish) VALUES(?,?)", s.pending.id, s.pending.wish);
     s.pending = null;
     this.save(s);
     return this.getGame();

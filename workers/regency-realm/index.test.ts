@@ -68,6 +68,48 @@ async function boot(fail = false) {
   return { ...t, player, deliveries, outbound };
 }
 describe("regency durable turns", () => {
+  it("builds a persistent mechanism, executes its scene action once and preserves consequences on cancellation", async () => {
+    const t = await boot(), mara = {...AGENT, callerId:"do:mara"}, builder = {...AGENT,callerId:"do:builder"};
+    await t.player("play", {id:"mill",wish:"Visit the mill and open its sluice."});
+    await t.callAs(mara,"requestDevelopment",{turnId:"mill",request:"Establish the upstream mill and its sluice mechanism."});
+    expect((await t.player("getGame")).neededSeats).toContainEqual({role:"builder",name:"The realm beyond the map"});
+    await t.player("registerParticipant",{role:"builder",targetId:"do:builder",channelId:"builder"});
+    await expect(t.callAs(mara,"developWorld",{turnId:"mill"})).rejects.toThrow(/registered/);
+    await t.callAs(builder,"developWorld",{
+      turnId:"mill",places:[{id:"mill",name:"The upstream mill",description:"Water queues behind the closed sluice.",facts:["The waterwheel is idle."]}],
+      systems:{mill:{water:12,flour:0,open:false}},
+      processes:[{id:"mill-work",title:"Water-powered milling",state:{turns:0},code:"const m=realm.systems.mill;if(phase==='interact'){if(event.action!=='open')throw new Error('Unknown action');if(realm.location!=='mill')throw new Error('You must reach the sluice');m.open=true;state.turns++;events.push('The sluice opened.');}if(phase==='tick'&&m.open){const work=Math.min(m.water,3);m.water-=work;m.flour+=work;}"}],
+    });
+    let view = await t.player("getGame");
+    expect(view.pending.world.systems.mill).toEqual({water:12,flour:0,open:false});
+    expect(view.pending.development).toBeUndefined();
+    const action={turnId:"mill",actionId:"open-sluice",processId:"mill-work",action:"open",payload:{}};
+    await expect(t.callAs(mara,"interactWorld",action)).rejects.toThrow(/reach/);
+    await t.callAs(mara,"visitPlace",{turnId:"mill",placeId:"mill"});
+    await t.callAs(mara,"interactWorld",action);
+    expect(await t.callAs(mara,"interactWorld",action)).toMatchObject({alreadyApplied:true});
+    await expect(t.callAs(mara,"interactWorld",{...action,action:"close"})).rejects.toThrow(/different intention/);
+    await t.player("cancel");
+    view=await t.player("getGame");
+    expect(view.game.world.systems.mill.open).toBe(true);
+    expect(view.game.world.processes[0].state.turns).toBe(1);
+    await t.player("advance",{id:"mill-month",months:1});
+    view=await t.player("getGame");
+    expect(view.game.world.systems.mill).toEqual({water:9,flour:3,open:true});
+  });
+  it("revises a mechanism prospectively without resetting its state or changing settled facts", async () => {
+    const t=await boot(), mara={...AGENT,callerId:"do:mara"}, builder={...AGENT,callerId:"do:builder"};
+    await t.player("registerParticipant",{role:"builder",targetId:"do:builder",channelId:"builder"});
+    await t.player("play",{id:"develop",wish:"Explore a river institution."});
+    await t.callAs(mara,"requestDevelopment",{turnId:"develop",request:"Model the water board."});
+    await t.callAs(builder,"developWorld",{turnId:"develop",processes:[{id:"water-board",title:"Water board",code:"if(phase==='tick')state.meetings++;",state:{meetings:7}}]});
+    await t.callAs(mara,"requestDevelopment",{turnId:"develop",request:"Refine the institution's meeting schedule."});
+    await t.callAs(builder,"developWorld",{turnId:"develop",revisions:[{id:"water-board",code:"if(phase==='tick'&&realm.month%2===0)state.meetings++;",reason:"Meetings occur every second month."}]});
+    const view=await t.player("getGame");
+    expect(view.pending.world.month).toBe(0);
+    expect(view.pending.world.processes[0].state.meetings).toBe(7);
+    expect(view.pending.world.ledger).toEqual(initialGame().world.ledger);
+  });
   it("persists delivery failure and retries without adding another player turn", async () => {
     const t = await boot(true);
     const pending = await t.player("play", {

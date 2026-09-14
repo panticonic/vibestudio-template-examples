@@ -2,8 +2,9 @@
 
 The player rules Willowmere through conversation with independently agentic advisors.
 They decide what kind of realm to build, hear competing arguments, examine a forecast,
-enact a decree and let time reveal its consequences. Personal stories provide brief
-evidence of governing; they are not the main objective. Questions never advance time
+enact a decree and let time reveal its consequences. Travel, relationships and local
+stories are adventures in their own right, connected to larger material forces.
+Questions never advance time
 or authorize a hypothetical policy.
 
 The opening has four regions, a flood-damaged crossing, uneven food access, a strained
@@ -13,6 +14,19 @@ council conversation and one time control. Proposals and evidence appear when us
 full forecasts and administrative detail remain folded.
 
 ## Causes before scores
+
+An independent world-builder extends geography, cast, institutions and executable
+mechanisms when exploration calls for them. `realm.systems` holds new domain state;
+processes keep private state and run on authorized monthly ticks or explicit scene
+interactions. Code revisions preserve accumulated state and apply prospectively.
+Development is validated on a copy before publication; it cannot silently replace
+existing systems. Scene actions have retry receipts, and committed effects survive
+conversation cancellation. No dice layer is involved.
+
+The shared economy also models military provisioning and labour, border tension,
+treaty grain purchases, debt interest, health, housing pressure, migration and faction
+support. These are deliberately legible starting dynamics, not a complete historical
+simulation. Generated processes extend them without duplicating core settlement.
 
 The shared economy settles each month: harvests depend on season and available labour;
 food travels over routes with real capacity, damage, tolls and subsidies; local people
@@ -56,6 +70,16 @@ the next conversation. The existing map reads the live economy each frame, showi
 active ferries, repair crews, completed bridges, cargo flow and seasonal change.
 
 ## Visual and interaction design
+
+Each place retains a generated Canvas illustration independently of the living
+strategic atlas. Scene-specific interaction documents provide fields, choices,
+dossiers and actions; they submit intentions through the advisor and world execution
+path rather than mutating state from the browser. They are generated compositions
+of validated controls, not unrestricted generated React applications.
+
+Bundled portraits, empty architectural references and opening compositions provide
+an immediate foundation. See `../../ARTWORK.md` for prompts. This starter set is
+bounded: further discoveries remain generated on demand.
 
 The whole realm is an editable Canvas program using the optional living-canvas art
 library. Code can go beyond every starter building, route and drawing helper.

@@ -14,6 +14,8 @@ import {
   POLICY_GUIDE,
   ACTION_GUIDE,
   RESULT_JSON_SCHEMA,
+  WORLD_BUILDER_PROMPT,
+  DEVELOPMENT_JSON_SCHEMA,
 } from "@workspace/regency-engine";
 
 export class RegencyAgentWorker extends AiChatWorker {
@@ -33,7 +35,7 @@ export class RegencyAgentWorker extends AiChatWorker {
     const role = this.role(channelId);
     return role.startsWith("person:")
       ? PEOPLE_PROMPT + POLICY_GUIDE + ACTION_GUIDE
-      : AGENT_PROMPT;
+      : role === "builder" ? WORLD_BUILDER_PROMPT : AGENT_PROMPT;
   }
   protected override async getLoopTools(
     channelId: string,
@@ -50,6 +52,7 @@ export class RegencyAgentWorker extends AiChatWorker {
       properties: Record<string, unknown>,
       required: string[],
       run: (p: any) => Promise<unknown>,
+      terminate = false,
     ): AgentTool => ({
       name,
       label: name,
@@ -66,6 +69,7 @@ export class RegencyAgentWorker extends AiChatWorker {
           return {
             content: [{ type: "text" as const, text: JSON.stringify(result) }],
             details: result,
+            terminate,
           };
         } catch (error) {
           return {
@@ -86,9 +90,18 @@ export class RegencyAgentWorker extends AiChatWorker {
         () => client.call("perspective"),
       ),
     ];
+    if (this.role(channelId) === "builder") return [
+      ...shared,
+      { name: "develop_world", label: "Develop the realm", description: "Add persistent places, people, institutions and executable systems. Existing facts cannot be replaced. Completes development and resumes the requesting advisor.", parameters: DEVELOPMENT_JSON_SCHEMA as never,
+        execute: async (_id: string, params: any) => { try { const result = await client.call("developWorld", params); return {content:[{type:"text" as const,text:JSON.stringify(result)}],details:result,terminate:true}; } catch(error) { return {content:[{type:"text" as const,text:String(error)}],details:null,isError:true}; } },
+      },
+    ];
     if (this.role(channelId).startsWith("person:"))
       return [
         ...shared,
+        tool("interact_world", "Execute an established scene mechanism for the player's actual intention, not a hypothetical. It cannot enact a policy or advance a month; its saved code determines the effects.", {turnId:{type:"string"},actionId:{type:"string",description:"Stable ID for this intended action; reuse on retry."},processId:{type:"string"},action:{type:"string"},payload:{type:"object"}}, ["turnId","actionId","processId","action","payload"], p => client.call("interactWorld", p)),
+        tool("request_development", "Ask the independent world-builder for missing geography, people or mechanisms required by this intention. Then stop; you will be resumed after development.", { turnId: {type:"string"}, request: {type:"string"} }, ["turnId","request"], p => client.call("requestDevelopment", p), true),
+        tool("visit_place", "Travel to an established place at the player's request. Does not enact policy or advance a month.", {turnId:{type:"string"},placeId:{type:"string"}}, ["turnId","placeId"], p => client.call("visitPlace", p)),
         tool(
           "invite",
           "Bring a new independently agentic specialist or representative to the council before anyone speaks.",

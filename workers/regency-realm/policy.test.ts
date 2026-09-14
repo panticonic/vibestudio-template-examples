@@ -32,8 +32,8 @@ describe("policies inside the living economy", () => {
     const three = simulate([ferry], "ferry", 3),
       four = simulate([ferry], "ferry", 4),
       without = simulate([], undefined, 3);
-    expect(three.world.economy.accounts.services).toBe(5);
-    expect(four.world.economy.accounts.services).toBe(0);
+    expect(three.world.economy.accounts.services - without.world.economy.accounts.services).toBe(5);
+    expect(four.world.economy.accounts.services).toBe(6); // The watch remains paid after the ferry expires.
     expect(four.states[0].remaining).toBe(0);
     expect(four.world.policies[0].status).toBe("Expired");
     expect(
@@ -91,7 +91,7 @@ describe("policies inside the living economy", () => {
       { timeout: 100 },
     );
     const result = JSON.parse(scope.policyResult);
-    expect(result.world.economy.accounts.services).toBe(0);
+    expect(result.world.economy.accounts.services).toBe(6); // Repeal stops the ferry, not the watch payroll.
     expect(result.states).toHaveLength(1);
     expect(() => programsWithProposal([], repeal)).toThrow(/fresh proposal/);
   });

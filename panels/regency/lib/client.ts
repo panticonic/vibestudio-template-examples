@@ -26,7 +26,7 @@ export class StoryClient {
   private artKey = "";
   private artworks: Artworks = {};
   private async withArt(view: View) {
-    const ids = view.game.scene.assets ?? [],
+    const ids = [...new Set([...(view.game.scene.assets ?? []), ...(view.game.world.places.find(place => place.id === view.game.world.location)?.scene?.assets ?? [])])],
       key = JSON.stringify(ids);
     if (key !== this.artKey) {
       this.artworks = ids.length

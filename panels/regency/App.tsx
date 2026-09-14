@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStateArgs } from "@workspace/react";
 import { initialGame } from "@workspace/regency-engine";
 import { Kingdom } from "./Kingdom.js";
+import { RealmScene } from "./RealmScene.js";
 import { useStory } from "./lib/useStory.js";
 import { chime, closeAudio } from "./lib/sound.js";
 import "./styles.css";
@@ -19,12 +20,6 @@ export default function Regency() {
   useEffect(() => {
     if (game.turn > last.current && sound) chime();
     last.current = game.turn;
-    log.current?.scrollTo({
-      top: log.current.scrollHeight,
-      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "instant"
-        : "smooth",
-    });
   }, [game.turn, busy, sound]);
   useEffect(() => () => closeAudio(), []);
   async function say(text: string) {
@@ -50,6 +45,9 @@ export default function Regency() {
         </button>
       </header>
       <div className="storybook">
+        <div className="realm-exploration">
+        <RealmScene game={game} artworks={story.view?.artworks} busy={busy || !story.view} onIntent={text => void say(text)} />
+        <details className="realm-atlas"><summary>Open the living atlas · economy and administration</summary>
         <section
           id="kingdom"
           className="kingdom-stage"
@@ -107,6 +105,8 @@ export default function Regency() {
             </button>
           </div>
         </section>
+        </details>
+        </div>
         <section className="conversation" aria-label="Your council">
           <div className="conversation-heading">
             <span className="eyebrow">{place?.name}</span>

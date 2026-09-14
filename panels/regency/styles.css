@@ -81,6 +81,18 @@ summary:focus-visible {
   min-height: 700px;
   align-items: start;
 }
+.realm-exploration { min-width: 0; padding: 1.5rem; }
+.realm-scene-art { width: 100%; height: clamp(220px, 30vw, 420px); object-fit: cover; display: block; }
+.realm-scene-introduction { padding: 1.4rem 0 .5rem; }
+.realm-scene-introduction h1 { max-width: 100%; margin: .7rem 0; }
+.realm-scene-introduction p { font-size: 1.1rem; line-height: 1.65; }
+.realm-cast { display: flex; gap: .6rem; flex-wrap: wrap; }
+.realm-cast button { display: flex; align-items: center; gap: .6rem; background: transparent; color: inherit; border: 1px solid #ad947844; padding: .5rem; text-align: left; }
+.realm-cast img { width: 48px; height: 56px; object-fit: cover; }
+.realm-cast small { display: block; max-width: 120px; font-size: .7rem; }
+.realm-travel { display: flex; flex-wrap: wrap; gap: .7rem; padding: 1rem 0; }
+.realm-travel button { font: inherit; padding: .6rem; border: 1px solid #ad947844; background: transparent; color: inherit; }
+.realm-atlas > summary { cursor: pointer; padding: 1rem 0; }
 .kingdom-stage {
   position: sticky;
   top: 0;
@@ -100,6 +112,13 @@ summary:focus-visible {
   width: 100%;
   height: 100%;
   border: 0;
+}
+.realm-scene > .scene-canvas {
+  position: relative;
+  inset: auto;
+  aspect-ratio: 1200 / 760;
+  height: auto;
+  overflow: hidden;
 }
 .scene-caption {
   position: absolute;
@@ -133,10 +152,6 @@ summary:focus-visible {
   color: #8a927b;
 }
 .conversation-log {
-  height: 440px;
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #c3ccb8 transparent;
   padding-right: 10px;
   margin-bottom: 22px;
 }
@@ -300,9 +315,6 @@ summary:focus-visible {
   .conversation {
     padding: 28px 7%;
   }
-  .conversation-log {
-    height: 330px;
-  }
   .edition {
     display: none;
   }
@@ -333,9 +345,6 @@ summary:focus-visible {
   }
   .conversation {
     padding: 26px 6%;
-  }
-  .conversation-log {
-    height: 300px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
