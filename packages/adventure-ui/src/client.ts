@@ -1,5 +1,6 @@
 import { contextId, images, rpc, workers } from "@workspace/runtime";
-import type { Campaign, ServiceView } from "@workspace/adventure-engine";
+import { initialWorld, type Campaign, type ServiceView } from "@workspace/adventure-engine";
+import { illustrationReferences, sceneSnapshot, type BundledArtwork } from "@workspace/adventure-engine/art";
 
 /** One campaign has one durable world; all participating panels see the same story. */
 export class AdventureClient {
@@ -12,6 +13,7 @@ export class AdventureClient {
     readonly key: string,
     readonly campaign: Campaign,
     readonly cover?: string
+    , readonly artwork?: BundledArtwork
   ) {
     this.service = workers.durableObjectService("examples.adventure.v1", key);
   }
@@ -29,8 +31,27 @@ export class AdventureClient {
   }
 
   private async importCover(game: ServiceView) {
+    if (this.artwork) {
+      const seed = initialWorld(this.campaign);
+      const opening = sceneSnapshot(seed);
+      const entries = [...Object.entries(this.artwork.places), ...Object.entries(this.artwork.people)];
+      for (const [entityId, url] of entries) {
+        const entity = seed.entities.find(e => e.id === entityId)!;
+        const ref = illustrationReferences({ location: entity, entities: [], inventory: [], exits: {}, events: [] }, seed.artDirection)[0]!;
+        if (game.visual.references?.[ref.key] === ref.signature) continue;
+        const asset = await this.importImage(url, `adventure:${this.key}:reference:${ref.key}`);
+        await this.service.call("setBundledReference", { key: ref.key, signature: ref.signature, asset });
+      }
+      const asset = await this.importImage(this.artwork.opening, `adventure:${this.key}:cover`);
+      await this.service.call("setOpeningArtwork", { asset, signature: opening.signature, placeId: opening.view.location.id });
+      return;
+    }
     if (!this.cover || game.world.tick !== 0 || game.world.artwork[game.view.location.id]) return;
-    const response = await fetch(this.cover);
+    const asset = await this.importImage(this.cover, `adventure:${this.key}:cover`);
+    await this.service.call("setOpeningArtwork", { asset });
+  }
+  private async importImage(url: string, owner: string) {
+    const response = await fetch(url);
     if (!response.ok) throw new Error("The opening illustration could not be opened.");
     const blob = await response.blob();
     const base64 = await new Promise<string>((resolve, reject) => {
@@ -40,8 +61,7 @@ export class AdventureClient {
         reject(reader.error ?? new Error("The illustration could not be read."));
       reader.readAsDataURL(blob);
     });
-    const asset = await images.importAsset({ base64, owner: `adventure:${this.key}:cover` });
-    await this.service.call("setOpeningArtwork", { asset });
+    return images.importAsset({ base64, owner });
   }
 
   async get(): Promise<ServiceView> {

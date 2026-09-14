@@ -9,6 +9,8 @@
     "./styles.css": "./src/styles.css"
   },
   "dependencies": {
+    "@workspace/living-canvas": "workspace:*",
+    "react-markdown": "^9.1.0",
     "@workspace/adventure-engine": "workspace:*",
     "@workspace/runtime": "workspace:*",
     "@workspace/react": "workspace:*",
@@ -17,5 +19,9 @@
   },
   "peerDependencies": {
     "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "vitest": "^3.2.7"
   }
 }

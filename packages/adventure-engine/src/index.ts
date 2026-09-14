@@ -1,9 +1,14 @@
+import { InteractionSchema, type Interaction } from "@workspace/living-canvas/interactions";
 /** Portable story state. Components are deliberately open: campaigns can invent their own mechanics. */
 export interface Components extends Record<string, any> {
+  interaction?: Interaction;
   exits?: Record<string, string>;
   frontier?: boolean;
   /** Component fields whose public values affect the scene illustration. */
   visualFields?: string[];
+  /** Stable physical identity, distinct from current clothing, props, goals and memories. */
+  appearance?: string;
+  visualAnchors?: string[];
   hidden?: boolean;
   open?: boolean;
   sealed?: boolean;
@@ -146,6 +151,7 @@ export function validateWorld(w: World) {
     throw new Error("Invalid world state");
   const ids = new Set<string>();
   for (const e of w.entities) {
+    if (e.components.interaction) InteractionSchema.parse(e.components.interaction);
     if (
       !e.id ||
       ids.has(e.id) ||
@@ -660,9 +666,10 @@ export type ServiceView = {
       signature: string;
       status: "queued" | "painting" | "error";
       error?: string;
+      preparing?: string[];
     } | null;
   };
-  visual: { signature: string; artworkSignature?: string; fresh: boolean };
+  visual: { signature: string; artworkSignature?: string; fresh: boolean; references?: Record<string, string> };
   seated: boolean;
   neededSeats: { role: AdventureRole; name: string }[];
 };

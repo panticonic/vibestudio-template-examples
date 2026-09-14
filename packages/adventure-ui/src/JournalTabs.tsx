@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
 import type { ServiceView } from "@workspace/adventure-engine";
 
 /** These pages project only the player view and witnessed journal; they invent no story facts. */
@@ -43,7 +44,9 @@ export function JournalTabs({ game, history }: { game: ServiceView | null; histo
                 </article>
               ))}
               {conversations.map((entry) => (
-                <blockquote key={entry.id}>{entry.text}</blockquote>
+                <blockquote key={entry.id}>
+                  <ReactMarkdown skipHtml>{entry.text}</ReactMarkdown>
+                </blockquote>
               ))}
               {!people.length && !conversations.length && <p>No encounters recorded yet.</p>}
             </>
@@ -78,7 +81,7 @@ export function JournalTabs({ game, history }: { game: ServiceView | null; histo
               ))}
               {observations.map((entry) => (
                 <article key={entry.id}>
-                  <p>{entry.text}</p>
+                  <ReactMarkdown skipHtml>{entry.text}</ReactMarkdown>
                 </article>
               ))}
               {!relations.length && !observations.length && (

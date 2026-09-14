@@ -80,6 +80,69 @@ async function boot(initialCampaign: Campaign = campaign) {
   return { ...t, user, agent, deliveries };
 }
 describe("durable adventure orchestration", () => {
+  it("persists reference jobs and reuses portraits by identity across scenes", async () => {
+    const t = await boot();
+    await t.user("play", { id: "first", text: "Look around" });
+    await t.agent("player", "finish", {
+      turnId: "first",
+      text: "The room is quiet.",
+    });
+    const perspective = await t.agent("artist", "perspective");
+    expect(perspective.references.map((ref: any) => ref.key)).toEqual([
+      "place:room",
+      "person:clerk",
+    ]);
+    const sceneId = perspective.pending.id;
+    await t.agent("artist", "setReferenceJob", {
+      turnId: sceneId,
+      key: "person:clerk",
+      jobId: "portrait-job",
+    });
+    expect((await t.agent("artist", "perspective")).references[1].jobId).toBe("portrait-job");
+    await expect(
+      t.agent("player", "publishReference", {
+        turnId: sceneId,
+        key: "person:clerk",
+        asset: { id: "wrong", digest: "wrong" },
+      })
+    ).rejects.toThrow("active artist");
+    await expect(
+      t.agent("artist", "publishReference", {
+        turnId: sceneId,
+        key: "person:absent",
+        asset: { id: "wrong", digest: "wrong" },
+      })
+    ).rejects.toThrow("reference subject");
+    for (const ref of perspective.references)
+      await t.agent("artist", "publishReference", {
+        turnId: sceneId,
+        key: ref.key,
+        asset: { id: ref.key, digest: "canonical" },
+      });
+    expect((await t.user("getGame")).background.scene.preparing).toEqual([]);
+    const deliveries = t.deliveries.length;
+    await t.user("getGame");
+    await t.user("retry");
+    expect(t.deliveries.length).toBe(deliveries);
+    await t.agent("artist", "publishArtwork", {
+      turnId: sceneId,
+      asset: { id: "scene-one", digest: "one" },
+    });
+    await t.user("play", { id: "second", text: "Change the clock" });
+    await t.agent("player", "execute", {
+      turnId: "second",
+      code: 'world.setComponent("clock", "appearance", "A polished face")',
+    });
+    await t.agent("player", "finish", {
+      turnId: "second",
+      text: "The clock gleams.",
+    });
+    await t.agent("person:clerk", "finish", { turnId: "second", text: "" });
+    const next = await t.agent("artist", "perspective");
+    expect(next.pending.id).not.toBe(sceneId);
+    expect(next.references.map((ref: any) => ref.asset.id)).toEqual(["place:room", "person:clerk"]);
+    expect(next.references.every((ref: any) => ref.jobId === undefined)).toBe(true);
+  });
   it("keeps the player's private intention out of NPC perspectives", async () => {
     const t = await boot();
     await t.user("play", { id: "private", text: "Secretly conceal the letter before speaking." });

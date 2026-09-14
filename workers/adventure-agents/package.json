@@ -139,6 +139,7 @@
     "icon": "./assets/icon.svg"
   },
   "dependencies": {
+    "@workspace/living-canvas": "workspace:*",
     "@workspace-workers/agent-worker": "workspace:*",
     "@workspace/agentic-core": "workspace:*",
     "@workspace/agentic-do": "workspace:*",

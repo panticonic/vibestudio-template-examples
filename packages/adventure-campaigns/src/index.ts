@@ -19,14 +19,20 @@ const person = (
   location: string,
   description: string,
   goals: string[],
-  knowledge: string[]
+  knowledge: string[],
+  appearance?: string
 ): Entity => ({
   id,
   name,
   kind: "person",
   location,
   description,
-  components: { goals, knowledge, memory: [] },
+  components: {
+    goals,
+    knowledge,
+    memory: [],
+    ...(appearance ? { appearance } : {}),
+  },
 });
 const object = (
   id: string,
@@ -143,7 +149,8 @@ export const deadLetterOffice: Campaign = {
         "Mara Vale was my mother.",
         "The sorting cabinet responds to truthful addresses, not legal status.",
         "The old flood-warning manifest is upstairs.",
-      ]
+      ],
+      "A woman in her early fifties with a long narrow face, pale freckled skin, straight iron-grey hair in a low braid, grey eyes and thin oval spectacles. Slight build and a precise upright bearing."
     ),
     person(
       "tomas",
@@ -157,7 +164,8 @@ export const deadLetterOffice: Campaign = {
       [
         "The tide steps become walkable after two harbour bells.",
         "The missing permit is in the cabinet's Salt Street drawer. A current relief warrant is also valid harbour authority.",
-      ]
+      ],
+      "A broad-shouldered man in his sixties, weathered brown skin, a square face, a close white beard, deep-set dark eyes and short tightly curled white hair. One eyebrow has a small old scar."
     ),
     object(
       "harbour-lamp",
@@ -321,7 +329,7 @@ export const missingCountry: Campaign = {
   intro:
     "At nine, you inherit an embassy. At ten, the city registry informs you that your country does not exist. At eleven, a woman arrives with a passport, a sleeping child, and a train ticket for a border that vanished last night.",
   artDirection:
-    "Lavish classic European illustrated adventure, painterly architectural precision and soft cinematic light. An impossible early twentieth-century embassy: ivory limestone, tall arched windows, faded rose damask, burgundy velvet, verdigris brass, intricate parquet. Antique diplomatic stationery and restrained art-nouveau motifs. Morning light in dusty gold, muted celadon shadows, deep carmine accents. The country of Orison is symbolized by a small silver moth over three blue waves. Elegance with signs of ordinary life: tea, a child's coat, repaired upholstery. No game UI or lettering baked into artwork. Preserve room geometry and individual appearance from references.",
+    "Lavish classic European illustrated adventure, painterly architectural precision and soft cinematic light. An impossible early twentieth-century embassy: ivory limestone, tall arched windows, faded rose damask, burgundy velvet, verdigris brass, intricate parquet. Antique diplomatic stationery and restrained art-nouveau motifs. Morning light in dusty gold, muted celadon shadows, deep carmine accents. The country of Orison is symbolized by a small silver moth over three blue waves. Elegance with signs of ordinary life: tea, a child's coat, repaired upholstery. No game UI or lettering baked into artwork. Architecture references establish places; each named portrait establishes only that person's identity.",
   playerId: "ambassador",
   story: {
     premise:
@@ -418,7 +426,8 @@ export const missingCountry: Campaign = {
       [
         "The north bridge leads to a real town even though its border post vanished.",
         "The railway workers kept their own route book.",
-      ]
+      ],
+      "A woman in her thirties with warm olive skin, a heart-shaped face, hazel eyes, a strong straight nose and short tousled chestnut curls. Wiry build, expressive brows and a few freckles across her nose."
     ),
     person(
       "ilyan",
@@ -429,7 +438,8 @@ export const missingCountry: Campaign = {
       [
         "The visitors' book once recorded acts of hospitality, not just names.",
         "An accepted invitation binds this embassy to protect its guest.",
-      ]
+      ],
+      "A tall slender man in his late sixties with dark brown skin, a long face, close-cropped silver hair, a neat silver moustache and gentle brown eyes. Slightly stooped shoulders."
     ),
     person(
       "vesper",
@@ -443,7 +453,8 @@ export const missingCountry: Campaign = {
       [
         "Two independent institutional witnesses can reopen a struck registry entry.",
         "The morning deletion was countersigned with a seal no one admits issuing.",
-      ]
+      ],
+      "A woman in her late fifties with fair skin, a broad angular face, steel-blue eyes and straight silver hair pinned in a severe high bun. Tall, solid build; round dark-rimmed spectacles and a pronounced cleft chin."
     ),
     object(
       "embassy-key",
@@ -620,7 +631,8 @@ export const wanderingHouse: Campaign = {
       [
         "The route table accepts a destination when the brass key is turned.",
         "The house slows safely when the arrival bell is rung.",
-      ]
+      ],
+      "A compact elderly man with light brown skin, a round face, silver hair swept back from a widow's peak, a pencil-thin white moustache and bright dark eyes. Upright, ceremonious posture."
     ),
     person(
       "saffron",
@@ -631,7 +643,8 @@ export const wanderingHouse: Campaign = {
       [
         "The missing bearing could be replaced with a small glazed ceramic piece.",
         "The house follows old promises as well as coordinates.",
-      ]
+      ],
+      "A young woman with dark brown skin, a broad nose, amber eyes, a rounded face and a dense halo of copper-red curls. Short athletic build and a gap between her front teeth."
     ),
     person(
       "vale",
@@ -645,7 +658,8 @@ export const wanderingHouse: Campaign = {
       [
         "The orchard's trees bloom when someone tells them a true memory.",
         "The proprietor promised its keeper she would return.",
-      ]
+      ],
+      "A woman in her forties with tawny skin, a long oval face, black almond-shaped eyes and very straight black hair in a chin-length bob with a white streak at the left temple. Tall and lean, with high cheekbones."
     ),
     object(
       "route-key",
@@ -841,7 +855,10 @@ export const postalPrograms = {
     self: Entity
   ) {
     const document = world.entity(event["itemId"]);
-    const inspection = self.components["recognizes"] as { issuer: string; permission: string };
+    const inspection = self.components["recognizes"] as {
+      issuer: string;
+      permission: string;
+    };
     if (!document.components["document"] || !inspection) return;
     const grant = world.world.relations.find(
       (relation) =>
@@ -1062,6 +1079,24 @@ wanderingHouse.behaviors = [
   },
 ];
 
+// Starting situations are invitations, not a quest graph. The builder continues beyond them.
+deadLetterOffice.entities.find(e => e.id === "landing")!.components.interaction = {
+  title: "At the tide steps",
+  sections: [{ id: "letter", title: "The impossible address", body: "The letter in your satchel names a woman said to have drowned. A light is still burning in the customs house.", actions: [{ label: "Examine the letter", intent: "Examine the letter in my satchel without opening its seal." }, { label: "Go to the lit window", intent: "Go to the customs house." }] }, { id: "beyond", title: "Follow your own curiosity", body: "Bellwether continues beyond the postal route.", folded: true, fields: [{id:"interest",label:"What would you like to find?"}], actions: [{label:"Explore",intent:"Explore the harbour in search of {interest}."}] }],
+};
+deadLetterOffice.entities.find(e => e.id === "customs")!.components.interaction = {
+  title: "The sorting counter",
+  sections: [{id:"cabinet",title:"Twelve brass pigeonholes",body:"The blue tide dial turns against the clock. The cabinet is a working instrument, not merely a display.",fields:[{id:"address",label:"An address to investigate"}],actions:[{label:"Ask Elin about this address",intent:"Elin, what can you tell me about post for {address}?"},{label:"Examine the cabinet",intent:"Examine the sorting cabinet and its tide dial."}]}],
+};
+missingCountry.entities.find(e => e.id === "vestibule")!.components.interaction = {
+  title: "The embassy desk",
+  sections: [{id:"telephone",title:"The ivory telephone",body:"Three institutional lines remain connected. A call can open a conversation; it cannot guarantee recognition.",fields:[{id:"contact",label:"Connect me to",options:["City Registry","Stationmaster","Foreign Ministry"]},{id:"message",label:"What do you want to ask?"}],actions:[{label:"Place the call",intent:"Use the ivory telephone to call the {contact} and ask: {message}"}]},{id:"welcome",title:"A visitor, not a case number",body:"Ada is waiting with a child's scarf. You can listen before deciding what to promise.",actions:[{label:"Hear Ada",intent:"Ada, tell me what happened to your family and what you need now."},{label:"Read the notice",intent:"Read the official notice on the embassy desk."}]}],
+};
+wanderingHouse.entities.find(e => e.id === "lobby")!.components.interaction = {
+  title: "The navigator’s table",
+  introduction: "The itinerary is unfinished. You need not finish someone else's journey.",
+  sections:[{id:"route",title:"Beyond the rim of the map",body:"The brass table holds an orchard above the clouds. Other destinations can be sought; the house's machinery and its guests still matter.",fields:[{id:"destination",label:"Where would you like to go?"}],actions:[{label:"Consider this destination with Pell",intent:"Mr. Pell, what would it take to travel to {destination}?"}]},{id:"bell",title:"The arrival bell",body:"A silver bell rests on green velvet. Ringing it asks the house to stop safely.",actions:[{label:"Ring the arrival bell",intent:"Ring the arrival bell to stop the house safely."},{label:"Inspect the route table",intent:"Examine the route table and its current destination."}]}],
+};
 export const campaigns = [deadLetterOffice, missingCountry, wanderingHouse];
 
 for (const [campaign, roleName] of [

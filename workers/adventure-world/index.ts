@@ -14,13 +14,14 @@ import {
   AgentProgramError,
   WorldActionRefusal,
 } from "./evaluate.js";
-import { sceneSnapshot } from "./scene.js";
+import { sceneSnapshot, illustrationReferences } from "./scene.js";
 type SceneTask = ReturnType<typeof sceneSnapshot> & {
   id: string;
   placeId: string;
   status: "queued" | "painting" | "error";
   error?: string;
   jobId?: string;
+  referenceJobs?: Record<string, string>;
   attempt: number;
 };
 type Seat = { role: AdventureRole; targetId: string; channelId: string };
@@ -35,6 +36,7 @@ type Stored = {
   scenes: SceneTask[];
   artworkSignatures: Record<string, string>;
   openingArtwork?: any;
+  illustrationReferences?: Record<string, { signature: string; asset: any }>;
   receipts: string[];
 };
 export class AdventureWorldDO extends DurableObjectBase {
@@ -197,12 +199,26 @@ export class AdventureWorldDO extends DurableObjectBase {
       view,
       pending: s.pending,
       background: {
-        scene:
-          s.scenes.find((task) => task.placeId === view.location.id) ??
-          s.scenes[0] ??
-          null,
+        scene: (() => {
+          const task = s.scenes.find(
+            (task) => task.placeId === view.location.id,
+          );
+          return task
+            ? {
+                id: task.id,
+                placeId: task.placeId,
+                signature: task.signature,
+                status: task.status,
+                error: task.error,
+                preparing: this.references(s, task)
+                  .filter((ref) => !ref.asset)
+                  .map((ref) => ref.name),
+              }
+            : null;
+        })(),
       },
       visual: {
+        references: Object.fromEntries(Object.entries(s.illustrationReferences ?? {}).map(([key,ref]) => [key, ref.signature])),
         signature: sceneSnapshot(s.world).signature,
         artworkSignature: s.artworkSignatures[view.location.id],
         fresh:
@@ -226,7 +242,7 @@ export class AdventureWorldDO extends DurableObjectBase {
     tier: "open",
     sensitivity: "write",
   })
-  setOpeningArtwork({ asset }: { asset: any }) {
+  setOpeningArtwork({ asset, signature, placeId: authoredPlace }: { asset: any; signature?: string; placeId?: string }) {
     this.player();
     const s = this.load();
     const placeId = s.world.entities.find(
@@ -234,6 +250,7 @@ export class AdventureWorldDO extends DurableObjectBase {
     )!.location!;
     if (!asset?.id || !asset?.digest)
       throw new Error("An image asset is required");
+    if (signature && (signature !== sceneSnapshot(s.world).signature || authoredPlace !== placeId)) return this.getGame();
     s.openingArtwork ??= asset;
     if (!s.world.artwork[placeId] && s.world.tick === 0) {
       s.world.artwork[placeId] = asset;
@@ -242,6 +259,18 @@ export class AdventureWorldDO extends DurableObjectBase {
     }
     this.save(s);
     return this.getGame();
+  }
+  @rpc({ website: {kind:"closed",reason:"Installed game artwork."}, principals:["host","user","code"], effect:{kind:"open"}, tier:"open", sensitivity:"write" })
+  setBundledReference(input: {key: string; signature: string; asset: any}) {
+    this.player();
+    const s = this.load();
+    const entity = s.world.entities.find(e => `${e.kind === "person" ? "person" : "place"}:${e.id}` === input.key && (e.kind === "person" || e.kind === "place"));
+    if (!entity || !input.asset?.id || !input.asset?.digest) throw new Error("A known reference subject and image asset are required.");
+    const ref = illustrationReferences({location:entity,entities:[],inventory:[],exits:{},events:[]},s.world.artDirection)[0]!;
+    if (ref.signature !== input.signature) return { superseded: true };
+    s.illustrationReferences ??= {};
+    if (!s.illustrationReferences[input.key]) s.illustrationReferences[input.key] = { signature: ref.signature, asset: input.asset };
+    this.save(s); return { ok: true };
   }
   @rpc({
     website: {
@@ -324,7 +353,7 @@ export class AdventureWorldDO extends DurableObjectBase {
   async retry() {
     this.player();
     const s = this.load();
-    if (s.pending) {
+    if (s.pending?.error) {
       s.pending.attempt++;
       delete s.pending.error;
       this.save(s);
@@ -406,7 +435,7 @@ export class AdventureWorldDO extends DurableObjectBase {
     const s = this.load(),
       scene = s.scenes.find((task) => !task.error),
       seat = s.seats.find((x) => x.role === "artist");
-    if (!scene || !seat || scene.error) return;
+    if (!scene || !seat || scene.status !== "queued") return;
     scene.status = "painting";
     this.save(s);
     try {
@@ -533,8 +562,8 @@ export class AdventureWorldDO extends DurableObjectBase {
         view: task?.view,
         signature: task?.signature,
         artwork: s.world.artwork,
-        openingArtwork: s.openingArtwork,
-        artDirection: s.world.artDirection,
+        references: task ? this.references(s, task) : [],
+        artDirection: task?.artDirection ?? s.world.artDirection,
         imageJob: task?.jobId ? { id: task.jobId } : undefined,
       };
     }
@@ -565,6 +594,68 @@ export class AdventureWorldDO extends DurableObjectBase {
       artDirection: s.world.artDirection,
       artwork: s.world.artwork,
     };
+  }
+  private references(s: Stored, task: SceneTask) {
+    return illustrationReferences(
+      task.view,
+      task.artDirection ?? s.world.artDirection,
+    ).map((ref) => {
+      const saved = s.illustrationReferences?.[ref.key];
+      return {
+        ...ref,
+        asset: saved?.signature === ref.signature ? saved.asset : undefined,
+        previousAsset: saved?.asset,
+        jobId: task.referenceJobs?.[ref.key],
+      };
+    });
+  }
+  @rpc({
+    website: {
+      kind: "closed",
+      reason: "Illustration references belong to the installed adventure.",
+    },
+    principals: ["host", "user", "code"],
+    effect: { kind: "open" },
+    tier: "open",
+    sensitivity: "write",
+  })
+  setReferenceJob(input: { turnId: string; key: string; jobId: string }) {
+    const s = this.load(),
+      task = s.scenes.find((task) => !task.error);
+    if (
+      this.seat(s).role !== "artist" ||
+      task?.id !== input.turnId ||
+      !this.references(s, task).some((ref) => ref.key === input.key)
+    )
+      throw new Error("Only the active artist may prepare a scene reference");
+    (task.referenceJobs ??= {})[input.key] = input.jobId;
+    this.save(s);
+    return { ok: true };
+  }
+  @rpc({
+    website: {
+      kind: "closed",
+      reason: "Illustration references belong to the installed adventure.",
+    },
+    principals: ["host", "user", "code"],
+    effect: { kind: "open" },
+    tier: "open",
+    sensitivity: "write",
+  })
+  publishReference(input: { turnId: string; key: string; asset: any }) {
+    const s = this.load(),
+      task = s.scenes.find((task) => !task.error);
+    if (this.seat(s).role !== "artist" || task?.id !== input.turnId)
+      throw new Error("Only the active artist may publish a scene reference");
+    const ref = this.references(s, task).find((ref) => ref.key === input.key);
+    if (!ref || !input.asset?.id || !input.asset?.digest)
+      throw new Error("A reference subject and image asset are required");
+    (s.illustrationReferences ??= {})[ref.key] = {
+      signature: ref.signature,
+      asset: input.asset,
+    };
+    this.save(s);
+    return { ok: true };
   }
   @rpc({
     website: {

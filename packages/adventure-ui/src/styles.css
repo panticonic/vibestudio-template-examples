@@ -50,7 +50,8 @@ body {
   --muted: #aaa99c;
   --accent: #c3a168;
   --line: #c3a16833;
-  --serif: "Cormorant Garamond", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --serif:
+    "Cormorant Garamond", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --sans: "DM Sans", "Segoe UI", sans-serif;
   color-scheme: dark;
   color: var(--ink);
@@ -290,38 +291,39 @@ body {
   text-wrap: pretty;
 }
 .adventure-scene-caption {
-  padding: 5px 8px;
-  background: #0a141bcc;
-  border-radius: 2px;
-  position: absolute;
-  bottom: 18px;
-  right: 27px;
-  color: #fff5df;
+  min-height: 52px;
+  padding: 8px 0;
+  box-sizing: border-box;
+  max-width: 1560px;
+  margin: auto;
+  color: var(--muted);
   font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.adventure-scene-caption:empty {
-  display: none;
+  line-height: 1.5;
 }
 .adventure-image-wait {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  color: var(--muted);
-  background: radial-gradient(ellipse at 50% 40%, var(--paper-raised), var(--paper));
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 21px;
+  background: radial-gradient(ellipse at 65% 20%, #53615a, #182b2c 80%);
 }
-.adventure-image-wait p {
-  font-family: var(--sans);
+.adventure-image-error {
+  padding: 65px 38px;
+  color: #fff5df;
   font-size: 12px;
-  font-style: normal;
+}
+.adventure-interlude {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  padding-bottom: 18px;
+}
+.adventure-interlude button {
+  display: block;
+  margin-top: 8px;
+  color: var(--accent);
+}
+.adventure-retry-illustration {
+  margin-bottom: 12px;
+  color: var(--accent);
 }
 .adventure-body {
   display: grid;
@@ -343,22 +345,17 @@ body {
   font-size: 18px;
 }
 .adventure-prose {
-  max-height: clamp(220px, 28dvh, 320px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
-  padding-right: 12px;
   font-family: var(--serif);
   font-size: 22px;
   line-height: 1.5;
   color: var(--ink);
   letter-spacing: 0.005em;
 }
+.adventure-prose > div + div,
 .adventure-prose p + p {
   margin-top: 17px;
 }
-.adventure-prose p:first-child::first-letter {
+.adventure-prose > p:first-child::first-letter {
   font-size: 43px;
   line-height: 0.9;
   color: var(--accent);
@@ -969,7 +966,6 @@ body {
   }
   .adventure-prose {
     font-size: 21px;
-    max-height: clamp(220px, 36dvh, 300px);
   }
   .adventure-house .adventure-scene {
     border-radius: 65px 65px 0 0;

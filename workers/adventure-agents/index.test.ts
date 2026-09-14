@@ -40,8 +40,45 @@ vi.mock("../agent-worker/ai-chat-worker.js", () => ({
 import { AdventureAgentWorker } from "./index.js";
 const instance = () => new AdventureAgentWorker(undefined as never, undefined as never) as any;
 describe("adventure native turn contract", () => {
+  it.each([false, true])("prepares and durably retains a missing portrait (resuming failed job: %s)", async (resume) => {
+    const agent = instance();
+    const calls: Array<{ method: string; args: any[] }> = [];
+    const asset = (id: string) => ({ id, digest: id, mimeType: "image/png", width: 1024, height: 1024, byteLength: 1,
+      provenance: { provider: "test", imageModel: "test", createdAt: 1 } });
+    let retried = false;
+    const execution = { rpc: { call: async (_target: string, method: string, args: any[]) => {
+      calls.push({ method, args });
+      if (method === "workers.resolveService") return { kind: "durable-object", targetId: args[0] };
+      if (method === "perspective") return {
+        pending: { id: "one", phase: "artist" }, view: { location: { id: "square" }, entities: [{ id: "vesper" }] },
+        artDirection: "Oil painting", artwork: {}, references: [
+          { key: "place:square", name: "Square", kind: "place", asset: asset("empty-square") },
+          { key: "person:vesper", name: "Vesper", kind: "portrait", prompt: "Vesper alone, silver bun", jobId: resume ? "portrait-job" : undefined },
+        ],
+      };
+      if (method === "generate") return { id: args[0].requestId.endsWith("person:vesper") ? "portrait-job" : "scene-job", status: "running" };
+      if (method === "retry") { retried = true; return { id: args[0], status: "running" }; }
+      if (method === "getJob") return resume && args[0] === "portrait-job" && !retried
+        ? { id: args[0], status: "failed", error: "Temporary provider failure" }
+        : { id: args[0], status: "succeeded", asset: asset(args[0]) };
+      return { ok: true };
+    } } };
+    const paint = (await agent.getLoopTools("artist", execution)).find((tool: any) => tool.name === "paint_scene");
+    const result = await paint.execute("paint", { turnId: "one", prompt: "Vesper in the square" });
+    expect(result.details.asset.id).toBe("scene-job");
+    const generations = calls.filter((call) => call.method === "generate");
+    expect(generations).toHaveLength(resume ? 1 : 2);
+    if (!resume) {
+      expect(generations[0]!.args[0].references).toEqual([]);
+      expect(calls.some((call) => call.method === "setReferenceJob")).toBe(true);
+    } else expect(calls.find((call) => call.method === "retry")?.args).toEqual(["portrait-job"]);
+    expect(generations.at(-1)!.args[0].references.map((image: any) => image.id)).toEqual(["empty-square", "portrait-job"]);
+    expect(calls.find((call) => call.method === "publishReference")?.args[0]).toEqual({ turnId: "one", key: "person:vesper", asset: asset("portrait-job") });
+    expect(calls.filter((call) => call.method === "retain").map((call) => call.args[0].owner)).toContain("adventure:journey:reference:person:vesper");
+    expect(calls.filter((call) => call.method === "forgetJob").map((call) => call.args[0])).toEqual(["portrait-job", "scene-job"]);
+  });
   it.each([false, true])(
-    "uses scoped image RPC and distinguishes style cover from same-place edit (same place: %s)",
+    "uses labelled canonical references, never a cover or finished scene (same place: %s)",
     async (samePlace) => {
       const agent = instance();
       agent.rpc.call = async () => {
@@ -76,6 +113,20 @@ describe("adventure native turn contract", () => {
                 artDirection: "Painted harbour",
                 artwork: samePlace ? { customs: reference } : { landing: reference },
                 openingArtwork: reference,
+                references: [
+                  {
+                    key: "place:customs",
+                    name: "Customs",
+                    kind: "place",
+                    asset: { ...reference, id: "empty-customs" },
+                  },
+                  {
+                    key: "person:elin",
+                    name: "Elin Vale",
+                    kind: "portrait",
+                    asset: { ...reference, id: "elin-portrait" },
+                  },
+                ],
               };
             if (method === "generate") return { id: "scene-job", status: "running" };
             if (method === "getJob") return { id: "scene-job", status: "succeeded", asset };
@@ -95,10 +146,13 @@ describe("adventure native turn contract", () => {
       expect(result.details.asset.id).toBe("customs-art");
       const generation = calls.find((c) => c.method === "generate");
       expect(generation.target).toBe("do:images");
-      expect(generation.args[0].references).toEqual([reference]);
-      expect(generation.args[0].prompt).toContain(
-        samePlace ? "REFERENCE EDIT:" : "STYLE REFERENCE ONLY:"
-      );
+      expect(generation.args[0].references.map((asset: any) => asset.id)).toEqual([
+        "empty-customs",
+        "elin-portrait",
+      ]);
+      expect(generation.args[0].prompt).toContain("Image 1: place:customs");
+      expect(generation.args[0].prompt).toContain("Image 2: person:elin");
+      expect(generation.args[0].prompt).toContain("AUTHORITATIVE VISIBLE SCENE:");
       expect(calls.find((c) => c.method === "publishArtwork").args[0]).toEqual({
         turnId: "one",
         asset,

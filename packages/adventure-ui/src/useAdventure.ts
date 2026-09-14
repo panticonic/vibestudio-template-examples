@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { panel } from "@workspace/runtime";
 import { useStateArgs } from "@workspace/react";
 import type { Campaign, ServiceView } from "@workspace/adventure-engine";
+import type { BundledArtwork } from "@workspace/adventure-engine/art";
 import { AdventureClient } from "./client.js";
 
 export function useCampaignKey(campaign: Campaign) {
@@ -52,10 +53,10 @@ export function useCampaignKey(campaign: Campaign) {
 }
 
 /** Polling is intentionally small: the world owns simulation and survives this view. */
-export function useAdventure(key: string | null, campaign: Campaign, cover?: string) {
+export function useAdventure(key: string | null, campaign: Campaign, cover?: string, artwork?: BundledArtwork) {
   const client = useMemo(
-    () => (key ? new AdventureClient(key, campaign, cover) : null),
-    [key, campaign, cover]
+    () => (key ? new AdventureClient(key, campaign, cover, artwork) : null),
+    [key, campaign, cover, artwork]
   );
   const [snapshot, setSnapshot] = useState<{ client: AdventureClient; game: ServiceView } | null>(
     null
