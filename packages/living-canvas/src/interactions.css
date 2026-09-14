@@ -1,0 +1,13 @@
+.scene-interaction { margin: 1.5rem 0; padding: 1.25rem; border: 1px solid #ad947844; background: #f8f4eaaa; color: #302d28; }
+.scene-interaction h2 { font: inherit; font-size: 1.5rem; margin: 0 0 .7rem; }
+.scene-interaction h3, .scene-interaction summary { font: inherit; font-weight: 600; margin: 0 0 .6rem; }
+.scene-interaction p { font-size: 1rem; line-height: 1.6; margin: .5rem 0; }
+.scene-interaction-sections { display: grid; gap: 1rem; }
+.scene-interaction article, .scene-interaction details { border-top: 1px solid #ad947844; padding-top: 1rem; min-width: 0; }
+.scene-interaction label { display: grid; gap: .4rem; margin: .7rem 0; font-size: .9rem; }
+.scene-interaction input, .scene-interaction select { width: 100%; box-sizing: border-box; padding: .7rem; color: inherit; background: #fffaf0; border: 1px solid #ad947866; font: inherit; }
+.scene-interaction-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.scene-interaction button { padding: .6rem .8rem; background: transparent; border: 1px solid #ad947866; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; text-align: left; }
+.scene-interaction button:disabled { opacity: .45; cursor: wait; }
+.scene-interaction summary { cursor: pointer; }
+.scene-interaction :focus-visible { outline: 2px solid #9d453c; outline-offset: 3px; }

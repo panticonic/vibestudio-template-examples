@@ -4,12 +4,15 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./interactions": "./src/interactions.ts",
+    "./interactions/react": "./src/SceneInteraction.tsx",
     ".": "./src/index.ts",
     "./react": "./src/SceneCanvas.tsx",
     "./image-tool": "./src/image-tool.ts",
     "./fonts.css": "./fonts.css",
     "./execution": "./src/execution.ts"
   },
+  "devDependencies": { "vitest": "^3.2.7", "@testing-library/react": "^16.3.0" },
   "dependencies": {
     "zod": "^3.25.76",
     "acorn": "^8.18.0",
