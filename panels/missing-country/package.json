@@ -55,6 +55,7 @@
       "requests": [
         {
           "capability": "workspace-service:adventure",
+          "packages": ["@workspace/adventure-ui"],
           "resource": {
             "kind": "prefix",
             "prefix": ""

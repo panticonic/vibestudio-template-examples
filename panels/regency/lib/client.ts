@@ -1,7 +1,5 @@
 import type { Artworks } from "@workspace/living-canvas";
 import { contextId, rpc, workers } from "@workspace/runtime";
-import { addAgentToChannel } from "@workspace-skills/agents";
-import { waitForApprovalResolution } from "@workspace/pubsub";
 import type { Game } from "@workspace/regency-engine";
 export type View = {
   game: Game;
@@ -70,6 +68,10 @@ export class StoryClient {
       await this.seatRole(role, "The scene artist");
   }
   private async seatRole(role: string, name: string) {
+    const [{ addAgentToChannel }, { waitForApprovalResolution }] = await Promise.all([
+      import("@workspace-skills/agents"),
+      import("@workspace/pubsub"),
+    ]);
     const channelId = `regency-story-${this.key}-${role}`;
     const seat = await addAgentToChannel({
       source: "workers/regency-agents",

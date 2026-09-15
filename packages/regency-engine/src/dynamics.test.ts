@@ -12,21 +12,21 @@ function months(
 describe("a realm with causes", () => {
   it("mobilization raises foreign tension while a nonaggression treaty reduces it", () => {
     const ordinary = months(1);
-    const mobilized = months(1, r => { r.economy.forces[0].posture = "mobilized"; });
-    const treaty = months(1, r => { r.economy.neighbors[0].treaty = "nonaggression"; });
-    expect(mobilized.economy.neighbors[0].tension).toBeGreaterThan(ordinary.economy.neighbors[0].tension);
-    expect(treaty.economy.neighbors[0].tension).toBeLessThan(ordinary.economy.neighbors[0].tension);
+    const mobilized = months(1, r => { r.economy.forces[0]!.posture = "mobilized"; });
+    const treaty = months(1, r => { r.economy.neighbors[0]!.treaty = "nonaggression"; });
+    expect(mobilized.economy.neighbors[0]!.tension).toBeGreaterThan(ordinary.economy.neighbors[0]!.tension);
+    expect(treaty.economy.neighbors[0]!.tension).toBeLessThan(ordinary.economy.neighbors[0]!.tension);
   });
   it("migration transfers households, labour and consumption without creating them", () => {
     const realm = initialGame().world;
-    const source = realm.economy.regions[0];
+    const source = realm.economy.regions[0]!;
     source.unrest = 90;
     for (const route of realm.economy.routes) route.condition = 1;
     const totals = () => ["population", "labour", "consumption"].map(key => realm.economy.regions.reduce((n,r) => n + r[key as "population" | "labour" | "consumption"],0));
     const before = totals(), population = source.population;
     settleRealmMonth(realm, []);
     expect(source.population).toBeLessThan(population);
-    totals().forEach((n,i) => expect(n).toBeCloseTo(before[i], 8));
+    totals().forEach((n,i) => expect(n).toBeCloseTo(before[i]!, 8));
   });
   it("moves conserved grain through connected routes, consumes food and accounts for every crown", () => {
     const realm = months(1);

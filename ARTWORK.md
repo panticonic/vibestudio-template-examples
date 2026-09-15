@@ -1,5 +1,10 @@
 # Adventure foundation artwork
 
+Delivery assets are full-dimension WebP encodings (quality 82, effort 6), replacing
+the original PNGs without changing compositions or cropping. The original masters
+remain recoverable from Git history. Only the current scene's identity references
+are registered with the image service; unexplored places are not uploaded at boot.
+
 Generated with the built-in image generation tool. These are a bounded starter set, not a pre-rendered world. Newly explored places and changed scenes continue to use on-demand generation.
 
 Three roles: distinct character identity references; unoccupied architectural plates; composed opening scenes. Dead Letter Office opens without a visible character, so its landing plate also serves as the opening scene. Do not use a composed scene as another character's identity reference.
@@ -203,4 +208,3 @@ Saved in `panels/wandering-house/assets/foundations/`.
 Prompt:
 
 Use case: illustration-story. Complete opening encounter in a walking hotel. Image 1 is architectural reference only; Image 2 is Mr Pell's identity. Preserve the emerald concierge desk, bifurcated walnut stairs, constellation chandelier and circular brass route table. Add exactly Mr Pell, compact elderly night porter with swept silver hair, light brown skin and thin white moustache, wearing emerald-lapeled coat. Match his portrait closely. He holds a ring of unusual keys and gestures toward the route table with a welcoming, slightly relieved expression. Sublime cloud sea beyond the windows. First-person guest is not shown. Rich hand-painted literary adventure, wide landscape, no other people, no UI or text.
-

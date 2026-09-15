@@ -29,3 +29,18 @@ Illustration identity belongs to the world. Campaign `artDirection` supplies sty
 Missing reference images are generated concurrently, retained durably and reused across scenes. The final composition receives labelled references plus the immutable visible scene; it never receives a finished scene as an identity source. The first illustration of a place/person therefore has an additional preparation step. Its progress is visible, and it does not block play. Reference job IDs survive interruptions, successful partial work survives retries, and failed native jobs use the image service's retry operation.
 
 Panels using the complete shell declare the adventure, channel and images service requests, and the native participant-creation authority. The three example panel manifests are complete consumers. Packages remain framework peers: the enclosing panel supplies React.
+# Startup efficiency
+
+Foundation artwork is delivered as full-dimension WebP, not embedded image data
+in JavaScript. Only the visible place and people are registered with the image
+service; successful registrations are shared across polling calls and failures
+remain retryable. Established games do not upload the opening again. Reference
+identity signatures prevent an old bundled portrait from replacing an evolved
+character. World snapshots remain available while preparation runs.
+
+Native build profiles on 2026-09-15 measured Embassy emitted assets at 5.29 MB
+(previously 22.16 MB) and Regency at 3.56 MB (previously 14.63 MB). Regency's
+initial JavaScript decreased from 1.64 MB to 0.88 MB after deferring agent setup
+imports. Both builds passed authority validation and verified-cache repeats
+retained identical build keys. These are artifact/build measurements, not a
+browser download or end-to-end interaction latency guarantee.
