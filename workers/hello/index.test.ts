@@ -32,7 +32,10 @@ describe("hello worker env probe", () => {
       {} as never
     );
 
-    expect(expose).toHaveBeenCalledWith("readNonSecretProbe", expect.any(Function));
+    expect(expose).toHaveBeenCalledWith("readNonSecretProbe", expect.any(Function), {
+      kind: "closed",
+      reason: "This diagnostic serves installed workspace applications and their agents.",
+    });
     const handler = expose.mock.calls[0]?.[1] as (() => unknown) | undefined;
     expect(handler?.()).toEqual({ value: "observed" });
   });
