@@ -4,6 +4,8 @@
   "private": true,
   "vibestudio": {
     "authority": {
+      "requests": [],
+      "provides": [],
       "serviceRequests": [{ "protocol": "examples.adventure.v1", "availability": "required" }]
     }
   },
