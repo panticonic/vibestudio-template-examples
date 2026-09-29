@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "vibestudio-panel": "./src/index.ts",
+      "browser": "./src/index.ts"
+    }
   },
   "dependencies": {
     "@workspace/runtime": "workspace:*"
