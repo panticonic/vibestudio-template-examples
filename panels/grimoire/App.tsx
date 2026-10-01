@@ -1,14 +1,48 @@
 import { StoryText } from "@workspace/living-canvas/react";
 import { useEffect, useRef, useState } from "react";
 import { useStateArgs } from "@workspace/react";
+import { panel } from "@workspace/runtime";
 import { initialGame } from "@workspace/grimoire-engine";
 import { Garden } from "./Garden.js";
 import { useStory } from "./lib/useStory.js";
 import { chime, closeAudio } from "./lib/sound.js";
 import "./styles.css";
 export default function Grimoire() {
-  const args = useStateArgs<{ estateKey?: string }>(),
-    story = useStory(args.estateKey || "garden");
+  const args = useStateArgs<{ estateKey?: string }>();
+  const [creating, setCreating] = useState(false);
+  const [creationError, setCreationError] = useState<string | null>(null);
+  const proposedKey = useRef<string | null>(null);
+  async function createWorld() {
+    proposedKey.current ??= crypto.randomUUID();
+    setCreating(true);
+    setCreationError(null);
+    try {
+      await panel.stateArgs.set({ estateKey: proposedKey.current });
+    } catch (error) {
+      setCreationError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCreating(false);
+    }
+  }
+  if (!args.estateKey)
+    return (
+      <main className="grimoire story-entry">
+        <h1>Grimoire</h1>
+        <p>
+          Begin your own garden. Your progress stays with this panel so you can
+          return later.
+        </p>
+        {creationError ? <p role="alert">{creationError}</p> : null}
+        <button disabled={creating} onClick={() => void createWorld()}>
+          {creating ? "Creating…" : "Begin a new story"}
+        </button>
+      </main>
+    );
+  return <GrimoireWorld key={args.estateKey} worldKey={args.estateKey} />;
+}
+
+function GrimoireWorld({ worldKey }: { worldKey: string }) {
+  const story = useStory(worldKey);
   const game = story.view?.game ?? initialGame();
   const [wish, setWish] = useState(""),
     [sound, setSound] = useState(false);
@@ -29,8 +63,25 @@ export default function Grimoire() {
     if (text.trim() && (await story.play(text.trim())))
       setWish((current) => (current.trim() === text.trim() ? "" : current));
   }
+  if (!story.view)
+    return (
+      <main className="grimoire story-entry" aria-busy={!story.error}>
+        <h1>Grimoire</h1>
+        {story.error ? (
+          <p role="alert">{story.error}</p>
+        ) : (
+          <p>Opening your story…</p>
+        )}
+      </main>
+    );
   return (
     <main className="grimoire" aria-busy={busy}>
+      {story.view.artError ? (
+        <p role="status">
+          The story is ready, but its illustration could not load:{" "}
+          {story.view.artError}. It will refresh when the artwork is available.
+        </p>
+      ) : null}
       <header className="g-header">
         <a className="wordmark" href="#garden">
           <span aria-hidden="true">✧</span> Grimoire

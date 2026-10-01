@@ -1,6 +1,7 @@
 import { StoryText } from "@workspace/living-canvas/react";
 import { useEffect, useRef, useState } from "react";
 import { useStateArgs } from "@workspace/react";
+import { panel } from "@workspace/runtime";
 import { initialGame } from "@workspace/regency-engine";
 import { Kingdom } from "./Kingdom.js";
 import { RealmScene } from "./RealmScene.js";
@@ -8,9 +9,42 @@ import { useStory } from "./lib/useStory.js";
 import { chime, closeAudio } from "./lib/sound.js";
 import "./styles.css";
 export default function Regency() {
-  const args = useStateArgs<{ gameKey?: string }>(),
-    story = useStory(args.gameKey || "willowmere"),
-    game = story.view?.game ?? initialGame();
+  const args = useStateArgs<{ gameKey?: string }>();
+  const [creating, setCreating] = useState(false);
+  const [creationError, setCreationError] = useState<string | null>(null);
+  const proposedKey = useRef<string | null>(null);
+  async function createWorld() {
+    proposedKey.current ??= crypto.randomUUID();
+    setCreating(true);
+    setCreationError(null);
+    try {
+      await panel.stateArgs.set({ gameKey: proposedKey.current });
+    } catch (error) {
+      setCreationError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCreating(false);
+    }
+  }
+  if (!args.gameKey)
+    return (
+      <main className="regency story-entry">
+        <h1>Regency</h1>
+        <p>
+          Begin your own realm. Your progress stays with this panel so you can
+          return later.
+        </p>
+        {creationError ? <p role="alert">{creationError}</p> : null}
+        <button disabled={creating} onClick={() => void createWorld()}>
+          {creating ? "Creating…" : "Begin a new story"}
+        </button>
+      </main>
+    );
+  return <RegencyWorld key={args.gameKey} worldKey={args.gameKey} />;
+}
+
+function RegencyWorld({ worldKey }: { worldKey: string }) {
+  const story = useStory(worldKey);
+  const game = story.view?.game ?? initialGame();
   const [words, setWords] = useState(""),
     [sound, setSound] = useState(false),
     log = useRef<HTMLDivElement>(null),
@@ -26,8 +60,25 @@ export default function Regency() {
     if (text.trim() && (await story.play(text.trim())))
       setWords((current) => (current.trim() === text.trim() ? "" : current));
   }
+  if (!story.view)
+    return (
+      <main className="regency story-entry" aria-busy={!story.error}>
+        <h1>Regency</h1>
+        {story.error ? (
+          <p role="alert">{story.error}</p>
+        ) : (
+          <p>Opening your story…</p>
+        )}
+      </main>
+    );
   return (
     <main className="regency" aria-busy={busy}>
+      {story.view.artError ? (
+        <p role="status">
+          The story is ready, but its illustration could not load:{" "}
+          {story.view.artError}. It will refresh when the artwork is available.
+        </p>
+      ) : null}
       <header className="r-header">
         <a href="#kingdom" className="wordmark">
           <span>♜</span> Regency
@@ -46,66 +97,74 @@ export default function Regency() {
       </header>
       <div className="storybook">
         <div className="realm-exploration">
-        <RealmScene game={game} artworks={story.view?.artworks} busy={busy || !story.view} onIntent={text => void say(text)} />
-        <details className="realm-atlas"><summary>Open the living atlas · economy and administration</summary>
-        <section
-          id="kingdom"
-          className="kingdom-stage"
-          aria-label="The world around you"
-        >
-          <Kingdom
-            scene={game.scene}
-            world={game.world}
-            annotations={game.world.economy.regions.map((region) => ({
-              x: region.x,
-              y: region.y,
-              label: region.name,
-              kind: "observed" as const,
-              detail:
-                region.character +
-                " Food reserves: " +
-                Math.round(
-                  (region.grain / Math.max(1, region.consumption)) * 4,
-                ) +
-                " weeks. " +
-                (game.world.economy.reports.find((report) =>
-                  report.startsWith(region.name),
-                ) ?? ""),
-            }))}
+          <RealmScene
+            game={game}
             artworks={story.view?.artworks}
-            busy={busy}
-            onRepair={(error) =>
-              void say(
-                "Please repair the illustration without changing policy or time. Drawing feedback: " +
-                  error.slice(0, 250),
-              )
-            }
+            busy={busy || !story.view}
+            onIntent={(text) => void say(text)}
           />
-          <div className="scene-caption">
-            <span className="eyebrow">{game.world.time}</span>
-            <h1>{game.title}</h1>
-          </div>
-          <div className="realm-signals">
-            {game.world.ledger.slice(0, 3).map((item) => (
-              <div key={item.id} title={item.context}>
-                <span>{item.label}</span>
-                <strong>
-                  {item.amount} <small>{item.unit}</small>
-                </strong>
-              </div>
-            ))}
-          </div>
-          <div className="realm-moment">
-            <span>{game.world.economy.reports[0]}</span>
-            <button
-              disabled={busy || !story.view}
-              onClick={() => void story.advance()}
+          <details className="realm-atlas">
+            <summary>
+              Open the living atlas · economy and administration
+            </summary>
+            <section
+              id="kingdom"
+              className="kingdom-stage"
+              aria-label="The world around you"
             >
-              Let a month pass ↗
-            </button>
-          </div>
-        </section>
-        </details>
+              <Kingdom
+                scene={game.scene}
+                world={game.world}
+                annotations={game.world.economy.regions.map((region) => ({
+                  x: region.x,
+                  y: region.y,
+                  label: region.name,
+                  kind: "observed" as const,
+                  detail:
+                    region.character +
+                    " Food reserves: " +
+                    Math.round(
+                      (region.grain / Math.max(1, region.consumption)) * 4,
+                    ) +
+                    " weeks. " +
+                    (game.world.economy.reports.find((report) =>
+                      report.startsWith(region.name),
+                    ) ?? ""),
+                }))}
+                artworks={story.view?.artworks}
+                busy={busy}
+                onRepair={(error) =>
+                  void say(
+                    "Please repair the illustration without changing policy or time. Drawing feedback: " +
+                      error.slice(0, 250),
+                  )
+                }
+              />
+              <div className="scene-caption">
+                <span className="eyebrow">{game.world.time}</span>
+                <h1>{game.title}</h1>
+              </div>
+              <div className="realm-signals">
+                {game.world.ledger.slice(0, 3).map((item) => (
+                  <div key={item.id} title={item.context}>
+                    <span>{item.label}</span>
+                    <strong>
+                      {item.amount} <small>{item.unit}</small>
+                    </strong>
+                  </div>
+                ))}
+              </div>
+              <div className="realm-moment">
+                <span>{game.world.economy.reports[0]}</span>
+                <button
+                  disabled={busy || !story.view}
+                  onClick={() => void story.advance()}
+                >
+                  Let a month pass ↗
+                </button>
+              </div>
+            </section>
+          </details>
         </div>
         <section className="conversation" aria-label="Your council">
           <div className="conversation-heading">

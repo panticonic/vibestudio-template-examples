@@ -5,6 +5,7 @@ export type View = {
   game: Game;
   painting: boolean;
   artworks: Artworks;
+  artError?: string;
   seated: boolean;
   neededSeats: Array<{ role: string; name: string }>;
   pending: {
@@ -23,13 +24,30 @@ export class StoryClient {
   private service;
   private artKey = "";
   private artworks: Artworks = {};
-  private async withArt(view: View) {
-    const ids = [...new Set([...(view.game.scene.assets ?? []), ...(view.game.world.places.find(place => place.id === view.game.world.location)?.scene?.assets ?? [])])],
+  private readonly artRequests = new Map<string, Promise<Artworks>>();
+  async getArt(view: View): Promise<View> {
+    const ids = [
+        ...new Set([
+          ...(view.game.scene.assets ?? []),
+          ...(view.game.world.places.find(
+            (place) => place.id === view.game.world.location,
+          )?.scene?.assets ?? []),
+        ]),
+      ],
       key = JSON.stringify(ids);
     if (key !== this.artKey) {
-      this.artworks = ids.length
-        ? await this.service.call<Artworks>("getArt", { ids })
-        : {};
+      let pending = this.artRequests.get(key);
+      if (!pending) {
+        pending = ids.length
+          ? this.service.call<Artworks>("getArt", { ids })
+          : Promise.resolve({});
+        this.artRequests.set(key, pending);
+      }
+      try {
+        this.artworks = await pending;
+      } finally {
+        if (this.artRequests.get(key) === pending) this.artRequests.delete(key);
+      }
       this.artKey = key;
     }
     return { ...view, artworks: this.artworks };
@@ -43,7 +61,7 @@ export class StoryClient {
       await this.seatRole(seat.role, seat.name);
     if (view.neededSeats.length)
       view = await this.service.call<View>("getGame");
-    return this.withArt(view);
+    return { ...view, artworks: this.artworks };
   }
   advance(id: string, months: number) {
     return this.service.call("advance", { id, months }).then(() => this.get());
@@ -68,10 +86,11 @@ export class StoryClient {
       await this.seatRole(role, "The scene artist");
   }
   private async seatRole(role: string, name: string) {
-    const [{ addAgentToChannel }, { waitForApprovalResolution }] = await Promise.all([
-      import("@workspace-skills/agents"),
-      import("@workspace/pubsub"),
-    ]);
+    const [{ addAgentToChannel }, { waitForApprovalResolution }] =
+      await Promise.all([
+        import("@workspace-skills/agents"),
+        import("@workspace/pubsub"),
+      ]);
     const channelId = `regency-story-${this.key}-${role}`;
     const seat = await addAgentToChannel({
       source: "workers/regency-agents",

@@ -8,6 +8,7 @@ export type View = {
   garden: Game["life"]["garden"];
   notice: string;
   artworks: Artworks;
+  artError?: string;
   seated: boolean;
   pending: {
     id: string;
@@ -22,13 +23,23 @@ export class StoryClient {
   private service;
   private artKey = "";
   private artworks: Artworks = {};
-  private async withArt(view: View) {
+  private readonly artRequests = new Map<string, Promise<Artworks>>();
+  async getArt(view: View): Promise<View> {
     const ids = view.game.scene.assets ?? [],
       key = JSON.stringify(ids);
     if (key !== this.artKey) {
-      this.artworks = ids.length
-        ? await this.service.call<Artworks>("getArt", { ids })
-        : {};
+      let pending = this.artRequests.get(key);
+      if (!pending) {
+        pending = ids.length
+          ? this.service.call<Artworks>("getArt", { ids })
+          : Promise.resolve({});
+        this.artRequests.set(key, pending);
+      }
+      try {
+        this.artworks = await pending;
+      } finally {
+        if (this.artRequests.get(key) === pending) this.artRequests.delete(key);
+      }
       this.artKey = key;
     }
     return { ...view, artworks: this.artworks };
@@ -37,7 +48,10 @@ export class StoryClient {
     this.service = workers.durableObjectService("examples.grimoire.v1", key);
   }
   async get() {
-    return this.withArt(await this.service.call<View>("getGame"));
+    return {
+      ...(await this.service.call<View>("getGame")),
+      artworks: this.artworks,
+    };
   }
   linger(id: string) {
     return this.service.call("linger", { id }).then(() => this.get());

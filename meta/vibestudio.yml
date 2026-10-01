@@ -1,5 +1,7 @@
 defaultAgentConfig:
   model: openai-codex:gpt-6.1-sol
+initPanels:
+  - source: panels/welcome
 services:
   - action: generate and manage reusable image assets
     authority:
@@ -117,6 +119,7 @@ template:
     - panels/missing-country
     - panels/regency
     - panels/wandering-house
+    - panels/welcome
     - templates/svelte
     - templates/vanilla
     - workers/adventure-agents
