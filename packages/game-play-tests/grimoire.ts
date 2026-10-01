@@ -1,6 +1,7 @@
 import {
   suite,
   withPanel,
+  waitForText,
   waitFor,
   evalInPanel,
   setViewport,
@@ -16,13 +17,15 @@ export const playSuite = suite("grimoire-play", {
     await withPanel(
       "panels/grimoire",
       async (panel) => {
+        await waitForText(panel, "Begin a new story");
+        await panel.click("main.story-entry button");
         await waitFor(
           () =>
             evalInPanel<boolean>(
               panel,
               '!!document.querySelector("#wish:not(:disabled)")',
             ),
-          { label: "Moth ready" },
+          { timeoutMs: 120000, label: "first-use world is ready" },
         );
         await evalInPanel(
           panel,
@@ -97,15 +100,43 @@ export const playSuite = suite("grimoire-play", {
         expect((await audit(panel)).horizontalOverflow, "phone layout").toBe(
           false,
         );
-        t.log(
+        const identity = (await panel.stateArgs.get<Record<string, string>>())[
+          "estateKey"
+        ];
+        expect(Boolean(identity), "first-use world identity is saved").toBe(
+          true,
+        );
+        const conversation = await evalInPanel<string>(
+          panel,
+          'document.querySelector(".conversation-log").innerText',
+        );
+        const exchanges = await evalInPanel<number>(
+          panel,
+          'document.querySelectorAll(".exchange").length',
+        );
+        await panel.reload();
+        await waitFor(
+          () =>
+            evalInPanel<boolean>(
+              panel,
+              `document.querySelectorAll(".exchange").length===${exchanges}`,
+            ),
+          { label: "accepted progress returns after reload" },
+        );
+        expect(
+          (await panel.stateArgs.get<Record<string, string>>())["estateKey"],
+          "same owned world after reload",
+        ).toBe(identity);
+        expect(
           await evalInPanel<string>(
             panel,
             'document.querySelector(".conversation-log").innerText',
           ),
-        );
+          "conversation survives reload",
+        ).toBe(conversation);
+        t.log(conversation);
       },
       {
-        stateArgs: { estateKey: `living-${crypto.randomUUID()}` },
         focus: false,
       },
     );

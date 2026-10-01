@@ -1,6 +1,8 @@
+import { workers } from "@workspace/runtime";
 import {
   suite,
   withPanel,
+  waitForText,
   waitFor,
   evalInPanel,
   setViewport,
@@ -16,6 +18,8 @@ export const playSuite = suite("regency-play", {
     await withPanel(
       "panels/regency",
       async (panel) => {
+        await waitForText(panel, "Begin a new story");
+        await panel.click("main.story-entry button");
         async function say(text: string, turn: number) {
           await waitFor(
             () =>
@@ -66,6 +70,7 @@ export const playSuite = suite("regency-play", {
           "Ivo, propose a temporary ferry subsidy costing 5 crowns a month for three months. Show me the cost before we enact anything.",
           1,
         );
+        await panel.click(".realm-atlas > summary");
         expect(
           await evalInPanel<string>(
             panel,
@@ -110,17 +115,45 @@ export const playSuite = suite("regency-play", {
           () =>
             evalInPanel<boolean>(
               panel,
-              '!!document.querySelector(".realm-evidence")',
+              '!!document.querySelector(".account-line")',
             ),
           { timeoutMs: 30000, label: "economy settles before commentary" },
         );
+        await panel.click(
+          "details.realm-evidence:has(.account-line) > summary",
+        );
+        const gameKey = (await panel.stateArgs.get<{ gameKey: string }>())
+          .gameKey;
+        const accepted = await workers
+          .durableObjectService("examples.regency.v1", gameKey)
+          .call<{
+            game: {
+              world: {
+                economy: {
+                  routes: Array<{ id: string; subsidy: number }>;
+                  accounts: { services: number };
+                };
+              };
+            };
+          }>("getGame");
+        expect(
+          accepted.game.world.economy.routes.find(
+            (route) => route.id === "east-ferry",
+          )?.subsidy,
+          "accepted ferry subsidy is five crowns",
+        ).toBe(5);
+        // The seeded realm also pays three watch companies two crowns each.
+        expect(
+          accepted.game.world.economy.accounts.services,
+          "core charges ferry service plus the existing watch payroll",
+        ).toBe(11);
         expect(
           await evalInPanel<string>(
             panel,
-            'document.querySelector(".account-line").textContent',
+            'document.querySelector(".account-line").innerText',
           ),
-          "core charges actual ferry service",
-        ).toContain("Services 5");
+          "visible accounts match accepted service spending",
+        ).toContain("Services 11");
         await waitFor(
           () =>
             evalInPanel<boolean>(
@@ -133,14 +166,43 @@ export const playSuite = suite("regency-play", {
         expect((await audit(panel)).horizontalOverflow, "phone layout").toBe(
           false,
         );
-        t.log(
+        const identity = (await panel.stateArgs.get<Record<string, string>>())[
+          "gameKey"
+        ];
+        expect(Boolean(identity), "first-use world identity is saved").toBe(
+          true,
+        );
+        const conversation = await evalInPanel<string>(
+          panel,
+          'document.querySelector(".conversation-log").innerText',
+        );
+        const exchanges = await evalInPanel<number>(
+          panel,
+          'document.querySelectorAll(".exchange").length',
+        );
+        await panel.reload();
+        await waitFor(
+          () =>
+            evalInPanel<boolean>(
+              panel,
+              `document.querySelectorAll(".exchange").length===${exchanges}`,
+            ),
+          { label: "accepted progress returns after reload" },
+        );
+        expect(
+          (await panel.stateArgs.get<Record<string, string>>())["gameKey"],
+          "same owned world after reload",
+        ).toBe(identity);
+        expect(
           await evalInPanel<string>(
             panel,
             'document.querySelector(".conversation-log").innerText',
           ),
-        );
+          "conversation survives reload",
+        ).toBe(conversation);
+        t.log(conversation);
       },
-      { stateArgs: { gameKey: `realm-${crypto.randomUUID()}` }, focus: false },
+      { focus: false },
     );
   },
 );

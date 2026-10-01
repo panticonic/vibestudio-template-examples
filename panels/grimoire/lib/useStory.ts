@@ -88,7 +88,7 @@ export function useStory(key: string) {
       const next = await operation();
       if (lifecycle.active) {
         showView(next);
-        lifecycle.uncertain = null;
+        setReadError(null);
       }
       return lifecycle.active;
     } catch (e) {
@@ -110,7 +110,9 @@ export function useStory(key: string) {
           : { id: crypto.randomUUID(), wish };
       lifecycle.uncertain = request;
       if (!view?.seated) await client.seat();
-      return client.play(request.id, wish);
+      const next = await client.play(request.id, wish);
+      lifecycle.uncertain = null;
+      return next;
     });
   const linger = () =>
     run(async () => {
@@ -120,7 +122,9 @@ export function useStory(key: string) {
           : { id: crypto.randomUUID(), wish: "linger" };
       lifecycle.uncertain = request;
       if (!view?.seated) await client.seat();
-      return client.linger(request.id);
+      const next = await client.linger(request.id);
+      lifecycle.uncertain = null;
+      return next;
     });
   const visit = (id: string) => run(() => client.visit(id));
   return {
@@ -131,6 +135,7 @@ export function useStory(key: string) {
     play,
     linger,
     visit,
+    refresh: () => run(() => client.get()),
     retry: () => run(() => client.retry()),
     cancel: () => run(() => client.cancel()),
   };

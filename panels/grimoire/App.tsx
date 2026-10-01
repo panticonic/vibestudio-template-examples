@@ -55,7 +55,9 @@ function GrimoireWorld({ worldKey }: { worldKey: string }) {
     last.current = game.turn;
     log.current?.scrollTo({
       top: log.current.scrollHeight,
-      behavior: "smooth",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
     });
   }, [game.turn, busy, sound]);
   useEffect(() => () => closeAudio(), []);
@@ -68,7 +70,15 @@ function GrimoireWorld({ worldKey }: { worldKey: string }) {
       <main className="grimoire story-entry" aria-busy={!story.error}>
         <h1>Grimoire</h1>
         {story.error ? (
-          <p role="alert">{story.error}</p>
+          <>
+            <p role="alert">{story.error}</p>
+            <button
+              onClick={() => void story.refresh()}
+              disabled={story.working}
+            >
+              Try opening again
+            </button>
+          </>
         ) : (
           <p>Opening your story…</p>
         )}
@@ -219,6 +229,7 @@ function GrimoireWorld({ worldKey }: { worldKey: string }) {
             />
             <button
               type="submit"
+              aria-label="Send your message to Moth"
               disabled={busy || !story.view || !wish.trim()}
             >
               {busy ? "✧" : "Say it ↗"}
@@ -239,10 +250,17 @@ function GrimoireWorld({ worldKey }: { worldKey: string }) {
           </div>
         )}
         {(story.error || story.view?.pending?.error || story.slow) && (
-          <div className="recovery" role="status">
+          <div
+            className="recovery"
+            role={
+              story.error || story.view?.pending?.error ? "alert" : "status"
+            }
+          >
             <p>
               {story.view?.pending
-                ? "Moth needs a little more time."
+                ? story.view.pending.error
+                  ? "Moth could not finish this request. Your message is kept below."
+                  : "Moth is still working on your request."
                 : "The conversation couldn’t reach Moth."}
             </p>
             {story.view?.pending && (

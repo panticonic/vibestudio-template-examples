@@ -11,6 +11,7 @@
     "./grimoire-art": "./grimoire-art.ts"
   },
   "dependencies": {
-    "@workspace/testkit": "workspace:*"
+    "@workspace/testkit": "workspace:*",
+    "@workspace/runtime": "workspace:*"
   }
 }

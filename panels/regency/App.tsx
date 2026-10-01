@@ -65,7 +65,15 @@ function RegencyWorld({ worldKey }: { worldKey: string }) {
       <main className="regency story-entry" aria-busy={!story.error}>
         <h1>Regency</h1>
         {story.error ? (
-          <p role="alert">{story.error}</p>
+          <>
+            <p role="alert">{story.error}</p>
+            <button
+              onClick={() => void story.refresh()}
+              disabled={story.working}
+            >
+              Try opening again
+            </button>
+          </>
         ) : (
           <p>Opening your story…</p>
         )}
@@ -327,7 +335,12 @@ function RegencyWorld({ worldKey }: { worldKey: string }) {
             </div>
           )}
           {(story.error || story.view?.pending?.error || story.slow) && (
-            <div className="recovery" role="status">
+            <div
+              className="recovery"
+              role={
+                story.error || story.view?.pending?.error ? "alert" : "status"
+              }
+            >
               <p>
                 {story.view?.pending
                   ? "The story needs a little more time."

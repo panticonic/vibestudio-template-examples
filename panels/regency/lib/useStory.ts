@@ -88,7 +88,7 @@ export function useStory(key: string) {
       const next = await operation();
       if (lifecycle.active) {
         showView(next);
-        lifecycle.uncertain = null;
+        setReadError(null);
       }
       return lifecycle.active;
     } catch (e) {
@@ -110,7 +110,9 @@ export function useStory(key: string) {
           : { id: crypto.randomUUID(), wish };
       lifecycle.uncertain = request;
       if (!view?.seated) await client.seat();
-      return client.play(request.id, wish);
+      const next = await client.play(request.id, wish);
+      lifecycle.uncertain = null;
+      return next;
     });
   const advance = () =>
     run(async () => {
@@ -120,7 +122,9 @@ export function useStory(key: string) {
           : { id: crypto.randomUUID(), wish: "advance:1" };
       lifecycle.uncertain = request;
       if (!view?.seated) await client.seat();
-      return client.advance(request.id, 1);
+      const next = await client.advance(request.id, 1);
+      lifecycle.uncertain = null;
+      return next;
     });
   const enact = (proposalId: string) =>
     run(async () => {
@@ -131,7 +135,9 @@ export function useStory(key: string) {
             : { id: crypto.randomUUID(), wish: key };
       lifecycle.uncertain = request;
       if (!view?.seated) await client.seat();
-      return client.enact(request.id, proposalId);
+      const next = await client.enact(request.id, proposalId);
+      lifecycle.uncertain = null;
+      return next;
     });
   return {
     view,
@@ -141,6 +147,7 @@ export function useStory(key: string) {
     play,
     advance,
     enact,
+    refresh: () => run(() => client.get()),
     retry: () => run(() => client.retry()),
     cancel: () => run(() => client.cancel()),
   };
