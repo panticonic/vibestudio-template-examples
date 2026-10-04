@@ -12,13 +12,20 @@
     "./fonts.css": "./fonts.css",
     "./execution": "./src/execution.ts"
   },
-  "devDependencies": { "vitest": "^3.2.7", "@testing-library/react": "^16.3.0" },
+  "devDependencies": {
+    "vitest": "^3.2.7",
+    "@testing-library/react": "^16.3.0",
+    "@workspace/harness": "workspace:*"
+  },
   "dependencies": {
     "zod": "^3.25.76",
     "acorn": "^8.18.0",
     "react": "^19.0.0",
-    "@workspace/pi-core": "workspace:*",
     "react-markdown": "^9.1.0",
-    "@vibestudio/service-schemas": "workspace:*"
+    "@vibestudio/service-schemas": "workspace:*",
+    "@panticonic/pi-ai": "0.99.2-vibestudio.11",
+    "@panticonic/pi-chord": "0.99.2-vibestudio.11",
+    "@panticonic/pi-durable": "0.99.2-vibestudio.11",
+    "@vibestudio/shared": "workspace:*"
   }
 }

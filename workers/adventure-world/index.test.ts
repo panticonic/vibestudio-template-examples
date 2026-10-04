@@ -13,7 +13,13 @@ const campaign: Campaign = {
   playerId: "player",
   story: { premise: "", arc: [], commitments: [] },
   entities: [
-    { id: "room", name: "Room", kind: "place", description: "", components: {} },
+    {
+      id: "room",
+      name: "Room",
+      kind: "place",
+      description: "",
+      components: {},
+    },
     {
       id: "player",
       name: "You",
@@ -44,7 +50,11 @@ async function boot(initialCampaign: Campaign = campaign) {
   const t = await createTestDO(AdventureWorldDO),
     deliveries: string[] = [];
   const scopes = new Map<string, any>();
-  (t.instance as any).rpc.call = async (target: string, method: string, args: any[]) => {
+  (t.instance as any).rpc.call = async (
+    target: string,
+    method: string,
+    args: any[],
+  ) => {
     if (method === "receiveMoment") {
       deliveries.push(target);
       return { ok: true };
@@ -61,24 +71,251 @@ async function boot(initialCampaign: Campaign = campaign) {
         const returnValue = await runInNewContext(
           `(async()=>{${p.source.code}})()`,
           { scope, structuredClone },
-          { timeout: 100 }
+          { timeout: 100 },
         );
-        return { snapshot: { status: "done", result: { success: true, returnValue } } };
+        return {
+          snapshot: { status: "done", result: { success: true, returnValue } },
+        };
       } catch (error) {
-        return { snapshot: { status: "done", result: { success: false, error: String(error) } } };
+        return {
+          snapshot: {
+            status: "done",
+            result: { success: false, error: String(error) },
+          },
+        };
       }
     }
     return undefined;
   };
   const user = (method: string, p?: any) =>
-    t.callAs<any>({ callerId: "panel:test", callerKind: "panel", userId: "player" }, method, p);
+    t.callAs<any>(
+      { callerId: "panel:test", callerKind: "panel", userId: "player" },
+      method,
+      p,
+    );
   const agent = (role: string, method: string, p?: any) =>
-    t.callAs<any>({ callerId: "do:" + role, callerKind: "do", userId: "player" }, method, p);
+    t.callAs<any>(
+      { callerId: "do:" + role, callerKind: "do", userId: "player" },
+      method,
+      p,
+    );
   await user("init", { campaign: initialCampaign });
   for (const role of ["player", "builder", "artist", "person:clerk"])
-    await user("registerParticipant", { role, targetId: "do:" + role, channelId: role });
+    await user("registerParticipant", {
+      role,
+      targetId: "do:" + role,
+      channelId: role,
+    });
   return { ...t, user, agent, deliveries };
 }
+describe("canonical illustration publication receipts", () => {
+  async function painting() {
+    const t = await boot();
+    await t.user("play", { id: "first", text: "Look around" });
+    await t.agent("player", "finish", {
+      turnId: "first",
+      text: "The room is quiet.",
+    });
+    const perspective = await t.agent("artist", "perspective");
+    return { ...t, turnId: perspective.pending.id as string };
+  }
+  it("withdraws only the authenticated artist's exact original job pointers without disturbing replacement work", async () => {
+    const t = await painting();
+    const perspective = await t.agent("artist", "perspective");
+    const turnId = t.turnId;
+    const placeId = perspective.view.location.id;
+    await t.agent("artist", "setImageJob", {
+      turnId,
+      placeId,
+      jobId: "original-job",
+    });
+    await expect(
+      t.agent("builder", "withdrawIllustrationJobs", {
+        turnId,
+        jobs: [{ jobId: "original-job", referenceKey: null }],
+      }),
+    ).rejects.toThrow("Only the scene artist");
+    await t.agent("artist", "withdrawIllustrationJobs", {
+      turnId,
+      jobs: [{ jobId: "different-job", referenceKey: null }],
+    });
+    expect((await t.agent("artist", "perspective")).imageJob.id).toBe(
+      "original-job",
+    );
+    await t.agent("artist", "setImageJob", {
+      turnId,
+      placeId,
+      jobId: "replacement-job",
+    });
+    await t.agent("artist", "withdrawIllustrationJobs", {
+      turnId,
+      jobs: [{ jobId: "original-job", referenceKey: null }],
+    });
+    expect((await t.agent("artist", "perspective")).imageJob.id).toBe(
+      "replacement-job",
+    );
+    await t.agent("artist", "withdrawIllustrationJobs", {
+      turnId,
+      jobs: [{ jobId: "replacement-job", referenceKey: null }],
+    });
+    await t.agent("artist", "withdrawIllustrationJobs", {
+      turnId,
+      jobs: [{ jobId: "replacement-job", referenceKey: null }],
+    });
+    expect((await t.agent("artist", "perspective")).imageJob).toBeUndefined();
+  });
+
+  it("replays accepted exact artwork after scene removal and refuses altered bytes or scene", async () => {
+    const t = await painting();
+    const input = {
+      operationId: "actual-native:command:one",
+      turnId: t.turnId,
+      asset: { id: "art", digest: "bytes" },
+    };
+    await expect(t.agent("artist", "publishArtwork", input)).resolves.toEqual({
+      ok: true,
+    });
+    await expect(
+      t.agent("artist", "publishArtwork", structuredClone(input)),
+    ).resolves.toEqual({ ok: true });
+    expect(
+      await t.agent("artist", "illustrationPublication", {
+        ...input,
+        purpose: "artwork",
+      }),
+    ).toEqual({ input: { asset: input.asset }, result: { ok: true } });
+    await expect(
+      t.agent("artist", "publishArtwork", {
+        ...input,
+        asset: { ...input.asset, digest: "changed" },
+      }),
+    ).rejects.toThrow("original input");
+    await expect(
+      t.agent("artist", "publishArtwork", { ...input, turnId: "other-scene" }),
+    ).rejects.toThrow("original owner or scene");
+    expect((await t.user("getGame")).world.artwork.room).toEqual(input.asset);
+  });
+  it("retains canonical reference ownership after scene completion and rejects foreign replacement artist", async () => {
+    const t = await painting();
+    const reference = {
+      operationId: "actual-native:command:ref",
+      turnId: t.turnId,
+      key: "place:room",
+      asset: { id: "ref", digest: "ref-bytes" },
+    };
+    await t.agent("artist", "publishReference", reference);
+    await t.agent("artist", "publishArtwork", {
+      operationId: "actual-native:command:art",
+      turnId: t.turnId,
+      asset: { id: "art", digest: "art-bytes" },
+    });
+    await expect(
+      t.agent("artist", "publishReference", reference),
+    ).resolves.toEqual({ ok: true });
+    expect(
+      await t.agent("artist", "illustrationPublication", {
+        ...reference,
+        purpose: "reference",
+      }),
+    ).toEqual({
+      input: { key: reference.key, asset: reference.asset },
+      result: { ok: true },
+    });
+    await t.user("registerParticipant", {
+      role: "artist",
+      targetId: "do:new-artist",
+      channelId: "new-artist",
+    });
+    await expect(
+      t.callAs(
+        { callerId: "do:new-artist", callerKind: "do" },
+        "publishReference",
+        reference,
+      ),
+    ).rejects.toThrow("original owner or scene");
+  });
+  it("persists accepted artwork and exact successor delivery before uncertain acknowledgement and replay joins only that debt", async () => {
+    const t = await painting();
+    await t.user("play", { id: "second", text: "Change the clock" });
+    await t.agent("player", "execute", {
+      turnId: "second",
+      code: 'world.setComponent("clock", "appearance", "polished")',
+    });
+    await t.agent("player", "finish", {
+      turnId: "second",
+      text: "The clock gleams.",
+    });
+    await t.agent("person:clerk", "finish", { turnId: "second", text: "" });
+    const input = {
+      operationId: "actual-native:command:owed",
+      turnId: t.turnId,
+      asset: { id: "art", digest: "bytes" },
+    };
+    const original = new Error("successor admitted but acknowledgement lost");
+    const delivered: unknown[] = [];
+    let lose = true;
+    const rpc = (t.instance as any).rpc;
+    const call = rpc.call;
+    rpc.call = async (target: string, method: string, args: unknown[]) => {
+      if (method !== "receiveMoment") return call(target, method, args);
+      delivered.push({ target, args: structuredClone(args) });
+      if (lose) {
+        lose = false;
+        throw original;
+      }
+      return { ok: true };
+    };
+    await expect(
+      t.agent("artist", "publishArtwork", input),
+    ).rejects.toMatchObject({ message: original.message });
+    expect(
+      await t.agent("artist", "illustrationPublication", {
+        ...input,
+        purpose: "artwork",
+      }),
+    ).toEqual({ input: { asset: input.asset }, result: { ok: true } });
+    expect((await t.user("getGame")).world.artwork.room).toEqual(input.asset);
+    await expect(t.agent("artist", "publishArtwork", input)).resolves.toEqual({
+      ok: true,
+    });
+    expect(delivered).toHaveLength(2);
+    expect(delivered[1]).toEqual(delivered[0]);
+    await t.agent("artist", "publishArtwork", input);
+    expect(delivered).toHaveLength(2);
+  });
+  it("keeps each actual failure receipt immutable while an explicit new operation can repair the same scene", async () => {
+    const t = await painting();
+    const failure = {
+      operationId: "actual-native:command:failure:actual-entry",
+      turnId: t.turnId,
+      error: "provider refused",
+    };
+    await t.agent("artist", "publishArtwork", failure);
+    await expect(t.agent("artist", "publishArtwork", failure)).resolves.toEqual(
+      { ok: true },
+    );
+    await expect(
+      t.agent("artist", "publishArtwork", {
+        ...failure,
+        error: "different error",
+      }),
+    ).rejects.toThrow("original input");
+    await t.user("retry");
+    await t.agent("artist", "publishArtwork", {
+      operationId: "actual-native:command:repair",
+      turnId: t.turnId,
+      asset: { id: "repaired", digest: "new-bytes" },
+    });
+    expect((await t.user("getGame")).world.artwork.room.id).toBe("repaired");
+    expect(
+      await t.agent("artist", "illustrationPublication", {
+        ...failure,
+        purpose: "error",
+      }),
+    ).toEqual({ input: { error: failure.error }, result: { ok: true } });
+  });
+});
+
 describe("durable adventure orchestration", () => {
   it("persists reference jobs and reuses portraits by identity across scenes", async () => {
     const t = await boot();
@@ -98,23 +335,28 @@ describe("durable adventure orchestration", () => {
       key: "person:clerk",
       jobId: "portrait-job",
     });
-    expect((await t.agent("artist", "perspective")).references[1].jobId).toBe("portrait-job");
+    expect((await t.agent("artist", "perspective")).references[1].jobId).toBe(
+      "portrait-job",
+    );
     await expect(
       t.agent("player", "publishReference", {
+        operationId: "native-command:1",
         turnId: sceneId,
         key: "person:clerk",
         asset: { id: "wrong", digest: "wrong" },
-      })
-    ).rejects.toThrow("active artist");
+      }),
+    ).rejects.toThrow("registered artist");
     await expect(
       t.agent("artist", "publishReference", {
+        operationId: "native-command:2",
         turnId: sceneId,
         key: "person:absent",
         asset: { id: "wrong", digest: "wrong" },
-      })
+      }),
     ).rejects.toThrow("reference subject");
     for (const ref of perspective.references)
       await t.agent("artist", "publishReference", {
+        operationId: "native-command:3",
         turnId: sceneId,
         key: ref.key,
         asset: { id: ref.key, digest: "canonical" },
@@ -125,6 +367,7 @@ describe("durable adventure orchestration", () => {
     await t.user("retry");
     expect(t.deliveries.length).toBe(deliveries);
     await t.agent("artist", "publishArtwork", {
+      operationId: "native-command:4",
       turnId: sceneId,
       asset: { id: "scene-one", digest: "one" },
     });
@@ -140,25 +383,45 @@ describe("durable adventure orchestration", () => {
     await t.agent("person:clerk", "finish", { turnId: "second", text: "" });
     const next = await t.agent("artist", "perspective");
     expect(next.pending.id).not.toBe(sceneId);
-    expect(next.references.map((ref: any) => ref.asset.id)).toEqual(["place:room", "person:clerk"]);
-    expect(next.references.every((ref: any) => ref.jobId === undefined)).toBe(true);
+    expect(next.references.map((ref: any) => ref.asset.id)).toEqual([
+      "place:room",
+      "person:clerk",
+    ]);
+    expect(next.references.every((ref: any) => ref.jobId === undefined)).toBe(
+      true,
+    );
   });
   it("keeps the player's private intention out of NPC perspectives", async () => {
     const t = await boot();
-    await t.user("play", { id: "private", text: "Secretly conceal the letter before speaking." });
-    expect((await t.agent("player", "perspective")).pending.text).toContain("Secretly");
-    expect((await t.agent("builder", "perspective")).pending.text).toContain("Secretly");
+    await t.user("play", {
+      id: "private",
+      text: "Secretly conceal the letter before speaking.",
+    });
+    expect((await t.agent("player", "perspective")).pending.text).toContain(
+      "Secretly",
+    );
+    expect((await t.agent("builder", "perspective")).pending.text).toContain(
+      "Secretly",
+    );
     const npc = await t.agent("person:clerk", "perspective");
     expect(npc.pending.text).toBe("");
-    expect(npc.view.events.some((event: { text: string }) => event.text.includes("Secretly"))).toBe(
-      false
-    );
+    expect(
+      npc.view.events.some((event: { text: string }) =>
+        event.text.includes("Secretly"),
+      ),
+    ).toBe(false);
   });
   it("sequences independent participants and artist, and deduplicates submitted turns", async () => {
     const t = await boot();
     await t.user("play", { id: "one", text: "Talk to the clerk" });
-    await t.agent("player", "execute", { turnId: "one", code: 'world.say("clerk","Hello")' });
-    await t.agent("player", "finish", { turnId: "one", text: "You greet the clerk." });
+    await t.agent("player", "execute", {
+      turnId: "one",
+      code: 'world.say("clerk","Hello")',
+    });
+    await t.agent("player", "finish", {
+      turnId: "one",
+      text: "You greet the clerk.",
+    });
     expect(t.deliveries.at(-1)).toBe("do:person:clerk");
     await t.agent("person:clerk", "execute", {
       turnId: "one",
@@ -166,15 +429,19 @@ describe("durable adventure orchestration", () => {
     });
     await t.agent("person:clerk", "finish", { turnId: "one", text: "" });
     expect(t.deliveries.at(-1)).toBe("do:artist");
-    await expect(t.agent("artist", "publishArtwork", { turnId: "one:scene" })).rejects.toThrow(
-      "no illustration"
-    );
+    await expect(
+      t.agent("artist", "publishArtwork", {
+        operationId: "native-command:5",
+        turnId: "one:scene",
+      }),
+    ).rejects.toThrow("no illustration");
     await t.agent("artist", "setImageJob", {
       turnId: "one:scene",
       jobId: "painted",
       placeId: "room",
     });
     await t.agent("artist", "publishArtwork", {
+      operationId: "native-command:6",
       turnId: "one:scene",
       asset: { id: "scene", digest: "painted" },
     });
@@ -185,10 +452,16 @@ describe("durable adventure orchestration", () => {
   it("repairs an NPC behavior and resumes that NPC without repeating player actions", async () => {
     const t = await boot();
     await t.user("play", { id: "one", text: "Say hello" });
-    await t.agent("player", "execute", { turnId: "one", code: 'world.say("clerk","Hello")' });
+    await t.agent("player", "execute", {
+      turnId: "one",
+      code: 'world.say("clerk","Hello")',
+    });
     await t.agent("player", "finish", { turnId: "one", text: "Hello." });
     await expect(
-      t.agent("person:clerk", "execute", { turnId: "one", code: 'world.act("clock","wind")' })
+      t.agent("person:clerk", "execute", {
+        turnId: "one",
+        code: 'world.act("clock","wind")',
+      }),
     ).rejects.toThrow();
     const state = await t.agent("builder", "perspective");
     expect(state.pending.failedRole).toBe("person:clerk");
@@ -208,7 +481,10 @@ describe("durable adventure orchestration", () => {
     });
     expect((await t.user("getGame")).pending.phase).toBe("participants");
     expect((await t.user("getGame")).world.tick).toBe(1);
-    await t.agent("person:clerk", "execute", { turnId: "one", code: 'world.act("clock","wind")' });
+    await t.agent("person:clerk", "execute", {
+      turnId: "one",
+      code: 'world.act("clock","wind")',
+    });
     expect((await t.user("getGame")).world.tick).toBe(2);
   });
   it.each([
@@ -219,28 +495,44 @@ describe("durable adventure orchestration", () => {
     "returns the participant's coding mistake for correction without builder or replay: %s",
     async (code) => {
       const t = await boot();
-      await t.user("play", { id: "one", text: "Greet the clerk and inspect the clock" });
-      await t.agent("player", "execute", { turnId: "one", code: 'world.say("clerk","Hello")' });
+      await t.user("play", {
+        id: "one",
+        text: "Greet the clerk and inspect the clock",
+      });
+      await t.agent("player", "execute", {
+        turnId: "one",
+        code: 'world.say("clerk","Hello")',
+      });
       const engine = (await t.agent("builder", "perspective")).engineSource;
-      const rejected = await t.agent("player", "execute", { turnId: "one", code });
+      const rejected = await t.agent("player", "execute", {
+        turnId: "one",
+        code,
+      });
       expect(rejected.programError).toBeTruthy();
       const resumed = await t.agent("player", "perspective");
       expect(resumed.pending.phase).toBe("player");
       expect(resumed.pending.purpose).toBeUndefined();
       expect(resumed.completedActions).toHaveLength(1);
       expect(t.deliveries).not.toContain("do:builder");
-      await t.agent("player", "execute", { turnId: "one", code: 'return world.inspect("clock")' });
+      await t.agent("player", "execute", {
+        turnId: "one",
+        code: 'return world.inspect("clock")',
+      });
       await t.agent("player", "finish", {
         turnId: "one",
         text: "You greet the clerk and inspect the clock.",
       });
       const game = await t.user("getGame");
       expect(game.world.tick).toBe(1);
-      expect(game.world.journal.some((entry: any) => entry.text.includes("Uncommitted"))).toBe(
-        false
+      expect(
+        game.world.journal.some((entry: any) =>
+          entry.text.includes("Uncommitted"),
+        ),
+      ).toBe(false);
+      expect((await t.agent("builder", "perspective")).engineSource).toBe(
+        engine,
       );
-      expect((await t.agent("builder", "perspective")).engineSource).toBe(engine);
-    }
+    },
   );
   it("keeps JavaScript faults inside authored world behavior under builder ownership", async () => {
     const c = structuredClone(campaign);
@@ -256,7 +548,10 @@ describe("durable adventure orchestration", () => {
     const t = await boot(c);
     await t.user("play", { id: "one", text: "Wind the clock" });
     await expect(
-      t.agent("player", "execute", { turnId: "one", code: 'world.act("clock","wind")' })
+      t.agent("player", "execute", {
+        turnId: "one",
+        code: 'world.act("clock","wind")',
+      }),
     ).rejects.toThrow();
     const state = await t.agent("builder", "perspective");
     expect(state.pending.phase).toBe("builder");
@@ -276,7 +571,10 @@ describe("durable adventure orchestration", () => {
     const t = await boot(c);
     await t.user("play", { id: "one", text: "Enter the inn" });
     await expect(
-      t.agent("player", "execute", { turnId: "one", code: 'world.move("inn")' })
+      t.agent("player", "execute", {
+        turnId: "one",
+        code: 'world.move("inn")',
+      }),
     ).rejects.toThrow("FRONTIER");
     expect((await t.user("getGame")).pending.purpose).toBe("frontier");
     await t.agent("builder", "repair", {
@@ -286,10 +584,19 @@ describe("durable adventure orchestration", () => {
     });
     const resumed = await t.agent("player", "perspective");
     expect(resumed.pending.participants).toEqual([]);
-    await t.agent("player", "execute", { turnId: "one", code: resumed.pending.continuationCode });
+    await t.agent("player", "execute", {
+      turnId: "one",
+      code: resumed.pending.continuationCode,
+    });
     expect((await t.user("getGame")).view.location.id).toBe("inn");
-    await t.agent("player", "finish", { turnId: "one", text: "You enter the inn." });
-    expect((await t.user("getGame")).pending.participants).toEqual(["clerk", "host"]);
+    await t.agent("player", "finish", {
+      turnId: "one",
+      text: "You enter the inn.",
+    });
+    expect((await t.user("getGame")).pending.participants).toEqual([
+      "clerk",
+      "host",
+    ]);
     // The clerk witnessed departure; the new host witnessed arrival. Both retain their own turn.
     await t.agent("person:clerk", "finish", { turnId: "one", text: "" });
     const needed = (await t.user("getGame")).neededSeats;
@@ -298,12 +605,21 @@ describe("durable adventure orchestration", () => {
   it("can repair malformed existing behavior without invoking it during maintenance", async () => {
     const c = structuredClone(campaign);
     c.behaviors = [
-      { id: "broken", entityId: "clock", trigger: "wind", code: "return )", state: {} },
+      {
+        id: "broken",
+        entityId: "clock",
+        trigger: "wind",
+        code: "return )",
+        state: {},
+      },
     ];
     const t = await boot(c);
     await t.user("play", { id: "one", text: "Look around" });
     await expect(
-      t.agent("player", "execute", { turnId: "one", code: "return world.observe()" })
+      t.agent("player", "execute", {
+        turnId: "one",
+        code: "return world.observe()",
+      }),
     ).rejects.toThrow();
     await t.agent("builder", "repair", {
       turnId: "one",
@@ -314,13 +630,21 @@ describe("durable adventure orchestration", () => {
   });
   it("repairs a broken stored engine through independent maintenance and resumes the real action once", async () => {
     const t = await boot();
-    const row = t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!;
+    const row = t.sql
+      .exec("SELECT body FROM adventure WHERE id=1")
+      .toArray()[0]!;
     const stored = JSON.parse(String(row["body"]));
     stored.engineSource = 'function(){throw new Error("Shared engine defect")}';
-    t.sql.exec("UPDATE adventure SET body=? WHERE id=1", JSON.stringify(stored));
+    t.sql.exec(
+      "UPDATE adventure SET body=? WHERE id=1",
+      JSON.stringify(stored),
+    );
     await t.user("play", { id: "one", text: "Greet the clerk" });
     await expect(
-      t.agent("player", "execute", { turnId: "one", code: 'world.say("clerk","Hello")' })
+      t.agent("player", "execute", {
+        turnId: "one",
+        code: 'world.say("clerk","Hello")',
+      }),
     ).rejects.toThrow("Shared engine defect");
     await t.agent("builder", "repair", {
       turnId: "one",
@@ -331,15 +655,19 @@ describe("durable adventure orchestration", () => {
     const repaired = await t.agent("builder", "perspective");
     expect(repaired.engineSource).toBe(defaultEngineSource);
     expect(repaired.world.tick).toBe(0);
-    expect(repaired.world.entities.find((e: any) => e.id === "clock").description).toBe(
-      "The maintenance visit is recorded"
-    );
-    await t.agent("player", "execute", { turnId: "one", code: repaired.pending.continuationCode });
+    expect(
+      repaired.world.entities.find((e: any) => e.id === "clock").description,
+    ).toBe("The maintenance visit is recorded");
+    await t.agent("player", "execute", {
+      turnId: "one",
+      code: repaired.pending.continuationCode,
+    });
     const resumed = await t.agent("builder", "perspective");
     expect(resumed.world.tick).toBe(1);
-    expect(resumed.world.entities.find((e: any) => e.id === "clerk").components.memory).toEqual([
-      "The traveller said: Hello",
-    ]);
+    expect(
+      resumed.world.entities.find((e: any) => e.id === "clerk").components
+        .memory,
+    ).toEqual(["The traveller said: Hello"]);
   });
   it("surfaces an unfinished native turn as resumable and ignores completed or stale stops", async () => {
     const t = await boot();
@@ -350,30 +678,44 @@ describe("durable adventure orchestration", () => {
     expect((await t.user("getGame")).pending.error).toContain("Resume");
     await t.user("retry");
     expect((await t.user("getGame")).pending.error).toBeUndefined();
-    await t.agent("player", "finish", { turnId: "one", text: "You look around." });
+    await t.agent("player", "finish", {
+      turnId: "one",
+      text: "You look around.",
+    });
     await t.agent("player", "participantStopped", { turnId: "one" });
     expect((await t.user("getGame")).pending).toBeNull();
   });
   it("rejects a different campaign for an existing journey", async () => {
     const t = await boot();
-    await expect(t.user("init", { campaign: { ...campaign, id: "another" } })).rejects.toThrow(
-      "different campaign"
-    );
+    await expect(
+      t.user("init", { campaign: { ...campaign, id: "another" } }),
+    ).rejects.toThrow("different campaign");
   });
   it("rejects unseated actors and keeps secrets out of the player projection", async () => {
     const t = await boot();
-    await expect(t.agent("stranger", "perspective")).rejects.toThrow("registered");
+    await expect(t.agent("stranger", "perspective")).rejects.toThrow(
+      "registered",
+    );
     const state = await t.user("getGame");
     expect(
-      state.view.entities.find((e: any) => e.id === "clerk").components.knowledge
+      state.view.entities.find((e: any) => e.id === "clerk").components
+        .knowledge,
     ).toBeUndefined();
   });
   it("does not wake models for an unchanged scene or an unwitnessed question", async () => {
     const t = await boot();
-    await t.user("setOpeningArtwork", { asset: { id: "cover", digest: "cover" } });
+    await t.user("setOpeningArtwork", {
+      asset: { id: "cover", digest: "cover" },
+    });
     await t.user("play", { id: "question", text: "What is this room?" });
-    await t.agent("player", "execute", { turnId: "question", code: "return world.observe()" });
-    await t.agent("player", "finish", { turnId: "question", text: "You are in the room." });
+    await t.agent("player", "execute", {
+      turnId: "question",
+      code: "return world.observe()",
+    });
+    await t.agent("player", "finish", {
+      turnId: "question",
+      text: "You are in the room.",
+    });
     const game = await t.user("getGame");
     expect(game.pending).toBeNull();
     expect(game.background.scene).toBeNull();
@@ -391,10 +733,18 @@ describe("durable adventure orchestration", () => {
       components: { exits: { south: "room" } },
     });
     const t = await boot(c);
-    await t.user("setOpeningArtwork", { asset: { id: "cover", digest: "cover" } });
+    await t.user("setOpeningArtwork", {
+      asset: { id: "cover", digest: "cover" },
+    });
     await t.user("play", { id: "north", text: "Go north" });
-    await t.agent("player", "execute", { turnId: "north", code: 'world.move("garden")' });
-    await t.agent("player", "finish", { turnId: "north", text: "You reach the garden." });
+    await t.agent("player", "execute", {
+      turnId: "north",
+      code: 'world.move("garden")',
+    });
+    await t.agent("player", "finish", {
+      turnId: "north",
+      text: "You reach the garden.",
+    });
     const reaction = await t.user("getGame");
     expect(reaction.pending.participants).toEqual(["clerk"]);
     expect(reaction.background.scene).toBeNull();
@@ -409,8 +759,12 @@ describe("durable adventure orchestration", () => {
       placeId: "garden",
     });
     await t.user("play", { id: "south", text: "Go south" });
-    await t.agent("player", "execute", { turnId: "south", code: 'world.move("room")' });
+    await t.agent("player", "execute", {
+      turnId: "south",
+      code: 'world.move("room")',
+    });
     await t.agent("artist", "publishArtwork", {
+      operationId: "native-command:7",
       turnId: sceneId,
       asset: { id: "garden-art", digest: "garden" },
     });
@@ -419,7 +773,9 @@ describe("durable adventure orchestration", () => {
     expect(returned.view.location.id).toBe("room");
     expect(returned.world.artwork.garden.id).toBe("garden-art");
     expect(returned.world.artwork.room.id).toBe("cover");
-    expect(returned.visual.artworkSignature).not.toBe(painting.visual.signature);
+    expect(returned.visual.artworkSignature).not.toBe(
+      painting.visual.signature,
+    );
   });
   it("cancels in-flight work without reverting prior commits or accepting late effects", async () => {
     const t = await boot();
@@ -436,7 +792,11 @@ describe("durable adventure orchestration", () => {
     const started = new Promise<void>((resolve) => {
       entered = resolve;
     });
-    (t.instance as any).rpc.call = async (target: string, method: string, args: any[]) => {
+    (t.instance as any).rpc.call = async (
+      target: string,
+      method: string,
+      args: any[],
+    ) => {
       if (method === "eval.start") {
         entered();
         await gate;
@@ -454,8 +814,12 @@ describe("durable adventure orchestration", () => {
     const game = await t.user("getGame");
     expect(game.pending).toBeNull();
     expect(game.world.tick).toBe(1);
-    expect(game.world.journal.some((e: any) => e.text.includes("Already said"))).toBe(true);
-    expect(game.world.journal.some((e: any) => e.text.includes("Too late"))).toBe(false);
+    expect(
+      game.world.journal.some((e: any) => e.text.includes("Already said")),
+    ).toBe(true);
+    expect(
+      game.world.journal.some((e: any) => e.text.includes("Too late")),
+    ).toBe(false);
     expect(t.deliveries).not.toContain("do:builder");
   });
   it("treats optimistic contention as reobservation rather than a world defect", async () => {
@@ -469,7 +833,11 @@ describe("durable adventure orchestration", () => {
     const started = new Promise<void>((resolve) => {
       entered = resolve;
     });
-    (t.instance as any).rpc.call = async (target: string, method: string, args: any[]) => {
+    (t.instance as any).rpc.call = async (
+      target: string,
+      method: string,
+      args: any[],
+    ) => {
       if (method === "eval.start") {
         entered();
         await gate;
@@ -482,10 +850,17 @@ describe("durable adventure orchestration", () => {
     });
     await started;
     const stored = JSON.parse(
-      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+      String(
+        t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]![
+          "body"
+        ],
+      ),
     );
     stored.world.revision++;
-    t.sql.exec("UPDATE adventure SET body=? WHERE id=1", JSON.stringify(stored));
+    t.sql.exec(
+      "UPDATE adventure SET body=? WHERE id=1",
+      JSON.stringify(stored),
+    );
     release();
     expect((await late).retry).toBe(true);
     const game = await t.user("getGame");
@@ -496,7 +871,13 @@ describe("durable adventure orchestration", () => {
   it("wakes an offscreen participant from a scheduled witnessed event, leaving unrelated residents idle", async () => {
     const c = structuredClone(campaign);
     c.entities.push(
-      { id: "tower", kind: "place", name: "Tower", description: "", components: {} },
+      {
+        id: "tower",
+        kind: "place",
+        name: "Tower",
+        description: "",
+        components: {},
+      },
       {
         id: "watcher",
         kind: "person",
@@ -504,7 +885,7 @@ describe("durable adventure orchestration", () => {
         description: "",
         location: "tower",
         components: {},
-      }
+      },
     );
     c.behaviors = [
       {
@@ -517,82 +898,64 @@ describe("durable adventure orchestration", () => {
     ];
     const t = await boot(c);
     const stored = JSON.parse(
-      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+      String(
+        t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]![
+          "body"
+        ],
+      ),
     );
-    stored.world.schedule.push({ id: "wake", entityId: "tower", at: 1, trigger: "bell" });
-    t.sql.exec("UPDATE adventure SET body=? WHERE id=1", JSON.stringify(stored));
+    stored.world.schedule.push({
+      id: "wake",
+      entityId: "tower",
+      at: 1,
+      trigger: "bell",
+    });
+    t.sql.exec(
+      "UPDATE adventure SET body=? WHERE id=1",
+      JSON.stringify(stored),
+    );
     await t.user("play", { id: "wait", text: "Wait briefly" });
-    await t.agent("player", "execute", { turnId: "wait", code: "world.wait(1)" });
+    await t.agent("player", "execute", {
+      turnId: "wait",
+      code: "world.wait(1)",
+    });
     await t.agent("player", "finish", { turnId: "wait", text: "Time passes." });
     const game = await t.user("getGame");
     expect(game.pending.participants).toEqual(["watcher"]);
-    expect(game.neededSeats.map((seat: any) => seat.role)).toEqual(["person:watcher"]);
-    expect(game.view.events.some((e: any) => e.text.includes("watch bell"))).toBe(false);
+    expect(game.neededSeats.map((seat: any) => seat.role)).toEqual([
+      "person:watcher",
+    ]);
+    expect(
+      game.view.events.some((e: any) => e.text.includes("watch bell")),
+    ).toBe(false);
     expect(t.deliveries).not.toContain("do:person:clerk");
   });
-  it("migrates old foreground painting to a resumable background task with the exact native job", async () => {
+  it("requires the current fresh state format and does not migrate prior execution state", async () => {
     const t = await boot();
     const stored = JSON.parse(
-      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+      String(
+        t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]![
+          "body"
+        ],
+      ),
     );
     delete stored.orchestrationVersion;
-    delete stored.scenes;
-    delete stored.artworkSignatures;
-    stored.pending = {
-      id: "legacy-turn",
-      phase: "artist",
-      text: "Look around",
-      participants: [],
-      replies: [],
-      attempt: 2,
-    };
-    stored.imageJob = {
-      id: "already-generating",
-      placeId: "room",
-      revision: stored.world.revision,
-    };
-    t.sql.exec("UPDATE adventure SET body=? WHERE id=1", JSON.stringify(stored));
-    const game = await t.user("getGame");
-    expect(game.pending).toBeNull();
-    expect(game.background.scene.id).toBe("legacy-turn");
-    expect(t.deliveries.at(-1)).toBe("do:artist");
-    const artist = await t.agent("artist", "perspective");
-    expect(artist.imageJob.id).toBe("already-generating");
-    expect(artist.pending.id).toBe("legacy-turn");
-    await t.agent("artist", "publishArtwork", {
-      turnId: "legacy-turn",
-      asset: { id: "legacy-art", digest: "finished" },
-    });
-    expect((await t.user("getGame")).world.artwork.room.id).toBe("legacy-art");
-    const migrated = JSON.parse(
-      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+    t.sql.exec(
+      "UPDATE adventure SET body=? WHERE id=1",
+      JSON.stringify(stored),
     );
-    expect(migrated.engineSource).toBe(stored.engineSource);
-    expect(migrated.world.behaviors).toEqual(stored.world.behaviors);
-    expect(migrated.scenes).toEqual([]);
-    expect(migrated.orchestrationVersion).toBe(2);
-  });
-  it("preserves a completed legacy journey when adding independent scene bookkeeping", async () => {
-    const t = await boot();
-    const stored = JSON.parse(
-      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
+    await expect(t.user("getGame")).rejects.toThrow(
+      "current pre-release format",
     );
-    delete stored.orchestrationVersion;
-    delete stored.scenes;
-    delete stored.artworkSignatures;
-    stored.receipts.push("finished");
-    stored.world.artwork.room = { id: "saved-art", digest: "kept" };
-    t.sql.exec("UPDATE adventure SET body=? WHERE id=1", JSON.stringify(stored));
-    const game = await t.user("getGame");
-    expect(game.pending).toBeNull();
-    expect(game.background.scene).toBeNull();
-    expect(game.world.artwork.room.id).toBe("saved-art");
-    const migrated = JSON.parse(
-      String(t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]!["body"])
-    );
-    expect(migrated.world).toEqual(stored.world);
-    expect(migrated.engineSource).toBe(stored.engineSource);
-    expect(migrated.receipts).toEqual(["finished"]);
+    expect(
+      JSON.parse(
+        String(
+          t.sql.exec("SELECT body FROM adventure WHERE id=1").toArray()[0]![
+            "body"
+          ],
+        ),
+      ),
+    ).toEqual(stored);
   });
   it("commits an agent-written component/transfer/relation program without inventing a named action or invoking the builder", async () => {
     const c = structuredClone(campaign);
@@ -612,7 +975,7 @@ describe("durable adventure orchestration", () => {
         description: "A shining lamp",
         location: "room",
         components: { light: true },
-      }
+      },
     );
     c.behaviors = [
       {
@@ -648,19 +1011,23 @@ describe("durable adventure orchestration", () => {
     const game = await t.user("getGame");
     expect(game.world.tick).toBe(3);
     expect(game.pending.phase).toBe("participants");
-    expect(game.view.entities.find((entity: any) => entity.id === "coat").description).toBe(
-      "A carefully folded coat"
-    );
+    expect(
+      game.view.entities.find((entity: any) => entity.id === "coat")
+        .description,
+    ).toBe("A carefully folded coat");
     const keeper = await t.agent("builder", "perspective");
     expect(
-      keeper.world.behaviors.find((behavior: any) => behavior.id === "folding").state.folds
+      keeper.world.behaviors.find((behavior: any) => behavior.id === "folding")
+        .state.folds,
     ).toBe(1);
-    expect(keeper.trajectory.filter((entry: any) => entry.code)).toHaveLength(1);
+    expect(keeper.trajectory.filter((entry: any) => entry.code)).toHaveLength(
+      1,
+    );
     expect(t.deliveries).not.toContain("do:builder");
     expect(
       game.world.journal
         .filter((entry: any) => entry.kind === "action")
-        .every((entry: any) => entry.audience.includes("clerk"))
+        .every((entry: any) => entry.audience.includes("clerk")),
     ).toBe(true);
   });
   it("returns ordinary physical and protected-field refusals to the participant without committing partial effects", async () => {
@@ -681,10 +1048,13 @@ describe("durable adventure orchestration", () => {
         description: "",
         location: "room",
         components: { light: true },
-      }
+      },
     );
     const t = await boot(c);
-    await t.user("play", { id: "shade", text: "Use the coat to shade the lamp" });
+    await t.user("play", {
+      id: "shade",
+      text: "Use the coat to shade the lamp",
+    });
     const refused = await t.agent("player", "execute", {
       turnId: "shade",
       code: 'world.setComponent("coat","folded",true);world.link("coat","lamp","covers");',
@@ -694,7 +1064,8 @@ describe("durable adventure orchestration", () => {
     let state = await t.agent("builder", "perspective");
     expect(state.world.tick).toBe(0);
     expect(
-      state.world.entities.find((entity: any) => entity.id === "coat").components.folded
+      state.world.entities.find((entity: any) => entity.id === "coat")
+        .components.folded,
     ).toBeUndefined();
     expect(state.world.relations).toEqual([]);
     const corrected = await t.agent("player", "execute", {
@@ -709,11 +1080,14 @@ describe("durable adventure orchestration", () => {
     expect(derived.actionError).toBeTruthy();
     state = await t.agent("builder", "perspective");
     expect(state.world.tick).toBe(2);
-    expect(state.world.entities.find((entity: any) => entity.id === "lamp").components.light).toBe(
-      true
-    );
     expect(
-      state.world.relations.filter((relation: any) => relation.kind === "covers")
+      state.world.entities.find((entity: any) => entity.id === "lamp")
+        .components.light,
+    ).toBe(true);
+    expect(
+      state.world.relations.filter(
+        (relation: any) => relation.kind === "covers",
+      ),
     ).toHaveLength(1);
     expect(t.deliveries).not.toContain("do:builder");
     await t.agent("player", "finish", {

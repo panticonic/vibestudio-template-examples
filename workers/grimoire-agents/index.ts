@@ -1,7 +1,10 @@
 import { imageTool } from "@workspace/living-canvas/image-tool";
 import { AiChatWorker } from "../agent-worker/ai-chat-worker.js";
 import type { AgentToolExecutionContext } from "@workspace/agentic-do";
-import type { AgentTool } from "@workspace/pi-core";
+import type { ToolRegistration } from "@panticonic/pi-durable";
+import { Type } from "@panticonic/pi-ai";
+import { copyJson, type JsonValue } from "@panticonic/pi-chord";
+import { authorNativeTool } from "@workspace/harness";
 import {
   createDurableObjectServiceClient,
   rpc,
@@ -29,108 +32,121 @@ export class GrimoireAgentWorker extends AiChatWorker {
       ? WILD_PROMPT
       : AGENT_PROMPT;
   }
-  protected override async getLoopTools(
+  protected override async getTools(
     channelId: string,
-    execution?: AgentToolExecutionContext,
-  ): Promise<AgentTool[]> {
-    const client = createDurableObjectServiceClient(
-      execution?.rpc ?? this.rpc,
-      "examples.grimoire.v1",
-      this.gameKey(channelId),
+  ): Promise<ToolRegistration[]> {
+    const gameKey = this.gameKey(channelId),
+      role = (this.subscriptions.getConfig(channelId) as { role?: string })
+        ?.role;
+    const native = (await super.getTools(channelId)).find(
+      (tool) => tool.name === "imagegen",
     );
-    const tool = (
-      name: string,
-      description: string,
-      properties: Record<string, unknown>,
-      required: string[],
-      run: (p: any) => Promise<unknown>,
-    ): AgentTool => ({
-      name,
-      label: name,
-      description,
-      parameters: {
-        type: "object",
-        properties,
-        required,
-        additionalProperties: false,
-      } as never,
-      execute: async (_id, params) => {
-        try {
+    const build = (
+      execution: AgentToolExecutionContext | undefined,
+    ): ToolRegistration[] => {
+      const client = execution
+        ? createDurableObjectServiceClient(
+            execution.rpc,
+            "examples.grimoire.v1",
+            gameKey,
+          )
+        : null;
+      const tool = (
+        name: string,
+        description: string,
+        properties: Record<string, unknown>,
+        required: string[],
+        run: (p: any) => Promise<unknown>,
+      ): ToolRegistration => ({
+        name,
+        description,
+        parameters: Type.Unsafe<Record<string, any>>({
+          type: "object",
+          properties,
+          required,
+          additionalProperties: false,
+        }),
+        execute: async (params) => {
           const result = await run(params);
           return {
             content: [{ type: "text" as const, text: JSON.stringify(result) }],
-            details: result,
+            details: copyJson(result, {
+              omitUndefinedProperties: true,
+            }) as JsonValue,
           };
-        } catch (error) {
-          return {
-            content: [{ type: "text" as const, text: String(error) }],
-            details: null,
-            isError: true,
-          };
-        }
-      },
-    });
-    // Game tools expose authored world actions and the native image painter.
-    const shared = [
-      tool(
-        "read_game",
-        "Read the illustrated scene, history and pending player decision. If nothing is pending, stop.",
-        {},
-        [],
-        () => client.call("perspective"),
-      ),
-    ];
-    if (
-      (this.subscriptions.getConfig(channelId) as { role?: string })?.role ===
-      "wild"
-    )
-      return [
-        ...shared,
+        },
+      });
+      // Game tools expose authored world actions and the native image painter.
+      const shared = [
         tool(
-          "stir",
-          "Let the independent living world respond.",
-          { id: { type: "string" }, result: STIR_JSON_SCHEMA },
-          ["id", "result"],
-          (p) => client.call("stir", p),
+          "read_game",
+          "Read the illustrated scene, history and pending player decision. If nothing is pending, stop.",
+          {},
+          [],
+          () => client!.call("perspective"),
         ),
       ];
-    const native = (await super.getLoopTools(channelId, execution)).find(
-      (tool) => tool.name === "imagegen",
-    );
-    const artwork = native
-      ? [
-          imageTool(
-            native,
-            (method, input) => client.call(method, input),
-            "grimoire",
+      if (role === "wild")
+        return [
+          ...shared,
+          tool(
+            "stir",
+            "Let the independent living world respond.",
+            { id: { type: "string" }, result: STIR_JSON_SCHEMA },
+            ["id", "result"],
+            (p) => client!.call("stir", p),
           ),
-        ]
-      : [];
-    return [
-      ...shared,
-      ...artwork,
-      tool(
-        "reply",
-        "Speak to the player immediately, before drawing or weaving.",
-        { turnId: { type: "string" }, text: { type: "string" } },
-        ["turnId", "text"],
-        (p) => client.call("reply", p),
+        ];
+
+      const artwork = native
+        ? [
+            imageTool(
+              native,
+              (method, input) => client!.call(method, input),
+              "grimoire",
+              () => {
+                if (!execution)
+                  throw new Error(
+                    "Artwork is not bound to its native invocation",
+                  );
+                return execution.commandId;
+              },
+            ),
+          ]
+        : [];
+      return [
+        ...shared,
+        ...artwork,
+        tool(
+          "reply",
+          "Speak to the player immediately, before drawing or weaving.",
+          { turnId: { type: "string" }, text: { type: "string" } },
+          ["turnId", "text"],
+          (p) => client!.call("reply", p),
+        ),
+        tool(
+          "weave",
+          "Author and execute a real enchantment against the public garden. Read the result before describing it.",
+          { turnId: { type: "string" }, code: { type: "string" } },
+          ["turnId", "code"],
+          (p) => client!.call("weave", p),
+        ),
+        tool(
+          "finish_turn",
+          "Commit the pending moment. Result must follow the scene and story schema in your prompt; invalid data returns an error to correct.",
+          { id: { type: "string" }, result: RESULT_JSON_SCHEMA },
+          ["id", "result"],
+          (p) => client!.call("finish", p),
+        ),
+      ];
+    };
+    return build(undefined).map((_tool, index) =>
+      authorNativeTool(
+        (execution: AgentToolExecutionContext | undefined) =>
+          build(execution)[index]!,
+        (api, context) => this.bindNativeToolExecution(api, context),
       ),
-      tool(
-        "weave",
-        "Author and execute a real enchantment against the public garden. Read the result before describing it.",
-        { turnId: { type: "string" }, code: { type: "string" } },
-        ["turnId", "code"],
-        (p) => client.call("weave", p),
-      ),
-      tool(
-        "finish_turn",
-        "Commit the pending moment. Result must follow the scene and story schema in your prompt; invalid data returns an error to correct.",
-        { id: { type: "string" }, result: RESULT_JSON_SCHEMA },
-        ["id", "result"],
-        (p) => client.call("finish", p),
-      ),
-    ];
+    );
   }
   @rpc({
     website: {

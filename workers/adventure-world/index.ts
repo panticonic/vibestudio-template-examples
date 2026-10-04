@@ -1,3 +1,5 @@
+import type { ImageAsset } from "@workspace/runtime/images";
+import { canonicalJson } from "@vibestudio/shared/canonicalJson";
 import { DurableObjectBase, rpc } from "@workspace/runtime/worker/kernel";
 import {
   initialWorld,
@@ -25,8 +27,18 @@ type SceneTask = ReturnType<typeof sceneSnapshot> & {
   attempt: number;
 };
 type Seat = { role: AdventureRole; targetId: string; channelId: string };
+type IllustrationPublicationReceipt = {
+  owner: string;
+  turnId: string;
+  input: { asset?: ImageAsset; error?: string; key?: string };
+  result: { ok: true };
+  delivery: {
+    targetId: string;
+    request: { channelId: string; turnId: string; steeringId: string };
+  } | null;
+};
 type Stored = {
-  orchestrationVersion?: 2;
+  orchestrationVersion: 2;
   world: World;
   seats: Seat[];
   pending: PendingTurn | null;
@@ -38,6 +50,7 @@ type Stored = {
   openingArtwork?: any;
   illustrationReferences?: Record<string, { signature: string; asset: any }>;
   receipts: string[];
+  illustrationPublications: Record<string, IllustrationPublicationReceipt>;
 };
 export class AdventureWorldDO extends DurableObjectBase {
   static override schemaVersion = 1;
@@ -56,29 +69,10 @@ export class AdventureWorldDO extends DurableObjectBase {
       .toArray()[0];
     if (!row) throw new Error("Initialize this campaign first");
     const state = JSON.parse(row.body);
-    state.scenes ??= [];
-    state.artworkSignatures ??= {};
-    if (state.orchestrationVersion !== 2) {
-      // Version 1 kept painting inside the foreground turn. Keep its exact turn/job
-      // identity so an already submitted native image request resumes rather than duplicates.
-      if (state.pending?.phase === "artist") {
-        const snapshot = sceneSnapshot(state.world);
-        state.scenes.push({
-          ...snapshot,
-          id: state.pending.id,
-          placeId: state.imageJob?.placeId ?? snapshot.view.location.id,
-          status: "queued",
-          jobId: state.imageJob?.id,
-          attempt: (state.pending.attempt ?? 0) + 1,
-        });
-        if (!state.receipts.includes(state.pending.id))
-          state.receipts.push(state.pending.id);
-        state.pending = null;
-        delete state.imageJob;
-      }
-      state.orchestrationVersion = 2;
-      this.save(state);
-    }
+    if (state.orchestrationVersion !== 2 || !state.illustrationPublications)
+      throw new Error(
+        "Adventure state does not match the current pre-release format",
+      );
     return state;
   }
   private save(s: Stored) {
@@ -96,6 +90,102 @@ export class AdventureWorldDO extends DurableObjectBase {
       throw new Error("Only a registered world participant may do this");
     return seat;
   }
+  private illustrationKey(
+    operationId: string,
+    purpose: "artwork" | "reference" | "error",
+    key?: string,
+  ): string {
+    if (!operationId)
+      throw new Error(
+        "Illustration publication requires its original operation ID",
+      );
+    return canonicalJson([operationId, purpose, key ?? null]);
+  }
+  private illustrationReceipt(
+    s: Stored,
+    input: {
+      operationId: string;
+      turnId: string;
+      purpose: "artwork" | "reference" | "error";
+      key?: string;
+    },
+  ) {
+    const seat = this.seat(s);
+    if (seat.role !== "artist")
+      throw new Error(
+        "Only the registered artist may inspect or publish illustration receipts",
+      );
+    const receipt =
+      s.illustrationPublications[
+        this.illustrationKey(input.operationId, input.purpose, input.key)
+      ];
+    if (
+      receipt &&
+      (receipt.owner !== seat.targetId || receipt.turnId !== input.turnId)
+    )
+      throw new Error(
+        "Illustration publication changed its original owner or scene",
+      );
+    return receipt;
+  }
+  private async joinIllustrationDelivery(key: string): Promise<void> {
+    const receipt = this.load().illustrationPublications[key];
+    if (!receipt)
+      throw new Error("Illustration publication lost its canonical receipt");
+    const delivery = receipt.delivery;
+    if (!delivery) return;
+    const accepted = await this.rpc.call<{ ok: boolean }>(
+      delivery.targetId,
+      "receiveMoment",
+      [delivery.request],
+    );
+    if (accepted?.ok !== true)
+      throw new Error(
+        "Illustration successor has no canonical admission acknowledgement",
+      );
+    const fresh = this.load();
+    const retained = fresh.illustrationPublications[key];
+    if (
+      !retained ||
+      (retained.delivery !== null &&
+        canonicalJson(retained.delivery) !== canonicalJson(delivery))
+    )
+      throw new Error(
+        "Illustration publication changed its original delivery debt",
+      );
+    retained.delivery = null;
+    this.save(fresh);
+  }
+  @rpc({
+    website: {
+      kind: "closed",
+      reason: "Illustration receipts belong to the owning installed artist.",
+    },
+    principals: ["host", "user", "code"],
+    effect: { kind: "open" },
+    tier: "open",
+    sensitivity: "read",
+  })
+  illustrationPublication(input: {
+    operationId: string;
+    turnId: string;
+    purpose: "artwork" | "reference" | "error";
+    key?: string;
+  }) {
+    if (
+      !["artwork", "reference", "error"].includes(input.purpose) ||
+      (input.purpose === "reference" && !input.key) ||
+      (input.purpose !== "reference" && input.key !== undefined)
+    )
+      throw new Error(
+        "Illustration receipt requires its exact publication purpose and reference key",
+      );
+    const receipt = this.illustrationReceipt(this.load(), input);
+    return receipt
+      ? { input: structuredClone(receipt.input), result: receipt.result }
+      : null;
+  }
+
   private player() {
     if (this.rpcCallerKind === "do")
       throw new Error("Only the player may start turns or seat agents");
@@ -116,6 +206,8 @@ export class AdventureWorldDO extends DurableObjectBase {
     this.ensureReady();
     if (!this.sql.exec("SELECT id FROM adventure WHERE id=1").toArray().length)
       this.save({
+        orchestrationVersion: 2,
+        illustrationPublications: {},
         world: initialWorld(campaign),
         seats: [],
         pending: null,
@@ -218,7 +310,12 @@ export class AdventureWorldDO extends DurableObjectBase {
         })(),
       },
       visual: {
-        references: Object.fromEntries(Object.entries(s.illustrationReferences ?? {}).map(([key,ref]) => [key, ref.signature])),
+        references: Object.fromEntries(
+          Object.entries(s.illustrationReferences ?? {}).map(([key, ref]) => [
+            key,
+            ref.signature,
+          ]),
+        ),
         signature: sceneSnapshot(s.world).signature,
         artworkSignature: s.artworkSignatures[view.location.id],
         fresh:
@@ -242,7 +339,15 @@ export class AdventureWorldDO extends DurableObjectBase {
     tier: "open",
     sensitivity: "write",
   })
-  setOpeningArtwork({ asset, signature, placeId: authoredPlace }: { asset: any; signature?: string; placeId?: string }) {
+  setOpeningArtwork({
+    asset,
+    signature,
+    placeId: authoredPlace,
+  }: {
+    asset: any;
+    signature?: string;
+    placeId?: string;
+  }) {
     this.player();
     const s = this.load();
     const placeId = s.world.entities.find(
@@ -250,7 +355,12 @@ export class AdventureWorldDO extends DurableObjectBase {
     )!.location!;
     if (!asset?.id || !asset?.digest)
       throw new Error("An image asset is required");
-    if (signature && (signature !== sceneSnapshot(s.world).signature || authoredPlace !== placeId)) return this.getGame();
+    if (
+      signature &&
+      (signature !== sceneSnapshot(s.world).signature ||
+        authoredPlace !== placeId)
+    )
+      return this.getGame();
     s.openingArtwork ??= asset;
     if (!s.world.artwork[placeId] && s.world.tick === 0) {
       s.world.artwork[placeId] = asset;
@@ -260,17 +370,38 @@ export class AdventureWorldDO extends DurableObjectBase {
     this.save(s);
     return this.getGame();
   }
-  @rpc({ website: {kind:"closed",reason:"Installed game artwork."}, principals:["host","user","code"], effect:{kind:"open"}, tier:"open", sensitivity:"write" })
-  setBundledReference(input: {key: string; signature: string; asset: any}) {
+  @rpc({
+    website: { kind: "closed", reason: "Installed game artwork." },
+    principals: ["host", "user", "code"],
+    effect: { kind: "open" },
+    tier: "open",
+    sensitivity: "write",
+  })
+  setBundledReference(input: { key: string; signature: string; asset: any }) {
     this.player();
     const s = this.load();
-    const entity = s.world.entities.find(e => `${e.kind === "person" ? "person" : "place"}:${e.id}` === input.key && (e.kind === "person" || e.kind === "place"));
-    if (!entity || !input.asset?.id || !input.asset?.digest) throw new Error("A known reference subject and image asset are required.");
-    const ref = illustrationReferences({location:entity,entities:[],inventory:[],exits:{},events:[]},s.world.artDirection)[0]!;
+    const entity = s.world.entities.find(
+      (e) =>
+        `${e.kind === "person" ? "person" : "place"}:${e.id}` === input.key &&
+        (e.kind === "person" || e.kind === "place"),
+    );
+    if (!entity || !input.asset?.id || !input.asset?.digest)
+      throw new Error(
+        "A known reference subject and image asset are required.",
+      );
+    const ref = illustrationReferences(
+      { location: entity, entities: [], inventory: [], exits: {}, events: [] },
+      s.world.artDirection,
+    )[0]!;
     if (ref.signature !== input.signature) return { superseded: true };
     s.illustrationReferences ??= {};
-    if (!s.illustrationReferences[input.key]) s.illustrationReferences[input.key] = { signature: ref.signature, asset: input.asset };
-    this.save(s); return { ok: true };
+    if (!s.illustrationReferences[input.key])
+      s.illustrationReferences[input.key] = {
+        signature: ref.signature,
+        asset: input.asset,
+      };
+    this.save(s);
+    return { ok: true };
   }
   @rpc({
     website: {
@@ -642,20 +773,48 @@ export class AdventureWorldDO extends DurableObjectBase {
     tier: "open",
     sensitivity: "write",
   })
-  publishReference(input: { turnId: string; key: string; asset: any }) {
+  publishReference(input: {
+    operationId: string;
+    turnId: string;
+    key: string;
+    asset: ImageAsset;
+  }) {
     const s = this.load(),
-      task = s.scenes.find((task) => !task.error);
-    if (this.seat(s).role !== "artist" || task?.id !== input.turnId)
+      seat = this.seat(s);
+    const receipt = this.illustrationReceipt(s, {
+      ...input,
+      purpose: "reference",
+    });
+    const value = JSON.parse(
+      canonicalJson({ key: input.key, asset: input.asset }),
+    );
+    if (receipt) {
+      if (canonicalJson(receipt.input) !== canonicalJson(value))
+        throw new Error("Illustration publication changed its original input");
+      return receipt.result;
+    }
+    const task = s.scenes.find((task) => !task.error);
+    if (task?.id !== input.turnId)
       throw new Error("Only the active artist may publish a scene reference");
     const ref = this.references(s, task).find((ref) => ref.key === input.key);
     if (!ref || !input.asset?.id || !input.asset?.digest)
       throw new Error("A reference subject and image asset are required");
     (s.illustrationReferences ??= {})[ref.key] = {
       signature: ref.signature,
-      asset: input.asset,
+      asset: value.asset,
+    };
+    const result = { ok: true } as const;
+    s.illustrationPublications[
+      this.illustrationKey(input.operationId, "reference", input.key)
+    ] = {
+      owner: seat.targetId,
+      turnId: input.turnId,
+      input: value,
+      result,
+      delivery: null,
     };
     this.save(s);
-    return { ok: true };
+    return result;
   }
   @rpc({
     website: {
@@ -955,6 +1114,44 @@ export class AdventureWorldDO extends DurableObjectBase {
   @rpc({
     website: {
       kind: "closed",
+      reason: "Illustration jobs belong to the installed adventure.",
+    },
+    principals: ["host", "user", "code"],
+    effect: { kind: "open" },
+    tier: "open",
+    sensitivity: "write",
+  })
+  withdrawIllustrationJobs(input: {
+    turnId: string;
+    jobs: Array<{ jobId: string; referenceKey: string | null }>;
+  }) {
+    const state = this.load();
+    if (this.seat(state).role !== "artist")
+      throw new Error("Only the scene artist may withdraw illustration jobs");
+    const scene = state.scenes.find(
+      (candidate) => candidate.id === input.turnId,
+    );
+    if (!scene) return { ok: true };
+    for (const job of input.jobs) {
+      if (
+        !job.jobId ||
+        !(job.referenceKey === null || typeof job.referenceKey === "string")
+      )
+        throw new Error(
+          "Illustration withdrawal requires exact original job coordinates",
+        );
+      if (job.referenceKey === null) {
+        if (scene.jobId === job.jobId) delete scene.jobId;
+      } else if (scene.referenceJobs?.[job.referenceKey] === job.jobId) {
+        delete scene.referenceJobs[job.referenceKey];
+      }
+    }
+    this.save(state);
+    return { ok: true };
+  }
+  @rpc({
+    website: {
+      kind: "closed",
       reason:
         "This receiver serves installed workspace applications and their agents.",
     },
@@ -963,17 +1160,42 @@ export class AdventureWorldDO extends DurableObjectBase {
     tier: "open",
     sensitivity: "write",
   })
-  async publishArtwork(input: { turnId: string; asset?: any; error?: string }) {
+  async publishArtwork(input: {
+    operationId: string;
+    turnId: string;
+    asset?: ImageAsset;
+    error?: string;
+  }) {
+    if (input.asset && input.error)
+      throw new Error(
+        "Illustration publication cannot contain both artwork and failure",
+      );
     const s = this.load(),
-      task = s.scenes.find((task) => !task.error);
-    if (this.seat(s).role !== "artist" || task?.id !== input.turnId)
-      throw new Error("No illustration pending");
+      seat = this.seat(s);
+    const purpose = input.error === undefined ? "artwork" : "error";
+    const key = this.illustrationKey(input.operationId, purpose);
+    const receipt = this.illustrationReceipt(s, { ...input, purpose });
+    const value = JSON.parse(
+      canonicalJson({ asset: input.asset, error: input.error }),
+    );
+    if (receipt) {
+      if (canonicalJson(receipt.input) !== canonicalJson(value))
+        throw new Error("Illustration publication changed its original input");
+      await this.joinIllustrationDelivery(key);
+      return receipt.result;
+    }
+    const task = s.scenes.find((task) => !task.error);
+    if (task?.id !== input.turnId) throw new Error("No illustration pending");
     if (!input.asset && !input.error && !s.world.artwork[task.placeId])
       throw new Error(
         "This place has no illustration yet. Use paint_scene before finishing.",
       );
+    if (input.asset && (!input.asset.id || !input.asset.digest))
+      throw new Error("An actual image asset is required");
+    if (input.error !== undefined && !input.error.trim())
+      throw new Error("An actual illustration failure is required");
     if (input.asset) {
-      s.world.artwork[task.placeId] = input.asset;
+      s.world.artwork[task.placeId] = value.asset;
       s.artworkSignatures[task.placeId] = task.signature;
     }
     if (input.error) {
@@ -981,9 +1203,31 @@ export class AdventureWorldDO extends DurableObjectBase {
       task.status = "error";
       s.trajectory.push({ turnId: input.turnId, imageError: input.error });
     } else s.scenes = s.scenes.filter((scene) => scene.id !== task.id);
+    const next = s.scenes.find((scene) => !scene.error);
+    const artist = s.seats.find((candidate) => candidate.role === "artist");
+    const delivery =
+      next?.status === "queued" && artist
+        ? {
+            targetId: artist.targetId,
+            request: {
+              channelId: artist.channelId,
+              turnId: next.id,
+              steeringId: `adventure:${this.objectKey}:${next.id}:artist:${next.attempt}`,
+            },
+          }
+        : null;
+    if (delivery) next!.status = "painting";
+    const result = { ok: true } as const;
+    s.illustrationPublications[key] = {
+      owner: seat.targetId,
+      turnId: input.turnId,
+      input: value,
+      result,
+      delivery,
+    };
     this.save(s);
-    await this.deliverScene();
-    return { ok: true };
+    await this.joinIllustrationDelivery(key);
+    return result;
   }
 }
 export default {

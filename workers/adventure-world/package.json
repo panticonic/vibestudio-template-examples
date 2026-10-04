@@ -8,7 +8,8 @@
     "@workspace/runtime": "workspace:*",
     "@vibestudio/service-schemas": "workspace:*",
     "acorn": "^8.18.0",
-    "@workspace/adventure-engine": "workspace:*"
+    "@workspace/adventure-engine": "workspace:*",
+    "@vibestudio/shared": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^3.2.7",

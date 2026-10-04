@@ -1,36 +1,58 @@
-import type { AgentTool } from "@workspace/pi-core";
+import { Type } from "@panticonic/pi-ai";
+import type { ToolRegistration } from "@panticonic/pi-durable";
+import { canonicalJson } from "@vibestudio/shared/canonicalJson";
+
+const schema = Type.Object(
+  {
+    name: Type.String({
+      pattern: "^[a-z0-9-]{1,48}$",
+      description: "Short lowercase asset name.",
+    }),
+    prompt: Type.String(),
+    references: Type.Optional(Type.Array(Type.String())),
+  },
+  { additionalProperties: false },
+);
+/** The caller binds the world and invocation once; retries retain the same artifact identity. */
 export function imageTool(
-  native: AgentTool,
+  native: ToolRegistration,
   call: (method: string, input?: unknown) => Promise<any>,
   game: string,
-): AgentTool {
+  commandId: () => string,
+): ToolRegistration<typeof schema> {
   return {
     name: "make_image",
-    label: "Paint a discovery",
     description:
       "Generate a reusable storybook image using the workspace's native imagegen. Use for a memorable place, portrait or artifact, not every reply. Supply existing asset ids as references for continuity. Returns an asset id for scene.assets and art.image.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Short lowercase asset name." },
-        prompt: { type: "string" },
-        references: { type: "array", items: { type: "string" } },
-      },
-      required: ["name", "prompt"],
-      additionalProperties: false,
-    } as never,
-    execute: async (toolId, raw: any, signal, onUpdate) => {
+    parameters: schema,
+    execute: async (raw, api, context) => {
+      context.abortSignal?.throwIfAborted();
       if (!/^[a-z0-9-]{1,48}$/.test(raw.name))
         throw new Error("Use a short lowercase asset name.");
+      const originalCommand = commandId();
+      if (!originalCommand)
+        throw new Error(
+          "Artwork requires its actual native invocation identity",
+        );
       const catalog = await call("artCatalog");
-      const refs = (raw.references ?? []).map((id: string) => {
+      const refs = (raw.references ?? []).map((id) => {
         if (!catalog[id]) throw new Error("Unknown reference image.");
         return catalog[id].path;
       });
-      const id = raw.name + "-" + crypto.randomUUID().slice(0, 8),
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(
+          canonicalJson({ game, commandId: originalCommand }),
+        ),
+      );
+      const suffix = Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      )
+        .join("")
+        .slice(0, 16);
+      const id = `${raw.name}-${suffix}`,
         path = `panels/${game}/assets/generated/${id}.png`;
       const result = await native.execute(
-        toolId,
         {
           prompt: raw.prompt,
           outputPath: path,
@@ -40,14 +62,13 @@ export function imageTool(
           outputFormat: "png",
           createOnly: true,
         },
-        signal,
-        onUpdate,
+        api,
+        context,
       );
-      if (result.isError) return result;
-      const image = result.content.find(
-        (part: any) => part.type === "image",
-      ) as { data: string; mimeType: string } | undefined;
-      if (!image) throw new Error("Image generation did not return an image.");
+      if ("wait" in result || result.isError) return result;
+      const image = result.content?.find((part) => part.type === "image");
+      if (!image || image.type !== "image")
+        throw new Error("Image generation did not return an image.");
       await call("storeArt", {
         id,
         path,
