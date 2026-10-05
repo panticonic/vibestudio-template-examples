@@ -166,9 +166,9 @@
     "@workspace/runtime": "workspace:*",
     "zod": "^3.25.76",
     "@workspace/adventure-engine": "workspace:*",
-    "@panticonic/pi-ai": "0.99.2-vibestudio.11",
-    "@panticonic/pi-chord": "0.99.2-vibestudio.11",
-    "@panticonic/pi-durable": "0.99.2-vibestudio.11",
+    "@panticonic/pi-ai": "0.99.2-vibestudio.12",
+    "@panticonic/pi-chord": "0.99.2-vibestudio.12",
+    "@panticonic/pi-durable": "0.99.2-vibestudio.12",
     "@vibestudio/shared": "workspace:*"
   },
   "devDependencies": {

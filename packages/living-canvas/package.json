@@ -23,9 +23,9 @@
     "react": "^19.0.0",
     "react-markdown": "^9.1.0",
     "@vibestudio/service-schemas": "workspace:*",
-    "@panticonic/pi-ai": "0.99.2-vibestudio.11",
-    "@panticonic/pi-chord": "0.99.2-vibestudio.11",
-    "@panticonic/pi-durable": "0.99.2-vibestudio.11",
+    "@panticonic/pi-ai": "0.99.2-vibestudio.12",
+    "@panticonic/pi-chord": "0.99.2-vibestudio.12",
+    "@panticonic/pi-durable": "0.99.2-vibestudio.12",
     "@vibestudio/shared": "workspace:*"
   }
 }
