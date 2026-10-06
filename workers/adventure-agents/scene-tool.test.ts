@@ -326,10 +326,13 @@ describe("native scene image ownership", () => {
       original.message,
     );
     expect(d.cancellations).toHaveLength(2);
-    expect(d.forgets).toContain(
-      [...d.recipes.values()].find((recipe) => recipe.prompt === "Two")!
-        .requestId,
-    );
+    // Independent references may reach cancellation in either order. The
+    // fixture refuses the first actual cancellation, so inspect those owners
+    // rather than assuming the second prompt was cancelled successfully.
+    const [refused, joined] = d.cancellations;
+    expect(d.jobs.get(refused!)!.status).toBe("running");
+    expect(d.jobs.get(joined!)!.status).toBe("cancelled");
+    expect(d.forgets).toEqual([joined]);
     await f.harness.retryTask(
       f.taskId,
       await incident(f.harness, f.taskId),
