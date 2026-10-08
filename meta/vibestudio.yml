@@ -104,6 +104,7 @@ template:
   description: Agent-driven playable worlds, from Grimoire and Regency to three illustrated adventures sharing a programmable world engine, independent characters, a world builder and a reference-based scene artist.
   name: Examples
   repositories:
+    - meta
     - packages/adventure-campaigns
     - packages/adventure-engine
     - packages/adventure-ui
