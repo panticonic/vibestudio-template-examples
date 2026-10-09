@@ -47,6 +47,38 @@
           "evidence": "intentional-broad"
         }
       ]
-    }
+    },
+    "services": [
+      {
+        "action": "read and change the state of a Grimoire estate",
+        "authority": {
+          "binding": {
+            "declaredFor": [
+              "panels/grimoire",
+              "workers/grimoire-agents"
+            ]
+          },
+          "principals": [
+            "host",
+            "user",
+            "code"
+          ]
+        },
+        "description": "Holds the enchanted garden, wishes and their visible consequences so Moth and the player share one truth.",
+        "durableObject": {
+          "className": "GrimoireWorldDO"
+        },
+        "name": "grimoire",
+        "notability": "everyday",
+        "presentation": {
+          "domain": "automation",
+          "verb": "manage"
+        },
+        "protocols": [
+          "examples.grimoire.v1"
+        ],
+        "title": "Grimoire estate"
+      }
+    ]
   }
 }

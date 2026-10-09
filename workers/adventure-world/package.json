@@ -49,6 +49,40 @@
         }
       ]
     },
-    "icon": "./assets/icon.svg"
+    "icon": "./assets/icon.svg",
+    "services": [
+      {
+        "action": "play and maintain illustrated adventure worlds",
+        "authority": {
+          "binding": {
+            "declaredFor": [
+              "panels/dead-letter-office",
+              "panels/missing-country",
+              "panels/wandering-house",
+              "workers/adventure-agents"
+            ]
+          },
+          "principals": [
+            "host",
+            "user",
+            "code"
+          ]
+        },
+        "description": "Persistent places, characters, story mechanisms and illustrated player journeys.",
+        "durableObject": {
+          "className": "AdventureWorldDO"
+        },
+        "name": "adventure",
+        "notability": "everyday",
+        "presentation": {
+          "domain": "automation",
+          "verb": "manage"
+        },
+        "protocols": [
+          "examples.adventure.v1"
+        ],
+        "title": "Adventure worlds"
+      }
+    ]
   }
 }

@@ -47,6 +47,38 @@
           "evidence": "intentional-broad"
         }
       ]
-    }
+    },
+    "services": [
+      {
+        "action": "read and change the state of a Regency game",
+        "authority": {
+          "binding": {
+            "declaredFor": [
+              "panels/regency",
+              "workers/regency-agents"
+            ]
+          },
+          "principals": [
+            "host",
+            "user",
+            "code"
+          ]
+        },
+        "description": "Holds the realm, advisor memories, executable policies and observed consequences behind Regency’s living illustration.",
+        "durableObject": {
+          "className": "RegencyGameDO"
+        },
+        "name": "regency",
+        "notability": "everyday",
+        "presentation": {
+          "domain": "automation",
+          "verb": "manage"
+        },
+        "protocols": [
+          "examples.regency.v1"
+        ],
+        "title": "Regency game"
+      }
+    ]
   }
 }

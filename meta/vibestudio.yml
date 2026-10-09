@@ -3,132 +3,17 @@ defaultAgentConfig:
 initPanels:
   - source: panels/welcome
 services:
-  - action: generate and manage reusable image assets
-    authority:
-      binding: declared
-      principals:
-        - host
-        - user
-        - code
-        - website
-        - session
-        - mission
-    description: Generate durable image assets, manage art direction, and read retained image content.
-    durableObject:
-      className: ImagesDO
-    name: images
-    notability: everyday
-    presentation:
-      domain: automation
-      verb: manage
-    protocols:
-      - vibestudio.images.v1
-    source: workers/images
-    title: Generated image assets
-  - action: read and change the state of a Regency game
-    authority:
-      binding:
-        declaredFor:
-          - panels/regency
-          - workers/regency-agents
-      principals:
-        - host
-        - user
-        - code
-    description: Holds the realm, advisor memories, executable policies and observed consequences behind Regency’s living illustration.
-    durableObject:
-      className: RegencyGameDO
-    name: regency
-    notability: everyday
-    presentation:
-      domain: automation
-      verb: manage
-    protocols:
-      - examples.regency.v1
+  - name: regency
     source: workers/regency-realm
-    title: Regency game
-  - action: read and change the state of a Grimoire estate
-    authority:
-      binding:
-        declaredFor:
-          - panels/grimoire
-          - workers/grimoire-agents
-      principals:
-        - host
-        - user
-        - code
-    description: Holds the enchanted garden, wishes and their visible consequences so Moth and the player share one truth.
-    durableObject:
-      className: GrimoireWorldDO
-    name: grimoire
-    notability: everyday
-    presentation:
-      domain: automation
-      verb: manage
-    protocols:
-      - examples.grimoire.v1
+  - name: grimoire
     source: workers/grimoire-world
-    title: Grimoire estate
-  - action: play and maintain illustrated adventure worlds
-    authority:
-      binding:
-        declaredFor:
-          - panels/dead-letter-office
-          - panels/missing-country
-          - panels/wandering-house
-          - workers/adventure-agents
-      principals:
-        - host
-        - user
-        - code
-    description: Persistent places, characters, story mechanisms and illustrated player journeys.
-    durableObject:
-      className: AdventureWorldDO
-    name: adventure
-    notability: everyday
-    presentation:
-      domain: automation
-      verb: manage
-    protocols:
-      - examples.adventure.v1
+  - name: adventure
     source: workers/adventure-world
-    title: Adventure worlds
-singletonObjects:
-  - className: ImagesDO
-    key: workspace-images
-    source: workers/images
 systemEpoch: 0
 template:
   dependencies:
     - url: git+https://github.com/panticonic/vibestudio-base.git
-  description: Agent-driven playable worlds, from Grimoire and Regency to three illustrated adventures sharing a programmable world engine, independent characters, a world builder and a reference-based scene artist.
+  description: Agent-driven playable worlds, from Grimoire and Regency to three
+    illustrated adventures sharing a programmable world engine, independent
+    characters, a world builder and a reference-based scene artist.
   name: Examples
-  repositories:
-    - meta
-    - packages/adventure-campaigns
-    - packages/adventure-engine
-    - packages/adventure-ui
-    - packages/game-play-tests
-    - packages/grimoire-engine
-    - packages/living-canvas
-    - packages/regency-engine
-    - packages/svelte
-    - panels/dead-letter-office
-    - panels/grimoire
-    - panels/hello-svelte
-    - panels/hello-vanilla
-    - panels/missing-country
-    - panels/regency
-    - panels/wandering-house
-    - panels/welcome
-    - templates/svelte
-    - templates/vanilla
-    - workers/adventure-agents
-    - workers/adventure-world
-    - workers/grimoire-agents
-    - workers/grimoire-world
-    - workers/hello
-    - workers/images
-    - workers/regency-agents
-    - workers/regency-realm
-    - workers/sample-do
