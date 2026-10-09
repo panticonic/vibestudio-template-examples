@@ -30,8 +30,6 @@ it.each([320, 390, 1280])(
         .getByRole("link", { name: "Open Svelte example" })
         .getAttribute("href"),
     ).toBe("panel://panels/hello-svelte");
-    await page.screenshot({
-      path: `/home/werg/vibestudio/.cache/template-review/template-ui-examples-${width}.png`,
-    });
+    await page.screenshot();
   },
 );

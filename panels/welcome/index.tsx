@@ -33,6 +33,10 @@ const worlds = [
       "Uncover the stories behind letters that never reached their destinations.",
   },
 ];
+const starters = [
+  { source: "panels/hello-svelte", label: "Svelte example" },
+  { source: "panels/hello-vanilla", label: "JavaScript example" },
+];
 export default function Welcome() {
   return (
     <AboutThemeRoot>
@@ -68,13 +72,10 @@ export default function Welcome() {
                 discover.
               </Text>
               <Flex gap="2" wrap="wrap">
-                {["hello-svelte", "hello-vanilla"].map((name) => (
-                  <Button key={name} asChild variant="soft">
-                    <a href={buildPanelLink(`panels/${name}`)}>
-                      Open{" "}
-                      {name === "hello-svelte"
-                        ? "Svelte example"
-                        : "JavaScript example"}
+                {starters.map((starter) => (
+                  <Button key={starter.source} asChild variant="soft">
+                    <a href={buildPanelLink(starter.source)}>
+                      Open {starter.label}
                     </a>
                   </Button>
                 ))}
