@@ -17,7 +17,7 @@ vi.mock("@workspace/runtime", () => ({
   contextId: "ctx",
   rpc: {},
   workers: { durableObjectService: fixture.worker },
-  panel: { stateArgs: { set: fixture.set } },
+  panel: { stateArgs: { patch: fixture.set } },
 }));
 vi.mock("@workspace/react", () => ({ useStateArgs: () => fixture.args }));
 vi.mock("@workspace/living-canvas/react", () => ({

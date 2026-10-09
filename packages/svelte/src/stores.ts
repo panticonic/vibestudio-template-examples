@@ -82,7 +82,7 @@ export const stateArgs = readable<Record<string, unknown>>(panel.stateArgs.get()
 
 /**
  * Update this panel's state args. Re-exported from @workspace/runtime
- * (`panel.stateArgs.set`, i.e. `setStateArgs`) for convenience — pairs with the
+ * (`panel.stateArgs.patch`, i.e. `patchStateArgs`) for convenience — pairs with the
  * `stateArgs` store, which reflects the resulting changes.
  */
-export const setStateArgs = panel.stateArgs.set;
+export const patchStateArgs = panel.stateArgs.patch;

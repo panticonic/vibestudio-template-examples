@@ -17,5 +17,5 @@ export {
   contextId,
   connectionError,
   stateArgs,
-  setStateArgs,
+  patchStateArgs,
 } from "./stores.js";

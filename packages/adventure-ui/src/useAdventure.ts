@@ -16,7 +16,7 @@ export function useCampaignKey(campaign: Campaign) {
   useEffect(() => {
     if (args.gameKey) return;
     let active = true;
-    void panel.stateArgs.set({ gameKey: generated }).then(
+    void panel.stateArgs.patch({ gameKey: generated }).then(
       () => {
         if (active) setSaved(generated);
       },
@@ -36,7 +36,7 @@ export function useCampaignKey(campaign: Campaign) {
         journeys.push({ key: journeyKey, label: `Journey ${journeys.length + 1}` });
     }
     try {
-      await panel.stateArgs.set({ gameKey: nextKey, journeys });
+      await panel.stateArgs.patch({ gameKey: nextKey, journeys });
       setSaved(nextKey);
       setError(null);
     } catch (reason) {

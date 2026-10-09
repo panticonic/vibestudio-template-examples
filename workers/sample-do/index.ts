@@ -2,7 +2,7 @@ import {
   DurableObjectBase,
   rpc,
   type DurableObjectContext,
-} from "@workspace/runtime/worker";
+} from "@workspace/runtime/worker/kernel";
 
 /**
  * Sample Durable Object showing the canonical userland storage primitive.
