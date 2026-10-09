@@ -10,7 +10,8 @@
     "./react": "./src/SceneCanvas.tsx",
     "./image-tool": "./src/image-tool.ts",
     "./fonts.css": "./fonts.css",
-    "./execution": "./src/execution.ts"
+    "./execution": "./src/execution.ts",
+    "./sound": "./src/sound.ts"
   },
   "devDependencies": {
     "vitest": "^3.2.7",

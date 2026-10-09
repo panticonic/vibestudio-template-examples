@@ -6,7 +6,7 @@ import { initialGame } from "@workspace/regency-engine";
 import { Kingdom } from "./Kingdom.js";
 import { RealmScene } from "./RealmScene.js";
 import { useStory } from "./lib/useStory.js";
-import { chime, closeAudio } from "./lib/sound.js";
+import { chime, closeAudio } from "@workspace/living-canvas/sound";
 import "./styles.css";
 export default function Regency() {
   const args = useStateArgs<{ gameKey?: string }>();
@@ -18,7 +18,7 @@ export default function Regency() {
     setCreating(true);
     setCreationError(null);
     try {
-      await panel.stateArgs.set({ gameKey: proposedKey.current });
+      await panel.stateArgs.patch({ gameKey: proposedKey.current });
     } catch (error) {
       setCreationError(error instanceof Error ? error.message : String(error));
     } finally {

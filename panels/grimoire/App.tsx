@@ -5,7 +5,7 @@ import { panel } from "@workspace/runtime";
 import { initialGame } from "@workspace/grimoire-engine";
 import { Garden } from "./Garden.js";
 import { useStory } from "./lib/useStory.js";
-import { chime, closeAudio } from "./lib/sound.js";
+import { chime, closeAudio } from "@workspace/living-canvas/sound";
 import "./styles.css";
 export default function Grimoire() {
   const args = useStateArgs<{ estateKey?: string }>();
@@ -17,7 +17,7 @@ export default function Grimoire() {
     setCreating(true);
     setCreationError(null);
     try {
-      await panel.stateArgs.set({ estateKey: proposedKey.current });
+      await panel.stateArgs.patch({ estateKey: proposedKey.current });
     } catch (error) {
       setCreationError(error instanceof Error ? error.message : String(error));
     } finally {
