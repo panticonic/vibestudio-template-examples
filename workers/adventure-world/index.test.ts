@@ -1,6 +1,8 @@
 import { runInNewContext } from "node:vm";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestDO } from "@workspace/runtime/worker/test-utils";
+import { schemaRpcMock } from "@vibestudio/rpc/test-utils";
+import type { RpcWireCaller } from "@vibestudio/rpc/internal";
 import type { Campaign } from "@workspace/adventure-engine";
 import { AdventureWorldDO } from "./index.js";
 import { defaultEngineSource } from "./evaluate.js";
@@ -59,21 +61,18 @@ async function boot(initialCampaign: Campaign = campaign) {
   const t = await createTestDO(AdventureWorldDO),
     deliveries: string[] = [];
   const scopes = new Map<string, any>();
-  (t.instance as any).rpc.call = async (
-    target: string,
-    method: string,
-    args: any[],
-  ) => {
+  const wireCall = vi.fn<RpcWireCaller["call"]>(async (target, method, args) => {
+    const payload = args[0] as any;
     if (method === "receiveMoment") {
       deliveries.push(target);
       return { ok: true };
     }
     if (method === "eval.dispose") {
-      scopes.delete(args[0].scopeKey);
+      scopes.delete(payload.scopeKey);
       return { ok: true };
     }
     if (method === "eval.start") {
-      const p = args[0],
+      const p = payload,
         scope = scopes.get(p.scope.key) ?? {};
       scopes.set(p.scope.key, scope);
       try {
@@ -83,19 +82,33 @@ async function boot(initialCampaign: Campaign = campaign) {
           { timeout: 100 },
         );
         return {
-          snapshot: { status: "done", result: { success: true, returnValue } },
+          runId: p.runId,
+          runDigest: "0".repeat(64),
+          authorityManifestDigest: "0".repeat(64),
+          status: "terminal",
+          snapshot: { status: "done", result: { success: true, console: "", returnValue } },
         };
       } catch (error) {
         return {
+          runId: p.runId,
+          runDigest: "0".repeat(64),
+          authorityManifestDigest: "0".repeat(64),
+          status: "terminal",
           snapshot: {
             status: "done",
-            result: { success: false, error: String(error) },
+            result: {
+              success: false,
+              console: "",
+              error: { message: String(error), name: "Error", errorKind: "application" },
+            },
           },
         };
       }
     }
     return undefined;
-  };
+  });
+  const rpc = schemaRpcMock({ call: wireCall });
+  Object.defineProperty(t.instance, "rpc", { value: rpc, configurable: true });
   const user = <Method extends keyof AdventureWorldDO & string>(method: Method, p?: unknown) =>
     t.callAs(
       { callerId: "panel:test", callerKind: "panel", userId: "player" },
@@ -115,7 +128,7 @@ async function boot(initialCampaign: Campaign = campaign) {
       targetId: "do:" + role,
       channelId: role,
     });
-  return { ...t, user, agent, deliveries };
+  return { ...t, user, agent, deliveries, wireCall };
 }
 describe("canonical illustration publication receipts", () => {
   async function painting() {
@@ -263,17 +276,16 @@ describe("canonical illustration publication receipts", () => {
     const original = new Error("successor admitted but acknowledgement lost");
     const delivered: unknown[] = [];
     let lose = true;
-    const rpc = (t.instance as any).rpc;
-    const call = rpc.call;
-    rpc.call = async (target: string, method: string, args: unknown[]) => {
-      if (method !== "receiveMoment") return call(target, method, args);
+    const native = t.wireCall.getMockImplementation()!;
+    t.wireCall.mockImplementation(async (target, method, args) => {
+      if (method !== "receiveMoment") return native(target, method, args);
       delivered.push({ target, args: structuredClone(args) });
       if (lose) {
         lose = false;
         throw original;
       }
       return { ok: true };
-    };
+    });
     await expect(
       t.agent("artist", "publishArtwork", input),
     ).rejects.toMatchObject({ message: original.message });
@@ -813,7 +825,7 @@ describe("durable adventure orchestration", () => {
       turnId: "cancel",
       code: 'world.say("clerk","Already said")',
     });
-    const original = (t.instance as any).rpc.call;
+    const original = t.wireCall.getMockImplementation()!;
     let release!: () => void, entered!: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -821,17 +833,13 @@ describe("durable adventure orchestration", () => {
     const started = new Promise<void>((resolve) => {
       entered = resolve;
     });
-    (t.instance as any).rpc.call = async (
-      target: string,
-      method: string,
-      args: any[],
-    ) => {
+    t.wireCall.mockImplementation(async (target, method, args) => {
       if (method === "eval.start") {
         entered();
         await gate;
       }
       return original(target, method, args);
-    };
+    });
     const late = t.agent("player", "execute", {
       turnId: "cancel",
       code: 'world.say("clerk","Too late")',
@@ -854,7 +862,7 @@ describe("durable adventure orchestration", () => {
   it("treats optimistic contention as reobservation rather than a world defect", async () => {
     const t = await boot();
     await t.user("play", { id: "race", text: "Inspect the room" });
-    const original = (t.instance as any).rpc.call;
+    const original = t.wireCall.getMockImplementation()!;
     let release!: () => void, entered!: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -862,17 +870,13 @@ describe("durable adventure orchestration", () => {
     const started = new Promise<void>((resolve) => {
       entered = resolve;
     });
-    (t.instance as any).rpc.call = async (
-      target: string,
-      method: string,
-      args: any[],
-    ) => {
+    t.wireCall.mockImplementation(async (target, method, args) => {
       if (method === "eval.start") {
         entered();
         await gate;
       }
       return original(target, method, args);
-    };
+    });
     const late = t.agent("player", "execute", {
       turnId: "race",
       code: 'world.say("clerk","Stale")',

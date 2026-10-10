@@ -1,6 +1,9 @@
 import { runInNewContext } from "node:vm";
-import { describe, it, expect } from "vitest";
+import { createHash } from "node:crypto";
+import { describe, it, expect, vi } from "vitest";
 import { createTestDO } from "@workspace/runtime/worker/test-utils";
+import { schemaRpcMock } from "@vibestudio/rpc/test-utils";
+import type { RpcWireCaller } from "@vibestudio/rpc/internal";
 import { initialGame } from "@workspace/regency-engine";
 import { RegencyGameDO } from "./index.js";
 function requirePresent<T>(value: T | null | undefined): T {
@@ -22,25 +25,14 @@ const AGENT = {
 async function boot(fail = false) {
   const t = await createTestDO(RegencyGameDO);
   const deliveries: string[] = [];
-  const outbound = (
-    t.instance as unknown as {
-      rpc: {
-        call: (
-          target: string,
-          method: string,
-          args?: unknown[],
-        ) => Promise<unknown>;
-      };
-    }
-  ).rpc;
   const scopes = new Map<string, Record<string, unknown>>();
-  outbound.call = async (target, method, args) => {
+  const wireCall = vi.fn<RpcWireCaller["call"]>(async (target, method, args) => {
     if (method === "eval.dispose") {
-      scopes.delete((args![0] as any).scopeKey);
+      scopes.delete((args[0] as any).scopeKey);
       return { ok: true };
     }
     if (method === "eval.start") {
-      const input = args![0] as any;
+      const input = args[0] as any;
       const scope = scopes.get(input.scope.key) ?? {};
       scopes.set(input.scope.key, scope);
       const returnValue = await runInNewContext(
@@ -49,7 +41,14 @@ async function boot(fail = false) {
         { timeout: 100 },
       );
       return {
-        snapshot: { status: "done", result: { success: true, returnValue } },
+        runId: input.runId,
+        runDigest: "0".repeat(64),
+        authorityManifestDigest: "0".repeat(64),
+        status: "terminal",
+        snapshot: {
+          status: "done",
+          result: { success: true, console: "", returnValue },
+        },
       };
     }
 
@@ -57,8 +56,10 @@ async function boot(fail = false) {
       deliveries.push(target);
       if (fail) throw new Error("delivery unavailable");
     }
-    return undefined;
-  };
+      return undefined;
+  });
+  const outbound = schemaRpcMock({ call: wireCall });
+  Object.defineProperty(t.instance, "rpc", { value: outbound, configurable: true });
   const player = <Method extends keyof RegencyGameDO & string>(
     method: Method,
     input?: unknown,
@@ -74,7 +75,7 @@ async function boot(fail = false) {
     channelId: "people",
     role: "person:mara",
   });
-  return { ...t, player, deliveries, outbound };
+  return { ...t, player, deliveries, outbound, wireCall };
 }
 describe("regency durable turns", () => {
   it("builds a persistent mechanism, executes its scene action once and preserves consequences on cancellation", async () => {
@@ -214,17 +215,17 @@ describe("regency durable turns", () => {
   });
   it("retries a failed time action as the same action, without substituting commentary", async () => {
     const t = await boot(),
-      native = t.outbound.call;
-    t.outbound.call = async (target, method, args) => {
+      native = t.wireCall.getMockImplementation()!;
+    t.wireCall.mockImplementation(async (target, method, args) => {
       if (method === "eval.start") throw new Error("temporarily unavailable");
       return native(target, method, args);
-    };
+    });
     await expect(
       t.player("advance", { id: "month", months: 1 }),
     ).rejects.toThrow("temporarily unavailable");
     expect((await t.player("getGame")).game.world.month).toBe(0);
     expect(t.deliveries).toEqual([]);
-    t.outbound.call = native;
+    t.wireCall.mockImplementation(native);
     await t.player("retry");
     expect((await t.player("getGame")).game.world.month).toBe(1);
   });
@@ -254,17 +255,18 @@ describe("regency durable turns", () => {
     const t = await boot();
     await t.player("play", { id: "art", wish: "Paint a discovery" });
     const bytes = "iVBOR" + "A".repeat(3_000_000);
-    t.outbound.call = async (_target, method, args) => {
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    t.wireCall.mockImplementation(async (_target, method, args) => {
       if (method === "blobstore.putText") {
         expect(args![0]).toBe(bytes);
-        return { digest: "painted-image", size: bytes.length };
+        return { digest, size: new TextEncoder().encode(bytes).byteLength };
       }
       if (method === "blobstore.getText") {
-        expect(args![0]).toBe("painted-image");
+        expect(args![0]).toBe(digest);
         return bytes;
       }
       throw new Error("Unexpected call: " + method);
-    };
+    });
     await t.callAs(AGENT, "storeArt", {
       id: "painted",
       path: "panels/regency/assets/generated/painted.png",
