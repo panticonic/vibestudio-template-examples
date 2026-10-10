@@ -14,7 +14,9 @@ import {
 import { createImagesClient } from "@workspace/runtime/images";
 import { WORLD_API_GUIDE } from "@workspace/adventure-engine";
 import { INTERACTION_GUIDE } from "@workspace/living-canvas/interactions";
-export class AdventureAgentWorker extends AiChatWorker {
+import { adventureWorldRpcMethods } from "@workspace-workers/adventure-world/contract";
+import type { AdventureAgentProtocol } from "@workspace/adventure-engine/rpc";
+export class AdventureAgentWorker extends AiChatWorker implements AdventureAgentProtocol {
   static override schemaVersion = AiChatWorker.schemaVersion;
   private config(channelId: string) {
     const c = this.subscriptions.getConfig(channelId) as {
@@ -61,6 +63,7 @@ export class AdventureAgentWorker extends AiChatWorker {
           ? createDurableObjectServiceClient(
               execution.rpc,
               "examples.adventure.v1",
+              adventureWorldRpcMethods,
               config.gameKey,
             )
           : null,
@@ -130,7 +133,7 @@ export class AdventureAgentWorker extends AiChatWorker {
             execution
               ? {
                   operationId: execution.commandId,
-                  call: (method, input) => client!.call(method, input),
+                  call: client!.call,
                   images: images!,
                 }
               : undefined,
@@ -186,6 +189,7 @@ export class AdventureAgentWorker extends AiChatWorker {
     const client = createDurableObjectServiceClient(
       this.agentRpc,
       "examples.adventure.v1",
+      adventureWorldRpcMethods,
       data["gameKey"],
     );
     await client.call("participantStopped", {
@@ -214,7 +218,7 @@ export class AdventureAgentWorker extends AiChatWorker {
   }: {
     channelId: string;
     turnId: string;
-  }) {
+  }): Promise<{ ok: true }> {
     const key = "adventure-turn:" + channelId;
     if (this.getStateValue(key) !== turnId) return { ok: true };
     this.deleteStateValue(key);
@@ -240,7 +244,7 @@ export class AdventureAgentWorker extends AiChatWorker {
     channelId: string;
     steeringId: string;
     turnId: string;
-  }) {
+  }): Promise<{ ok: true }> {
     if (!this.subscriptions.getParticipantId(channelId))
       throw new Error("This participant is not seated");
     this.setStateValue("adventure-turn:" + channelId, turnId);

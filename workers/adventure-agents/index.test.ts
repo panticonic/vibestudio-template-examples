@@ -1,3 +1,5 @@
+import { durableObjectServiceFixture } from "@vibestudio/service-schemas/test-utils";
+import { schemaRpcMock } from "@vibestudio/rpc/test-utils";
 import { describe, it, expect, vi } from "vitest";
 import { executeTool } from "@workspace/harness/testing/native-tool";
 import { createModels } from "@panticonic/pi-ai";
@@ -22,14 +24,14 @@ vi.mock("../agent-worker/ai-chat-worker.js", () => ({
       getConfig: () => ({ gameKey: "journey", role: this.role }),
       getParticipantId: () => "artist",
     };
-    rpc = {
+    rpc = schemaRpcMock({
       call: async (target: string, method: string, args: any[]) => {
         this.calls.push({ target, method, args });
         if (method === "workers.resolveService")
-          return { kind: "durable-object", targetId: "do:world" };
+          return durableObjectServiceFixture("do:world");
         return { ok: true };
       },
-    };
+    });
     get agentRpc() {
       return this.rpc;
     }
@@ -123,14 +125,15 @@ describe("adventure native turn contract", () => {
       const execution = {
         invocationId: "native:artist-invocation",
         commandId: "native:artist-command",
-        rpc: {
+        rpc: schemaRpcMock({
           call: async (_target: string, method: string, args: any[]) => {
             calls.push({ method, args });
             if (method === "workers.resolveService")
-              return { kind: "durable-object", targetId: args[0] };
+              return durableObjectServiceFixture(args[0] as string);
             if (method === "illustrationPublication") return null;
             if (method === "perspective")
               return {
+                role: "artist",
                 pending: { id: "one", phase: "artist" },
                 view: {
                   location: { id: "square" },
@@ -176,7 +179,7 @@ describe("adventure native turn contract", () => {
                 : { id: args[0], status: "succeeded", asset: asset(args[0]) };
             return { ok: true };
           },
-        },
+        }),
       };
       const paint = (
         await ((agent.execution = execution), agent.getTools("artist"))
@@ -241,18 +244,17 @@ describe("adventure native turn contract", () => {
       const execution = {
         invocationId: "invocation",
         commandId: "command",
-        rpc: {
+        rpc: schemaRpcMock({
           call: async (target: string, method: string, args: any[]) => {
             calls.push({ target, method, args });
             if (method === "workers.resolveService")
-              return {
-                kind: "durable-object",
-                targetId:
-                  args[0] === "vibestudio.images.v1" ? "do:images" : "do:world",
-              };
+              return durableObjectServiceFixture(
+                args[0] === "vibestudio.images.v1" ? "do:images" : "do:world",
+              );
             if (method === "illustrationPublication") return null;
             if (method === "perspective")
               return {
+                role: "artist",
                 pending: { id: "one", phase: "artist" },
                 view: { location: { id: "customs" } },
                 artDirection: "Painted harbour",
@@ -281,7 +283,7 @@ describe("adventure native turn contract", () => {
               return { id: "scene-job", status: "succeeded", asset };
             return { ok: true };
           },
-        },
+        }),
       };
       const paint = (
         await ((agent.execution = execution), agent.getTools("artist"))

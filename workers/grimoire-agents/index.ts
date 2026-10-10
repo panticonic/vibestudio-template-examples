@@ -1,5 +1,6 @@
 import { imageTool } from "@workspace/living-canvas/image-tool";
 import { AiChatWorker } from "../agent-worker/ai-chat-worker.js";
+import type { GrimoireAgentReceiver } from "@workspace/grimoire-engine/agentRpc";
 import type { AgentToolExecutionContext } from "@workspace/agentic-do";
 import type { ToolRegistration } from "@panticonic/pi-durable";
 import { Type } from "@panticonic/pi-ai";
@@ -15,8 +16,9 @@ import {
   WILD_PROMPT,
   STIR_JSON_SCHEMA,
 } from "@workspace/grimoire-engine";
+import { grimoireWorldRpcMethods } from "@workspace-workers/grimoire-world/contract";
 
-export class GrimoireAgentWorker extends AiChatWorker {
+export class GrimoireAgentWorker extends AiChatWorker implements GrimoireAgentReceiver {
   static override schemaVersion = AiChatWorker.schemaVersion;
   private gameKey(channelId: string): string {
     const config = this.subscriptions.getConfig(channelId) as
@@ -48,6 +50,7 @@ export class GrimoireAgentWorker extends AiChatWorker {
         ? createDurableObjectServiceClient(
             execution.rpc,
             "examples.grimoire.v1",
+            grimoireWorldRpcMethods,
             gameKey,
           )
         : null;
@@ -102,7 +105,10 @@ export class GrimoireAgentWorker extends AiChatWorker {
         ? [
             imageTool(
               native,
-              (method, input) => client!.call(method, input),
+              {
+                artCatalog: () => client!.call("artCatalog"),
+                storeArt: (input) => client!.call("storeArt", input),
+              },
               "grimoire",
               () => {
                 if (!execution)

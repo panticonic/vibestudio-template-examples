@@ -284,6 +284,7 @@
     "@workspace/harness": "workspace:*",
     "@workspace/pubsub": "workspace:*",
     "@workspace/regency-engine": "workspace:*",
+    "@workspace-workers/regency-realm": "workspace:*",
     "@workspace/runtime": "workspace:*",
     "zod": "^3.25.76",
     "@workspace/living-canvas": "workspace:*",

@@ -4,6 +4,15 @@ import { createTestDO } from "@workspace/runtime/worker/test-utils";
 import type { Campaign } from "@workspace/adventure-engine";
 import { AdventureWorldDO } from "./index.js";
 import { defaultEngineSource } from "./evaluate.js";
+function requirePresent<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error("Expected the operation to produce its declared value");
+  }
+  return value;
+}
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 const campaign: Campaign = {
   id: "test",
   title: "Test",
@@ -87,14 +96,14 @@ async function boot(initialCampaign: Campaign = campaign) {
     }
     return undefined;
   };
-  const user = (method: string, p?: any) =>
-    t.callAs<any>(
+  const user = <Method extends keyof AdventureWorldDO & string>(method: Method, p?: unknown) =>
+    t.callAs(
       { callerId: "panel:test", callerKind: "panel", userId: "player" },
       method,
       p,
     );
-  const agent = (role: string, method: string, p?: any) =>
-    t.callAs<any>(
+  const agent = <Method extends keyof AdventureWorldDO & string>(role: string, method: Method, p?: unknown) =>
+    t.callAs(
       { callerId: "do:" + role, callerKind: "do", userId: "player" },
       method,
       p,
@@ -117,13 +126,13 @@ describe("canonical illustration publication receipts", () => {
       text: "The room is quiet.",
     });
     const perspective = await t.agent("artist", "perspective");
-    return { ...t, turnId: perspective.pending.id as string };
+    return { ...t, turnId: requirePresent(perspective.pending).id };
   }
   it("withdraws only the authenticated artist's exact original job pointers without disturbing replacement work", async () => {
     const t = await painting();
     const perspective = await t.agent("artist", "perspective");
     const turnId = t.turnId;
-    const placeId = perspective.view.location.id;
+    const placeId = requirePresent(perspective.view).location.id;
     await t.agent("artist", "setImageJob", {
       turnId,
       placeId,
@@ -139,7 +148,7 @@ describe("canonical illustration publication receipts", () => {
       turnId,
       jobs: [{ jobId: "different-job", referenceKey: null }],
     });
-    expect((await t.agent("artist", "perspective")).imageJob.id).toBe(
+    expect(requirePresent((await t.agent("artist", "perspective")).imageJob).id).toBe(
       "original-job",
     );
     await t.agent("artist", "setImageJob", {
@@ -151,7 +160,7 @@ describe("canonical illustration publication receipts", () => {
       turnId,
       jobs: [{ jobId: "original-job", referenceKey: null }],
     });
-    expect((await t.agent("artist", "perspective")).imageJob.id).toBe(
+    expect(requirePresent((await t.agent("artist", "perspective")).imageJob).id).toBe(
       "replacement-job",
     );
     await t.agent("artist", "withdrawIllustrationJobs", {
@@ -193,7 +202,7 @@ describe("canonical illustration publication receipts", () => {
     await expect(
       t.agent("artist", "publishArtwork", { ...input, turnId: "other-scene" }),
     ).rejects.toThrow("original owner or scene");
-    expect((await t.user("getGame")).world.artwork.room).toEqual(input.asset);
+    expect((await t.user("getGame")).world.artwork["room"]).toEqual(input.asset);
   });
   it("retains canonical reference ownership after scene completion and rejects foreign replacement artist", async () => {
     const t = await painting();
@@ -274,7 +283,7 @@ describe("canonical illustration publication receipts", () => {
         purpose: "artwork",
       }),
     ).toEqual({ input: { asset: input.asset }, result: { ok: true } });
-    expect((await t.user("getGame")).world.artwork.room).toEqual(input.asset);
+    expect((await t.user("getGame")).world.artwork["room"]).toEqual(input.asset);
     await expect(t.agent("artist", "publishArtwork", input)).resolves.toEqual({
       ok: true,
     });
@@ -306,7 +315,7 @@ describe("canonical illustration publication receipts", () => {
       turnId: t.turnId,
       asset: { id: "repaired", digest: "new-bytes" },
     });
-    expect((await t.user("getGame")).world.artwork.room.id).toBe("repaired");
+    expect((await t.user("getGame")).world.artwork["room"].id).toBe("repaired");
     expect(
       await t.agent("artist", "illustrationPublication", {
         ...failure,
@@ -325,17 +334,17 @@ describe("durable adventure orchestration", () => {
       text: "The room is quiet.",
     });
     const perspective = await t.agent("artist", "perspective");
-    expect(perspective.references.map((ref: any) => ref.key)).toEqual([
+    expect(requirePresent(perspective.references).map((ref: any) => ref.key)).toEqual([
       "place:room",
       "person:clerk",
     ]);
-    const sceneId = perspective.pending.id;
+    const sceneId = requirePresent(perspective.pending).id;
     await t.agent("artist", "setReferenceJob", {
       turnId: sceneId,
       key: "person:clerk",
       jobId: "portrait-job",
     });
-    expect((await t.agent("artist", "perspective")).references[1].jobId).toBe(
+    expect(requirePresent(requirePresent((await t.agent("artist", "perspective")).references)[1]).jobId).toBe(
       "portrait-job",
     );
     await expect(
@@ -354,14 +363,14 @@ describe("durable adventure orchestration", () => {
         asset: { id: "wrong", digest: "wrong" },
       }),
     ).rejects.toThrow("reference subject");
-    for (const ref of perspective.references)
+    for (const ref of requirePresent(perspective.references))
       await t.agent("artist", "publishReference", {
         operationId: "native-command:3",
         turnId: sceneId,
         key: ref.key,
         asset: { id: ref.key, digest: "canonical" },
       });
-    expect((await t.user("getGame")).background.scene.preparing).toEqual([]);
+    expect(requirePresent((await t.user("getGame")).background.scene).preparing).toEqual([]);
     const deliveries = t.deliveries.length;
     await t.user("getGame");
     await t.user("retry");
@@ -382,12 +391,12 @@ describe("durable adventure orchestration", () => {
     });
     await t.agent("person:clerk", "finish", { turnId: "second", text: "" });
     const next = await t.agent("artist", "perspective");
-    expect(next.pending.id).not.toBe(sceneId);
-    expect(next.references.map((ref: any) => ref.asset.id)).toEqual([
+    expect(requirePresent(next.pending).id).not.toBe(sceneId);
+    expect(requirePresent(next.references).map((ref) => ref.asset.id)).toEqual([
       "place:room",
       "person:clerk",
     ]);
-    expect(next.references.every((ref: any) => ref.jobId === undefined)).toBe(
+    expect(requirePresent(next.references).every((ref) => ref.jobId === undefined)).toBe(
       true,
     );
   });
@@ -397,16 +406,22 @@ describe("durable adventure orchestration", () => {
       id: "private",
       text: "Secretly conceal the letter before speaking.",
     });
-    expect((await t.agent("player", "perspective")).pending.text).toContain(
+    const playerPending = requirePresent((await t.agent("player", "perspective")).pending);
+    if (!("text" in playerPending)) throw new Error("Player perspective omits the private intention");
+    expect(playerPending.text).toContain(
       "Secretly",
     );
-    expect((await t.agent("builder", "perspective")).pending.text).toContain(
+    const builderPending = requirePresent((await t.agent("builder", "perspective")).pending);
+    if (!("text" in builderPending)) throw new Error("Builder perspective omits the private intention");
+    expect(builderPending.text).toContain(
       "Secretly",
     );
     const npc = await t.agent("person:clerk", "perspective");
-    expect(npc.pending.text).toBe("");
+    const npcPending = requirePresent(npc.pending);
+    if (!("text" in npcPending)) throw new Error("NPC perspective omits the redacted intention");
+    expect(npcPending.text).toBe("");
     expect(
-      npc.view.events.some((event: { text: string }) =>
+      requirePresent(npc.view).events.some((event: { text: string }) =>
         event.text.includes("Secretly"),
       ),
     ).toBe(false);
@@ -464,10 +479,12 @@ describe("durable adventure orchestration", () => {
       }),
     ).rejects.toThrow();
     const state = await t.agent("builder", "perspective");
-    expect(state.pending.failedRole).toBe("person:clerk");
-    expect(state.pending.purpose).toBe("extension");
-    expect(state.pending.error).toBeUndefined();
-    state.world.behaviors.push({
+    const failedPending = requirePresent(state.pending);
+    if (!("failedRole" in failedPending)) throw new Error("Builder perspective has no failed role");
+    expect(failedPending.failedRole).toBe("person:clerk");
+    expect(failedPending.purpose).toBe("extension");
+    expect(failedPending.error).toBeUndefined();
+    requirePresent(state.world).behaviors.push({
       id: "clockwork",
       entityId: "clock",
       trigger: "wind",
@@ -476,10 +493,10 @@ describe("durable adventure orchestration", () => {
     });
     await t.agent("builder", "repair", {
       turnId: "one",
-      code: `world.world.behaviors.push(${JSON.stringify(state.world.behaviors[0])});`,
+      code: `world.world.behaviors.push(${JSON.stringify(requirePresent(state.world).behaviors[0])});`,
       note: "Model the clock winding",
     });
-    expect((await t.user("getGame")).pending.phase).toBe("participants");
+    expect(requirePresent((await t.user("getGame")).pending).phase).toBe("participants");
     expect((await t.user("getGame")).world.tick).toBe(1);
     await t.agent("person:clerk", "execute", {
       turnId: "one",
@@ -508,10 +525,12 @@ describe("durable adventure orchestration", () => {
         turnId: "one",
         code,
       });
-      expect(rejected.programError).toBeTruthy();
+      if (!isRecord(rejected)) throw new Error("Interpreter failure did not return a result object");
+      expect(rejected["programError"]).toBeTruthy();
       const resumed = await t.agent("player", "perspective");
-      expect(resumed.pending.phase).toBe("player");
-      expect(resumed.pending.purpose).toBeUndefined();
+      expect(requirePresent(resumed.pending).phase).toBe("player");
+      const resumedPending = requirePresent(resumed.pending);
+      expect("purpose" in resumedPending ? resumedPending.purpose : undefined).toBeUndefined();
       expect(resumed.completedActions).toHaveLength(1);
       expect(t.deliveries).not.toContain("do:builder");
       await t.agent("player", "execute", {
@@ -554,9 +573,11 @@ describe("durable adventure orchestration", () => {
       }),
     ).rejects.toThrow();
     const state = await t.agent("builder", "perspective");
-    expect(state.pending.phase).toBe("builder");
-    expect(state.pending.purpose).toBe("repair");
-    expect(state.world.tick).toBe(0);
+    expect(requirePresent(state.pending).phase).toBe("builder");
+    const repairPending = requirePresent(state.pending);
+    if (!("purpose" in repairPending)) throw new Error("Repair did not mark its pending turn");
+    expect(repairPending.purpose).toBe("repair");
+    expect(requirePresent(state.world).tick).toBe(0);
   });
   it("materializes a frontier with code while keeping the current resident roster stable", async () => {
     const c = structuredClone(campaign);
@@ -576,24 +597,26 @@ describe("durable adventure orchestration", () => {
         code: 'world.move("inn")',
       }),
     ).rejects.toThrow("FRONTIER");
-    expect((await t.user("getGame")).pending.purpose).toBe("frontier");
+    expect(requirePresent((await t.user("getGame")).pending).purpose).toBe("frontier");
     await t.agent("builder", "repair", {
       turnId: "one",
       note: "Materialize the established inn",
       code: 'world.patch("inn",{description:"A warm inn with amber lamps",components:{...world.entity("inn").components,frontier:false}});world.add({id:"host",name:"Host",kind:"person",description:"An attentive host",location:"inn",components:{goals:["Offer supper"],memory:[]}});world.add({id:"bell",name:"Bell",kind:"object",description:"A brass bell",location:"inn",components:{}});world.world.behaviors.push({id:"ring",entityId:"bell",trigger:"ring",state:{},code:"world.emit(String(42));"});',
     });
     const resumed = await t.agent("player", "perspective");
-    expect(resumed.pending.participants).toEqual([]);
+    const repairedPending = requirePresent(resumed.pending);
+    if (!("participants" in repairedPending)) throw new Error("Repaired turn has no participant list");
+    expect(repairedPending.participants).toEqual([]);
     await t.agent("player", "execute", {
       turnId: "one",
-      code: resumed.pending.continuationCode,
+      code: repairedPending.continuationCode,
     });
     expect((await t.user("getGame")).view.location.id).toBe("inn");
     await t.agent("player", "finish", {
       turnId: "one",
       text: "You enter the inn.",
     });
-    expect((await t.user("getGame")).pending.participants).toEqual([
+    expect(requirePresent((await t.user("getGame")).pending).participants).toEqual([
       "clerk",
       "host",
     ]);
@@ -626,7 +649,7 @@ describe("durable adventure orchestration", () => {
       code: 'world.world.behaviors[0].code="world.emit(String(42));";',
       note: "Repair malformed behavior source",
     });
-    expect((await t.user("getGame")).pending.phase).toBe("player");
+    expect(requirePresent((await t.user("getGame")).pending).phase).toBe("player");
   });
   it("repairs a broken stored engine through independent maintenance and resumes the real action once", async () => {
     const t = await boot();
@@ -654,18 +677,24 @@ describe("durable adventure orchestration", () => {
     });
     const repaired = await t.agent("builder", "perspective");
     expect(repaired.engineSource).toBe(defaultEngineSource);
-    expect(repaired.world.tick).toBe(0);
+    const repairedWorld = requirePresent(repaired.world);
+    expect(repairedWorld.tick).toBe(0);
     expect(
-      repaired.world.entities.find((e: any) => e.id === "clock").description,
+      requirePresent(repairedWorld.entities.find((e) => e.id === "clock")).description,
     ).toBe("The maintenance visit is recorded");
     await t.agent("player", "execute", {
       turnId: "one",
-      code: repaired.pending.continuationCode,
+      code: (() => {
+        const pending = requirePresent(repaired.pending);
+        if (!("continuationCode" in pending)) throw new Error("Repair did not produce a continuation");
+        return pending.continuationCode;
+      })(),
     });
     const resumed = await t.agent("builder", "perspective");
-    expect(resumed.world.tick).toBe(1);
+    const resumedWorld = requirePresent(resumed.world);
+    expect(resumedWorld.tick).toBe(1);
     expect(
-      resumed.world.entities.find((e: any) => e.id === "clerk").components
+      requirePresent(resumedWorld.entities.find((e) => e.id === "clerk")).components
         .memory,
     ).toEqual(["The traveller said: Hello"]);
   });
@@ -673,11 +702,11 @@ describe("durable adventure orchestration", () => {
     const t = await boot();
     await t.user("play", { id: "one", text: "Look around" });
     await t.agent("player", "participantStopped", { turnId: "other" });
-    expect((await t.user("getGame")).pending.error).toBeUndefined();
+    expect(requirePresent((await t.user("getGame")).pending).error).toBeUndefined();
     await t.agent("player", "participantStopped", { turnId: "one" });
-    expect((await t.user("getGame")).pending.error).toContain("Resume");
+    expect(requirePresent((await t.user("getGame")).pending).error).toContain("Resume");
     await t.user("retry");
-    expect((await t.user("getGame")).pending.error).toBeUndefined();
+    expect(requirePresent((await t.user("getGame")).pending).error).toBeUndefined();
     await t.agent("player", "finish", {
       turnId: "one",
       text: "You look around.",
@@ -698,7 +727,7 @@ describe("durable adventure orchestration", () => {
     );
     const state = await t.user("getGame");
     expect(
-      state.view.entities.find((e: any) => e.id === "clerk").components
+      requirePresent(state.view.entities.find((e) => e.id === "clerk")).components
         .knowledge,
     ).toBeUndefined();
   });
@@ -746,13 +775,13 @@ describe("durable adventure orchestration", () => {
       text: "You reach the garden.",
     });
     const reaction = await t.user("getGame");
-    expect(reaction.pending.participants).toEqual(["clerk"]);
+    expect(requirePresent(reaction.pending).participants).toEqual(["clerk"]);
     expect(reaction.background.scene).toBeNull();
     await t.agent("person:clerk", "finish", { turnId: "north", text: "" });
     const painting = await t.user("getGame");
     expect(painting.pending).toBeNull();
-    expect(painting.background.scene.placeId).toBe("garden");
-    const sceneId = painting.background.scene.id;
+    expect(requirePresent(painting.background.scene).placeId).toBe("garden");
+    const sceneId = requirePresent(painting.background.scene).id;
     await t.agent("artist", "setImageJob", {
       turnId: sceneId,
       jobId: "garden-job",
@@ -769,10 +798,10 @@ describe("durable adventure orchestration", () => {
       asset: { id: "garden-art", digest: "garden" },
     });
     const returned = await t.user("getGame");
-    expect(returned.pending.id).toBe("south");
+    expect(requirePresent(returned.pending).id).toBe("south");
     expect(returned.view.location.id).toBe("room");
-    expect(returned.world.artwork.garden.id).toBe("garden-art");
-    expect(returned.world.artwork.room.id).toBe("cover");
+    expect(returned.world.artwork["garden"].id).toBe("garden-art");
+    expect(returned.world.artwork["room"].id).toBe("cover");
     expect(returned.visual.artworkSignature).not.toBe(
       painting.visual.signature,
     );
@@ -862,9 +891,11 @@ describe("durable adventure orchestration", () => {
       JSON.stringify(stored),
     );
     release();
-    expect((await late).retry).toBe(true);
+    const lateResult = await late;
+    if (!isRecord(lateResult)) throw new Error("Stale action did not return its retry result");
+    expect(lateResult["retry"]).toBe(true);
     const game = await t.user("getGame");
-    expect(game.pending.phase).toBe("player");
+    expect(requirePresent(game.pending).phase).toBe("player");
     expect(game.world.tick).toBe(0);
     expect(t.deliveries).not.toContain("do:builder");
   });
@@ -921,7 +952,7 @@ describe("durable adventure orchestration", () => {
     });
     await t.agent("player", "finish", { turnId: "wait", text: "Time passes." });
     const game = await t.user("getGame");
-    expect(game.pending.participants).toEqual(["watcher"]);
+    expect(requirePresent(game.pending).participants).toEqual(["watcher"]);
     expect(game.neededSeats.map((seat: any) => seat.role)).toEqual([
       "person:watcher",
     ]);
@@ -1001,26 +1032,28 @@ describe("durable adventure orchestration", () => {
       return {fold:world.getComponent("coat","fold"),light:world.getComponent(lamp.id,"effectiveLight"),cover};
     `,
     });
-    expect(result.fold).toEqual({ layers: 2, orientation: "lengthwise" });
-    expect(result.light).toBe(false);
-    expect(result.cover.kind).toBe("covers");
+    if (!isRecord(result)) throw new Error("World program did not return its result object");
+    expect(result["fold"]).toEqual({ layers: 2, orientation: "lengthwise" });
+    expect(result["light"]).toBe(false);
+    if (!isRecord(result["cover"])) throw new Error("World program did not return its cover relation");
+    expect(result["cover"]["kind"]).toBe("covers");
     await t.agent("player", "finish", {
       turnId: "improvise",
       text: "You fold the coat and cover the lamp.",
     });
     const game = await t.user("getGame");
     expect(game.world.tick).toBe(3);
-    expect(game.pending.phase).toBe("participants");
+    expect(requirePresent(game.pending).phase).toBe("participants");
     expect(
-      game.view.entities.find((entity: any) => entity.id === "coat")
+      requirePresent(game.view.entities.find((entity) => entity.id === "coat"))
         .description,
     ).toBe("A carefully folded coat");
     const keeper = await t.agent("builder", "perspective");
     expect(
-      keeper.world.behaviors.find((behavior: any) => behavior.id === "folding")
-        .state.folds,
+      requirePresent(requirePresent(keeper.world).behaviors.find((behavior) => behavior.id === "folding"))
+        .state["folds"],
     ).toBe(1);
-    expect(keeper.trajectory.filter((entry: any) => entry.code)).toHaveLength(
+    expect(requirePresent(keeper.trajectory).filter((entry) => entry.code)).toHaveLength(
       1,
     );
     expect(t.deliveries).not.toContain("do:builder");
@@ -1059,15 +1092,16 @@ describe("durable adventure orchestration", () => {
       turnId: "shade",
       code: 'world.setComponent("coat","folded",true);world.link("coat","lamp","covers");',
     });
-    expect(refused.actionError).toBeTruthy();
-    expect((await t.user("getGame")).pending.phase).toBe("player");
+    if (!isRecord(refused)) throw new Error("Refused world action did not return its diagnostic");
+    expect(refused["actionError"]).toBeTruthy();
+    expect(requirePresent((await t.user("getGame")).pending).phase).toBe("player");
     let state = await t.agent("builder", "perspective");
-    expect(state.world.tick).toBe(0);
+    expect(requirePresent(state.world).tick).toBe(0);
     expect(
-      state.world.entities.find((entity: any) => entity.id === "coat")
-        .components.folded,
+      requirePresent(requirePresent(state.world).entities.find((entity) => entity.id === "coat"))
+        .components["folded"],
     ).toBeUndefined();
-    expect(state.world.relations).toEqual([]);
+    expect(requirePresent(state.world).relations).toEqual([]);
     const corrected = await t.agent("player", "execute", {
       turnId: "shade",
       code: 'world.transfer("coat","room");world.link("coat","lamp","covers");return world.getComponent("lamp","effectiveLight");',
@@ -1077,15 +1111,16 @@ describe("durable adventure orchestration", () => {
       turnId: "shade",
       code: 'world.setComponent("lamp","effectiveLight",false);',
     });
-    expect(derived.actionError).toBeTruthy();
+    if (!isRecord(derived)) throw new Error("Derived component rejection did not return its diagnostic");
+    expect(derived["actionError"]).toBeTruthy();
     state = await t.agent("builder", "perspective");
-    expect(state.world.tick).toBe(2);
+    expect(requirePresent(state.world).tick).toBe(2);
     expect(
-      state.world.entities.find((entity: any) => entity.id === "lamp")
-        .components.light,
+      requirePresent(requirePresent(state.world).entities.find((entity) => entity.id === "lamp"))
+        .components["light"],
     ).toBe(true);
     expect(
-      state.world.relations.filter(
+      requirePresent(state.world).relations.filter(
         (relation: any) => relation.kind === "covers",
       ),
     ).toHaveLength(1);
@@ -1094,6 +1129,6 @@ describe("durable adventure orchestration", () => {
       turnId: "shade",
       text: "You place the coat over the lamp; its light is screened.",
     });
-    expect((await t.user("getGame")).pending.phase).toBe("participants");
+    expect(requirePresent((await t.user("getGame")).pending).phase).toBe("participants");
   });
 });

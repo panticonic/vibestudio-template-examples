@@ -1,5 +1,6 @@
 import { imageTool } from "@workspace/living-canvas/image-tool";
 import { AiChatWorker } from "../agent-worker/ai-chat-worker.js";
+import type { RegencyAgentReceiver } from "@workspace/regency-engine/agentRpc";
 import type { AgentToolExecutionContext } from "@workspace/agentic-do";
 import type { ToolRegistration } from "@panticonic/pi-durable";
 import { Type } from "@panticonic/pi-ai";
@@ -18,10 +19,12 @@ import {
   ACTION_GUIDE,
   RESULT_JSON_SCHEMA,
   WORLD_BUILDER_PROMPT,
+  DevelopmentSchema,
   DEVELOPMENT_JSON_SCHEMA,
 } from "@workspace/regency-engine";
+import { regencyRealmRpcMethods } from "@workspace-workers/regency-realm/contract";
 
-export class RegencyAgentWorker extends AiChatWorker {
+export class RegencyAgentWorker extends AiChatWorker implements RegencyAgentReceiver {
   static override schemaVersion = AiChatWorker.schemaVersion;
   private gameKey(channelId: string): string {
     const config = this.subscriptions.getConfig(channelId) as
@@ -57,6 +60,7 @@ export class RegencyAgentWorker extends AiChatWorker {
         ? createDurableObjectServiceClient(
             execution.rpc,
             "examples.regency.v1",
+            regencyRealmRpcMethods,
             gameKey,
           )
         : null;
@@ -108,7 +112,10 @@ export class RegencyAgentWorker extends AiChatWorker {
               DEVELOPMENT_JSON_SCHEMA,
             ),
             execute: async (params) => {
-              const result = await client!.call("developWorld", params);
+              const result = await client!.call(
+                "developWorld",
+                DevelopmentSchema.parse(params),
+              );
               return {
                 content: [
                   { type: "text" as const, text: JSON.stringify(result) },
@@ -222,7 +229,10 @@ export class RegencyAgentWorker extends AiChatWorker {
         ? [
             imageTool(
               native,
-              (method, input) => client!.call(method, input),
+              {
+                artCatalog: () => client!.call("artCatalog"),
+                storeArt: (input) => client!.call("storeArt", input),
+              },
               "regency",
               () => {
                 if (!execution)

@@ -1,3 +1,7 @@
+import { mainRpcMethods } from "@vibestudio/service-schemas/mainRpc";
+import { createMainRpcCaller } from "@vibestudio/service-schemas/mainRpc";
+import { regencyAgentRpcMethods } from "@workspace/regency-engine/agentRpc";
+import type { RegencyAgentRole } from "@workspace/regency-engine/agentRpc";
 import { validateScene } from "@workspace/living-canvas";
 import { runPolicies } from "./policy.js";
 import { DurableObjectBase, rpc } from "@workspace/runtime/worker/kernel";
@@ -21,7 +25,7 @@ import {
   type Development,
 } from "@workspace/regency-engine";
 
-type Role = "storyteller" | "builder" | `person:${string}`;
+type Role = RegencyAgentRole;
 type Seat = { targetId: string; channelId: string; role: Role };
 type Pending = {
   id: string;
@@ -124,9 +128,9 @@ export class RegencyGameDO extends DurableObjectBase {
           .toArray()[0];
         if (!row) throw new Error("Unknown artwork.");
         const art = JSON.parse(row.body);
-        const data = await this.rpc.call<string | null>(
+        const data = await this.rpc.call(
           "main",
-          "blobstore.getText",
+          mainRpcMethods["blobstore.getText"],
           [art.dataRef.digest],
         );
         if (data === null)
@@ -176,9 +180,9 @@ export class RegencyGameDO extends DurableObjectBase {
     )
       throw new Error("Artwork must use the game's asset directory.");
     const artTurn = s.painting?.id ?? s.pending?.id;
-    const dataRef = await this.rpc.call<{ digest: string; size: number }>(
+    const dataRef = await this.rpc.call(
       "main",
-      "blobstore.putText",
+      mainRpcMethods["blobstore.putText"],
       [input.data],
     );
     if ((this.load().painting?.id ?? this.load().pending?.id) !== artTurn)
@@ -212,6 +216,16 @@ export class RegencyGameDO extends DurableObjectBase {
   })
   getGame() {
     const s = this.load();
+    const neededSeats: { role: Role; name: string }[] = s.pending?.development
+      ? s.seats.some((seat) => seat.role === "builder")
+        ? []
+        : [{ role: "builder", name: "The realm beyond the map" }]
+      : s.pending?.audience
+          .filter((id) => !s.seats.some((seat) => seat.role === `person:${id}`))
+          .map((id) => ({
+            role: `person:${id}` as const,
+            name: s.pending!.cast.find((person) => person.id === id)!.name,
+          })) ?? [];
     return {
       game: s.game,
       pending: s.pending,
@@ -219,13 +233,7 @@ export class RegencyGameDO extends DurableObjectBase {
       seated: ["storyteller"].every((role) =>
         s.seats.some((seat) => seat.role === role),
       ),
-      neededSeats:
-        s.pending?.development ? (s.seats.some(seat => seat.role === "builder") ? [] : [{ role: "builder", name: "The realm beyond the map" }]) : s.pending?.audience
-          .filter((id) => !s.seats.some((seat) => seat.role === `person:${id}`))
-          .map((id) => ({
-            role: `person:${id}`,
-            name: s.pending!.cast.find((p) => p.id === id)!.name,
-          })) ?? [],
+      neededSeats,
     };
   }
   @rpc({
@@ -408,7 +416,7 @@ export class RegencyGameDO extends DurableObjectBase {
       proposal = s.game.proposals.find((p) => p.id === proposalId);
     try {
       const result = await runPolicies(
-        (method, args) => this.rpc.call("main", method, args),
+        createMainRpcCaller(this.rpc),
         s.game.world,
         programsWithProposal(s.game.programs, proposal),
         proposalId,
@@ -454,7 +462,7 @@ export class RegencyGameDO extends DurableObjectBase {
     const recipients = s.seats.filter((p) => roles.includes(p.role));
     const results = await Promise.allSettled(
       recipients.map((seat) =>
-        this.rpc.call(seat.targetId, "receiveMoment", [
+        this.rpc.call(seat.targetId, regencyAgentRpcMethods.receiveMoment, [
           {
             channelId: seat.channelId,
             steeringId: `regency:${this.objectKey}:${id}:${seat.role}:${attempt}`,
@@ -516,8 +524,7 @@ export class RegencyGameDO extends DurableObjectBase {
     const activePrograms = s.pending.simulation?.programs ?? s.game.programs;
     if (input.replaces && !activePrograms.some((p) => p.id === input.replaces))
       throw new Error("Choose a running policy to amend.");
-    const call = <T>(method: string, args: unknown[]): Promise<T> =>
-      this.rpc.call<T>("main", method, args);
+    const call = createMainRpcCaller(this.rpc);
     // Compare the same three months with and without the proposed policy.
     // Both branches include existing programs, so their interactions are real.
     const without = await runPolicies(call, base, activePrograms, undefined, 3);
@@ -632,7 +639,7 @@ export class RegencyGameDO extends DurableObjectBase {
       throw new Error("That policy is already enacted.");
     const programs = programsWithProposal(s.game.programs, proposal);
     const result = await runPolicies(
-      (method, args) => this.rpc.call("main", method, args),
+      createMainRpcCaller(this.rpc),
       s.game.world,
       programs,
       proposal?.id,
@@ -770,7 +777,7 @@ export class RegencyGameDO extends DurableObjectBase {
     }
     const cast = validatePeople({ people: [...s.pending.cast, ...input.people], dialogue: [] }, world);
     // Validate prospective mechanisms without advancing committed time or changing old facts.
-    await runPolicies((method, args) => this.rpc.call("main", method, args), world, s.game.programs, undefined, 1);
+    await runPolicies(createMainRpcCaller(this.rpc), world, s.game.programs, undefined, 1);
     const current = this.load();
     if (current.pending?.id !== input.turnId || !current.pending.development || JSON.stringify(current.pending.world) !== JSON.stringify(base)) throw new Error("The world changed during development; reread it.");
     current.pending.world = world;
@@ -807,7 +814,7 @@ export class RegencyGameDO extends DurableObjectBase {
     }
     if (!input.action?.trim() || input.action.length > 120 || JSON.stringify(input.payload).length > 4000) throw new Error("Describe a bounded scene interaction.");
     const base = s.pending!.world!;
-    const result = await runPolicies((method,args) => this.rpc.call("main",method,args), base, s.pending!.simulation?.programs ?? s.game.programs, undefined, 0, input);
+    const result = await runPolicies(createMainRpcCaller(this.rpc), base, s.pending!.simulation?.programs ?? s.game.programs, undefined, 0, input);
     const current = this.load();
     if (current.pending?.id !== input.turnId || JSON.stringify(current.pending.world) !== JSON.stringify(base)) throw new Error("The world changed. Reread before acting.");
     current.pending.world = result.world;
@@ -1008,7 +1015,7 @@ export class RegencyGameDO extends DurableObjectBase {
       const artist = s.seats.find((seat) => seat.role === "storyteller");
       if (artist)
         await this.rpc
-          .call(artist.targetId, "receiveMoment", [
+          .call(artist.targetId, regencyAgentRpcMethods.receiveMoment, [
             {
               channelId: artist.channelId,
               steeringId: "paint:" + this.objectKey + ":" + p.id,

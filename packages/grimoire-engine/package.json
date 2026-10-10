@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Small, validated story state and turn transitions.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./agentRpc": "./src/agentRpc.ts"
   },
   "vibestudio": {
     "tests": [
@@ -24,6 +25,7 @@
   "dependencies": {
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.24.5",
-    "@workspace/living-canvas": "workspace:*"
+    "@workspace/living-canvas": "workspace:*",
+    "@vibestudio/shared": "workspace:*"
   }
 }

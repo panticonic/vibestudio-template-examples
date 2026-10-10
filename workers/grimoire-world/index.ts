@@ -1,3 +1,6 @@
+import { mainRpcMethods } from "@vibestudio/service-schemas/mainRpc";
+import { createMainRpcCaller } from "@vibestudio/service-schemas/mainRpc";
+import { grimoireAgentRpcMethods } from "@workspace/grimoire-engine/agentRpc";
 import { runWorldCode } from "@workspace/living-canvas/execution";
 import { parse } from "acorn";
 import { DurableObjectBase, rpc } from "@workspace/runtime/worker/kernel";
@@ -120,9 +123,9 @@ export class GrimoireWorldDO extends DurableObjectBase {
           .toArray()[0];
         if (!row) throw new Error("Unknown artwork.");
         const art = JSON.parse(row.body);
-        const data = await this.rpc.call<string | null>(
+        const data = await this.rpc.call(
           "main",
-          "blobstore.getText",
+          mainRpcMethods["blobstore.getText"],
           [art.dataRef.digest],
         );
         if (data === null)
@@ -169,9 +172,9 @@ export class GrimoireWorldDO extends DurableObjectBase {
       !input.path.startsWith("panels/grimoire/assets/generated/")
     )
       throw new Error("Artwork must use the game's asset directory.");
-    const dataRef = await this.rpc.call<{ digest: string; size: number }>(
+    const dataRef = await this.rpc.call(
       "main",
-      "blobstore.putText",
+      mainRpcMethods["blobstore.putText"],
       [input.data],
     );
     if (this.load().pending?.id !== s.pending.id)
@@ -231,7 +234,7 @@ export class GrimoireWorldDO extends DurableObjectBase {
     if (ast.body.length !== 1 || ast.body[0]?.type !== "FunctionDeclaration")
       throw new Error("Write only the enchantment function body.");
     const result = (await runWorldCode(
-      (method, args) => this.rpc.call("main", method, args),
+      createMainRpcCaller(this.rpc),
       `const garden=${JSON.stringify(s.pending!.life.garden)},events=[];const enchant=function(garden,events){\n${input.code}\n};enchant(garden,events);return {garden,events};`,
     )) as { garden: unknown; events: unknown };
     const garden = validateGarden(result.garden);
@@ -285,7 +288,7 @@ export class GrimoireWorldDO extends DurableObjectBase {
     const code = `const garden=${JSON.stringify(s.game.life.garden)},events=[];${rules.map((rule, i) => `(function(garden,state,events){\n${rule.code}\n})(garden,garden.rules[${i}].state,events);`).join("\n")}(${pulseGarden.toString()})(garden,events);return garden;`;
     const garden = validateGarden(
       await runWorldCode(
-        (method, args) => this.rpc.call("main", method, args),
+        createMainRpcCaller(this.rpc),
         code,
       ),
     );
@@ -351,7 +354,7 @@ export class GrimoireWorldDO extends DurableObjectBase {
     };
     this.save(s);
     try {
-      await this.rpc.call(seat.targetId, "receiveMoment", [
+      await this.rpc.call(seat.targetId, grimoireAgentRpcMethods.receiveMoment, [
         {
           channelId: seat.channelId,
           steeringId: "wild:" + this.objectKey + ":" + s.wild.id,
@@ -471,7 +474,7 @@ export class GrimoireWorldDO extends DurableObjectBase {
     if (!seat) return;
     const { id, attempt } = s.pending;
     try {
-      await this.rpc.call(seat.targetId, "receiveMoment", [
+      await this.rpc.call(seat.targetId, grimoireAgentRpcMethods.receiveMoment, [
         {
           channelId: seat.channelId,
           steeringId: `grimoire:${this.objectKey}:${id}:${seat.role}:${attempt}`,

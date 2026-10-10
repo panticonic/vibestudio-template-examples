@@ -22,7 +22,8 @@
     "@workspace/runtime": "workspace:*",
     "@workspace/react": "workspace:*",
     "@workspace/pubsub": "workspace:*",
-    "@workspace-skills/agents": "workspace:*"
+    "@workspace-skills/agents": "workspace:*",
+    "@workspace-workers/adventure-world": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.0.0"

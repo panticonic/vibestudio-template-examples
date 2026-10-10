@@ -1,4 +1,5 @@
 import { workers } from "@workspace/runtime";
+import { regencyRealmRpcMethods } from "@workspace-workers/regency-realm/contract";
 import {
   suite,
   withPanel,
@@ -125,17 +126,8 @@ export const playSuite = suite("regency-play", {
         const gameKey = (await panel.stateArgs.get<{ gameKey: string }>())
           .gameKey;
         const accepted = await workers
-          .durableObjectService("examples.regency.v1", gameKey)
-          .call<{
-            game: {
-              world: {
-                economy: {
-                  routes: Array<{ id: string; subsidy: number }>;
-                  accounts: { services: number };
-                };
-              };
-            };
-          }>("getGame");
+          .durableObjectService("examples.regency.v1", regencyRealmRpcMethods, gameKey)
+          .call("getGame");
         expect(
           accepted.game.world.economy.routes.find(
             (route) => route.id === "east-ferry",

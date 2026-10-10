@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@workspace/testkit": "workspace:*",
-    "@workspace/runtime": "workspace:*"
+    "@workspace/runtime": "workspace:*",
+    "@workspace-workers/regency-realm": "workspace:*"
   }
 }

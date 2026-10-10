@@ -1,13 +1,15 @@
 import type { Artworks } from "@workspace/living-canvas";
 import { contextId, rpc, workers } from "@workspace/runtime";
 import type { Game } from "@workspace/regency-engine";
+import type { RegencyAgentRole } from "@workspace/regency-engine/agentRpc";
+import { regencyRealmRpcMethods } from "@workspace-workers/regency-realm/contract";
 export type View = {
   game: Game;
   painting: boolean;
   artworks: Artworks;
   artError?: string;
   seated: boolean;
-  neededSeats: Array<{ role: string; name: string }>;
+  neededSeats: Array<{ role: RegencyAgentRole; name: string }>;
   pending: {
     id: string;
     wish: string;
@@ -39,7 +41,7 @@ export class StoryClient {
       let pending = this.artRequests.get(key);
       if (!pending) {
         pending = ids.length
-          ? this.service.call<Artworks>("getArt", { ids })
+          ? this.service.call("getArt", { ids })
           : Promise.resolve({});
         this.artRequests.set(key, pending);
       }
@@ -53,14 +55,14 @@ export class StoryClient {
     return { ...view, artworks: this.artworks };
   }
   constructor(readonly key: string) {
-    this.service = workers.durableObjectService("examples.regency.v1", key);
+    this.service = workers.durableObjectService("examples.regency.v1", regencyRealmRpcMethods, key);
   }
   async get() {
-    let view = await this.service.call<View>("getGame");
+    let view = await this.service.call("getGame");
     for (const seat of view.neededSeats)
       await this.seatRole(seat.role, seat.name);
     if (view.neededSeats.length)
-      view = await this.service.call<View>("getGame");
+      view = await this.service.call("getGame");
     return { ...view, artworks: this.artworks };
   }
   advance(id: string, months: number) {
@@ -72,20 +74,20 @@ export class StoryClient {
       .then(() => this.get());
   }
   play(id: string, wish: string) {
-    return this.service.call<View>("play", { id, wish }).then(() => this.get());
+    return this.service.call("play", { id, wish }).then(() => this.get());
   }
   retry() {
-    return this.service.call<View>("retry").then(() => this.get());
+    return this.service.call("retry").then(() => this.get());
   }
   cancel() {
-    return this.service.call<View>("cancel").then(() => this.get());
+    return this.service.call("cancel").then(() => this.get());
   }
   async seat() {
     if (!contextId) throw new Error("This game needs a workspace context.");
-    for (const role of ["storyteller"])
+    for (const role of ["storyteller"] as const)
       await this.seatRole(role, "The scene artist");
   }
-  private async seatRole(role: string, name: string) {
+  private async seatRole(role: RegencyAgentRole, name: string) {
     const [{ addAgentToChannel }, { waitForApprovalResolution }] =
       await Promise.all([
         import("@workspace-skills/agents"),

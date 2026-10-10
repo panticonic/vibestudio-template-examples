@@ -3,6 +3,12 @@ import { describe, it, expect } from "vitest";
 import { createTestDO } from "@workspace/runtime/worker/test-utils";
 import { initialGame } from "@workspace/grimoire-engine";
 import { GrimoireWorldDO } from "./index.js";
+function requirePresent<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error("Expected the operation to produce its declared value");
+  }
+  return value;
+}
 const PLAYER = {
   callerId: "panel:game",
   callerKind: "panel" as const,
@@ -53,8 +59,11 @@ async function boot(fail = false) {
     }
     return undefined;
   };
-  const player = <T = any>(method: string, input?: unknown) =>
-    t.callAs<T>(PLAYER, method, input);
+  const player = <Method extends keyof GrimoireWorldDO & string>(
+    method: Method,
+    input?: unknown,
+  ) =>
+    t.callAs(PLAYER, method, input);
   await player("registerParticipant", {
     targetId: "do:story",
     channelId: "story",
@@ -74,14 +83,14 @@ describe("grimoire durable turns", () => {
       id: "one",
       wish: "Make a crossing",
     });
-    expect(pending.pending.error).toContain("delivery unavailable");
+    expect(requirePresent(pending.pending).error).toContain("delivery unavailable");
     const again = await t.player("play", {
       id: "one",
       wish: "Make a crossing",
     });
-    expect(again.pending.attempt).toBe(0);
+    expect(requirePresent(again.pending).attempt).toBe(0);
     await t.player("retry");
-    expect((await t.player("getGame")).pending.attempt).toBe(1);
+    expect(requirePresent((await t.player("getGame")).pending).attempt).toBe(1);
     await expect(
       t.player("play", { id: "two", wish: "Another" }),
     ).rejects.toThrow(/already/);
@@ -94,7 +103,7 @@ describe("grimoire durable turns", () => {
       turnId: "one",
       text: "Let us find Sol a comfortable place.",
     });
-    expect((await t.player("getGame")).pending.reply).toContain("Sol");
+    expect(requirePresent((await t.player("getGame")).pending).reply).toContain("Sol");
     const input = {
       id: "one",
       result: {
@@ -128,9 +137,9 @@ describe("grimoire durable turns", () => {
       code: "const bank=garden.habitats.find(h=>h.id==='bank');bank.shade=.8;bank.shelter=.9;bank.water=.7;events.push('A leaf roof opens beside the stream.');",
     });
     expect(
-      (await t.player("getGame")).game.life.garden.habitats.find(
-        (h: any) => h.id === "bank",
-      ).shelter,
+      requirePresent((await t.player("getGame")).game.life.garden.habitats.find(
+        (h) => h.id === "bank",
+      )).shelter,
     ).toBe(0.15);
     await t.callAs(AGENT, "finish", {
       id: "care",
@@ -141,22 +150,24 @@ describe("grimoire durable turns", () => {
         suggestions: [],
       },
     });
-    const wild = await t.callAs<any>(
+    const wild = await t.callAs(
       { ...AGENT, callerId: "do:wild" },
       "perspective",
     );
     for (let i = 0; i < 4; i++) await t.player("linger", { id: "moment-" + i });
     const view = await t.player("getGame");
     expect(
-      view.game.life.garden.residents.find((r: any) => r.id === "sol").home,
+      requirePresent(view.game.life.garden.residents.find((r) => r.id === "sol")).home,
     ).toBe("bank");
     expect(view.game.life.garden.discoveries.length).toBeGreaterThan(0);
     const phase = view.game.life.garden.phase;
     await t.player("linger", { id: "moment-3" });
     expect((await t.player("getGame")).game.life.garden.phase).toBe(phase);
+    const wildPending = requirePresent(wild.pending);
+    if (!("id" in wildPending)) throw new Error("Wild perspective has no pending identity");
     expect(
       await t.callAs({ ...AGENT, callerId: "do:wild" }, "stir", {
-        id: wild.pending.id,
+        id: wildPending.id,
         result: { beings: [], mysteries: [], manifestation: "" },
       }),
     ).toEqual({ superseded: true });

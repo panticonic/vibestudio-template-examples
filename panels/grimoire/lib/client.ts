@@ -3,6 +3,7 @@ import { contextId, rpc, workers } from "@workspace/runtime";
 import { addAgentToChannel } from "@workspace-skills/agents";
 import { waitForApprovalResolution } from "@workspace/pubsub";
 import type { Game } from "@workspace/grimoire-engine";
+import { grimoireWorldRpcMethods } from "@workspace-workers/grimoire-world/contract";
 export type View = {
   game: Game;
   garden: Game["life"]["garden"];
@@ -31,7 +32,7 @@ export class StoryClient {
       let pending = this.artRequests.get(key);
       if (!pending) {
         pending = ids.length
-          ? this.service.call<Artworks>("getArt", { ids })
+          ? this.service.call("getArt", { ids })
           : Promise.resolve({});
         this.artRequests.set(key, pending);
       }
@@ -45,11 +46,11 @@ export class StoryClient {
     return { ...view, artworks: this.artworks };
   }
   constructor(readonly key: string) {
-    this.service = workers.durableObjectService("examples.grimoire.v1", key);
+    this.service = workers.durableObjectService("examples.grimoire.v1", grimoireWorldRpcMethods, key);
   }
   async get() {
     return {
-      ...(await this.service.call<View>("getGame")),
+      ...(await this.service.call("getGame")),
       artworks: this.artworks,
     };
   }
@@ -60,17 +61,17 @@ export class StoryClient {
     return this.service.call("visit", { residentId }).then(() => this.get());
   }
   play(id: string, wish: string) {
-    return this.service.call<View>("play", { id, wish }).then(() => this.get());
+    return this.service.call("play", { id, wish }).then(() => this.get());
   }
   retry() {
-    return this.service.call<View>("retry").then(() => this.get());
+    return this.service.call("retry").then(() => this.get());
   }
   cancel() {
-    return this.service.call<View>("cancel").then(() => this.get());
+    return this.service.call("cancel").then(() => this.get());
   }
   async seat() {
     if (!contextId) throw new Error("This game needs a workspace context.");
-    for (const role of ["wild", "moth"]) {
+    for (const role of ["wild", "moth"] as const) {
       const channelId = `grimoire-story-${this.key}-${role}`;
       const seat = await addAgentToChannel({
         source: "workers/grimoire-agents",

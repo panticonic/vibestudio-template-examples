@@ -104,7 +104,8 @@
     "@workspace/pubsub": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@workspace/living-canvas": "workspace:*"
+    "@workspace/living-canvas": "workspace:*",
+    "@workspace-workers/grimoire-world": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^3.2.7",

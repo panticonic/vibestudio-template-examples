@@ -1,5 +1,7 @@
 import type { ImageAsset } from "@workspace/runtime/images";
 import { canonicalJson } from "@vibestudio/shared/canonicalJson";
+import { createMainRpcCaller } from "@vibestudio/service-schemas/mainRpc";
+import { adventureAgentRpcMethods } from "@workspace/adventure-engine/rpc";
 import { DurableObjectBase, rpc } from "@workspace/runtime/worker/kernel";
 import {
   initialWorld,
@@ -134,9 +136,9 @@ export class AdventureWorldDO extends DurableObjectBase {
       throw new Error("Illustration publication lost its canonical receipt");
     const delivery = receipt.delivery;
     if (!delivery) return;
-    const accepted = await this.rpc.call<{ ok: boolean }>(
+    const accepted = await this.rpc.call(
       delivery.targetId,
-      "receiveMoment",
+      adventureAgentRpcMethods.receiveMoment,
       [delivery.request],
     );
     if (accepted?.ok !== true)
@@ -535,7 +537,7 @@ export class AdventureWorldDO extends DurableObjectBase {
         : pending.phase;
     const seat = s.seats.find((seat) => seat.role === role);
     if (seat)
-      await this.rpc.call(seat.targetId, "cancelMoment", [
+      await this.rpc.call(seat.targetId, adventureAgentRpcMethods.cancelMoment, [
         { channelId: seat.channelId, turnId: pending.id },
       ]);
     await this.deliverScene();
@@ -570,7 +572,7 @@ export class AdventureWorldDO extends DurableObjectBase {
     scene.status = "painting";
     this.save(s);
     try {
-      await this.rpc.call(seat.targetId, "receiveMoment", [
+      await this.rpc.call(seat.targetId, adventureAgentRpcMethods.receiveMoment, [
         {
           channelId: seat.channelId,
           turnId: scene.id,
@@ -613,7 +615,7 @@ export class AdventureWorldDO extends DurableObjectBase {
       const seat = s.seats.find((x) => x.role === role);
       if (!seat) continue;
       try {
-        await this.rpc.call(seat.targetId, "receiveMoment", [
+        await this.rpc.call(seat.targetId, adventureAgentRpcMethods.receiveMoment, [
           {
             channelId: seat.channelId,
             turnId: pending.id,
@@ -845,7 +847,7 @@ export class AdventureWorldDO extends DurableObjectBase {
     const revision = s.world.revision;
     try {
       const result = await evaluate(
-        (m, a) => this.rpc.call("main", m, a),
+        createMainRpcCaller(this.rpc),
         s.world,
         seat.role === "player" ? s.world.playerId : seat.role.slice(7),
         code,
@@ -1033,7 +1035,7 @@ export class AdventureWorldDO extends DurableObjectBase {
     const source = engineSource ?? s.engineSource;
     // Maintenance must remain available even if the stored engine or a local behavior is broken.
     const edited = await evaluate(
-      (m, a) => this.rpc.call("main", m, a),
+      createMainRpcCaller(this.rpc),
       s.world,
       s.world.playerId,
       code,
@@ -1048,7 +1050,7 @@ export class AdventureWorldDO extends DurableObjectBase {
         .find((entry: any) => entry.error && entry.turnId === turnId)?.code ??
       "return world.observe();";
     await evaluate(
-      (m, a) => this.rpc.call("main", m, a),
+      createMainRpcCaller(this.rpc),
       world,
       s.pending.failedRole?.startsWith("person:")
         ? s.pending.failedRole.slice(7)

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./rpc": "./src/rpc.ts",
     "./art": "./src/art.ts",
     ".": "./src/index.ts"
   },
@@ -22,6 +23,7 @@
     ]
   },
   "dependencies": {
+    "@vibestudio/shared": "workspace:*",
     "@workspace/living-canvas": "workspace:*",
     "@workspace/test-runtime": "workspace:*"
   }

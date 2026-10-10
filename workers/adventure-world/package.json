@@ -11,6 +11,9 @@
     "@workspace/adventure-engine": "workspace:*",
     "@vibestudio/shared": "workspace:*"
   },
+  "exports": {
+    "./contract": "./contract.ts"
+  },
   "devDependencies": {
     "vitest": "^3.2.7",
     "@workspace/adventure-campaigns": "workspace:*"

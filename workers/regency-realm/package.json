@@ -8,7 +8,11 @@
     "@workspace/runtime": "workspace:*",
     "@workspace/regency-engine": "workspace:*",
     "@vibestudio/service-schemas": "workspace:*",
+    "@vibestudio/shared": "workspace:*",
     "acorn": "^8.18.0"
+  },
+  "exports": {
+    "./contract": "./contract.ts"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

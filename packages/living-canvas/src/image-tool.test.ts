@@ -24,15 +24,23 @@ function fixture(command = "native:owner-one:invocation-one") {
       ],
     })),
   };
-  const call = vi.fn(async (method: string, _input?: unknown) =>
-    method === "artCatalog"
-      ? { portrait: { path: "panels/story/assets/portrait.png" } }
-      : { ok: true },
-  );
+  const art = {
+    artCatalog: vi.fn(async () => ({
+      portrait: { path: "panels/story/assets/portrait.png" },
+    })),
+    storeArt: vi.fn(
+      async (_input: {
+        id: string;
+        path: string;
+        data: string;
+        mimeType: string;
+      }) => ({ ok: true }),
+    ),
+  };
   return {
     native,
-    call,
-    tool: imageTool(native, call, "story", () => command),
+    art,
+    tool: imageTool(native, art, "story", () => command),
   };
 }
 describe("native story image tool", () => {
@@ -40,9 +48,7 @@ describe("native story image tool", () => {
     const f = fixture();
     const original = new Error("Store accepted but reply lost");
     let lost = true;
-    f.call.mockImplementation(async (method) => {
-      if (method === "artCatalog")
-        return { portrait: { path: "panels/story/assets/portrait.png" } };
+    f.art.storeArt.mockImplementation(async () => {
       if (lost) {
         lost = false;
         throw original;
@@ -66,8 +72,8 @@ describe("native story image tool", () => {
       ),
       createOnly: true,
     });
-    const writes = f.call.mock.calls.filter((call) => call[0] === "storeArt");
-    expect(writes[0]![1]).toEqual(writes[1]![1]);
+    const writes = f.art.storeArt.mock.calls;
+    expect(writes[0]![0]).toEqual(writes[1]![0]);
     expect(result.details).toMatchObject({
       path: outputPath(executions[0]![0]),
     });
@@ -101,9 +107,7 @@ describe("native story image tool", () => {
     expect(
       await executeTool(f.tool, { name: "garden", prompt: "A garden" }),
     ).toMatchObject(failed);
-    expect(f.call.mock.calls.some((call) => call[0] === "storeArt")).toBe(
-      false,
-    );
+    expect(f.art.storeArt).not.toHaveBeenCalled();
   });
   it("propagates the actual caller cancellation before any domain or provider dispatch", async () => {
     const f = fixture();
@@ -117,7 +121,8 @@ describe("native story image tool", () => {
         { signal: controller.signal },
       ),
     ).rejects.toBe(original);
-    expect(f.call).not.toHaveBeenCalled();
+    expect(f.art.artCatalog).not.toHaveBeenCalled();
+    expect(f.art.storeArt).not.toHaveBeenCalled();
     expect(f.native.execute).not.toHaveBeenCalled();
   });
 });

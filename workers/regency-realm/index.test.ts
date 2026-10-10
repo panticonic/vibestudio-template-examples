@@ -3,6 +3,12 @@ import { describe, it, expect } from "vitest";
 import { createTestDO } from "@workspace/runtime/worker/test-utils";
 import { initialGame } from "@workspace/regency-engine";
 import { RegencyGameDO } from "./index.js";
+function requirePresent<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error("Expected the operation to produce its declared value");
+  }
+  return value;
+}
 const PLAYER = {
   callerId: "panel:game",
   callerKind: "panel" as const,
@@ -53,8 +59,11 @@ async function boot(fail = false) {
     }
     return undefined;
   };
-  const player = <T = any>(method: string, input?: unknown) =>
-    t.callAs<T>(PLAYER, method, input);
+  const player = <Method extends keyof RegencyGameDO & string>(
+    method: Method,
+    input?: unknown,
+  ) =>
+    t.callAs(PLAYER, method, input);
   await player("registerParticipant", {
     targetId: "do:story",
     channelId: "story",
@@ -81,8 +90,8 @@ describe("regency durable turns", () => {
       processes:[{id:"mill-work",title:"Water-powered milling",state:{turns:0},code:"const m=realm.systems.mill;if(phase==='interact'){if(event.action!=='open')throw new Error('Unknown action');if(realm.location!=='mill')throw new Error('You must reach the sluice');m.open=true;state.turns++;events.push('The sluice opened.');}if(phase==='tick'&&m.open){const work=Math.min(m.water,3);m.water-=work;m.flour+=work;}"}],
     });
     let view = await t.player("getGame");
-    expect(view.pending.world.systems.mill).toEqual({water:12,flour:0,open:false});
-    expect(view.pending.development).toBeUndefined();
+    expect(requirePresent(requirePresent(view.pending).world).systems["mill"]).toEqual({water:12,flour:0,open:false});
+    expect(requirePresent(view.pending).development).toBeUndefined();
     const action={turnId:"mill",actionId:"open-sluice",processId:"mill-work",action:"open",payload:{}};
     await expect(t.callAs(mara,"interactWorld",action)).rejects.toThrow(/reach/);
     await t.callAs(mara,"visitPlace",{turnId:"mill",placeId:"mill"});
@@ -91,11 +100,11 @@ describe("regency durable turns", () => {
     await expect(t.callAs(mara,"interactWorld",{...action,action:"close"})).rejects.toThrow(/different intention/);
     await t.player("cancel");
     view=await t.player("getGame");
-    expect(view.game.world.systems.mill.open).toBe(true);
-    expect(view.game.world.processes[0].state.turns).toBe(1);
+    expect(view.game.world.systems["mill"]).toEqual({water:12,flour:0,open:true});
+    expect(requirePresent(view.game.world.processes[0]).state).toEqual({turns:1});
     await t.player("advance",{id:"mill-month",months:1});
     view=await t.player("getGame");
-    expect(view.game.world.systems.mill).toEqual({water:9,flour:3,open:true});
+    expect(view.game.world.systems["mill"]).toEqual({water:9,flour:3,open:true});
   });
   it("revises a mechanism prospectively without resetting its state or changing settled facts", async () => {
     const t=await boot(), mara={...AGENT,callerId:"do:mara"}, builder={...AGENT,callerId:"do:builder"};
@@ -106,9 +115,10 @@ describe("regency durable turns", () => {
     await t.callAs(mara,"requestDevelopment",{turnId:"develop",request:"Refine the institution's meeting schedule."});
     await t.callAs(builder,"developWorld",{turnId:"develop",revisions:[{id:"water-board",code:"if(phase==='tick'&&realm.month%2===0)state.meetings++;",reason:"Meetings occur every second month."}]});
     const view=await t.player("getGame");
-    expect(view.pending.world.month).toBe(0);
-    expect(view.pending.world.processes[0].state.meetings).toBe(7);
-    expect(view.pending.world.ledger).toEqual(initialGame().world.ledger);
+    const pendingWorld = requirePresent(requirePresent(view.pending).world);
+    expect(pendingWorld.month).toBe(0);
+    expect(requirePresent(pendingWorld.processes[0]).state).toEqual({meetings:7});
+    expect(pendingWorld.ledger).toEqual(initialGame().world.ledger);
   });
   it("persists delivery failure and retries without adding another player turn", async () => {
     const t = await boot(true);
@@ -116,14 +126,14 @@ describe("regency durable turns", () => {
       id: "one",
       wish: "Make a crossing",
     });
-    expect(pending.pending.error).toContain("delivery unavailable");
+    expect(requirePresent(pending.pending).error).toContain("delivery unavailable");
     const again = await t.player("play", {
       id: "one",
       wish: "Make a crossing",
     });
-    expect(again.pending.attempt).toBe(0);
+    expect(requirePresent(again.pending).attempt).toBe(0);
     await t.player("retry");
-    expect((await t.player("getGame")).pending.attempt).toBe(1);
+    expect(requirePresent((await t.player("getGame")).pending).attempt).toBe(1);
     await expect(
       t.player("play", { id: "two", wish: "Another" }),
     ).rejects.toThrow(/already/);
@@ -173,10 +183,10 @@ describe("regency durable turns", () => {
   it("gives each advisor only their own private perspective and a seat in the current conversation", async () => {
     const t = await boot();
     const mara = { ...AGENT, callerId: "do:mara" };
-    const perspective = await t.callAs<any>(mara, "perspective");
-    expect(perspective.you.desire).toEqual(initialGame().people[0]!.desire);
+    const perspective = await t.callAs(mara, "perspective");
+    expect(requirePresent(perspective.you).desire).toEqual(initialGame().people[0]!.desire);
     expect(
-      perspective.others.every(
+      requirePresent(perspective.others).every(
         (person: any) => !("desire" in person) && !("memory" in person),
       ),
     ).toBe(true);
@@ -196,7 +206,7 @@ describe("regency durable turns", () => {
     await t.player("advance", { id: "month", months: 1 });
     const view = await t.player("getGame");
     expect(view.game.world.month).toBe(before.month + 1);
-    expect(view.pending.simulation).toBeTruthy();
+    expect(requirePresent(view.pending).simulation).toBeTruthy();
     await t.player("advance", { id: "month", months: 1 });
     expect((await t.player("getGame")).game.world.month).toBe(before.month + 1);
     await t.player("cancel");

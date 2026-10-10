@@ -17,10 +17,17 @@ import type {
   ImageAsset,
   ImageGenerationRequest,
 } from "@workspace/runtime/images";
+import type { adventureWorldRpcMethods } from "@workspace-workers/adventure-world/contract";
+import type { RpcMethodArgs, RpcMethodResult } from "@vibestudio/shared/rpcMethods";
 
+type AdventureWorldMethod = keyof typeof adventureWorldRpcMethods & string;
+type AdventureWorldCall = <K extends AdventureWorldMethod>(
+  method: K,
+  ...args: RpcMethodArgs<typeof adventureWorldRpcMethods[K]>
+) => Promise<RpcMethodResult<typeof adventureWorldRpcMethods[K]>>;
 interface Binding {
   operationId: string;
-  call: <T = unknown>(method: string, input?: unknown) => Promise<T>;
+  call: AdventureWorldCall;
   images: ImagesClient;
 }
 type SceneReference = {
@@ -33,16 +40,13 @@ type SceneReference = {
   jobId?: string;
 };
 type OriginalScene = {
+  role: "artist";
   pending: { id: string; phase: string } | null;
-  view: { location: { id: string } };
+  view?: { location: { id: string } };
   artDirection: string;
   imageJob?: { id: string };
   artwork: Record<string, ImageAsset>;
   references: SceneReference[];
-};
-type IllustrationReceipt = {
-  input: { asset?: ImageAsset; key?: string; error?: string };
-  result: { ok: true };
 };
 type OwnedImages = {
   original: JsonValue | null;
@@ -168,7 +172,7 @@ export function adventureSceneTool(
     key?: string,
   ) {
     const bound = requireBinding();
-    return bound.call<IllustrationReceipt | null>("illustrationPublication", {
+    return bound.call("illustrationPublication", {
       operationId: bound.operationId,
       turnId,
       purpose,
@@ -202,17 +206,12 @@ export function adventureSceneTool(
         };
     }, context);
   }
-  async function worldCall<T = unknown>(
-    method: string,
-    input?: Record<string, unknown>,
-  ): Promise<T> {
+  async function worldCall<K extends AdventureWorldMethod>(
+    method: K,
+    ...args: RpcMethodArgs<typeof adventureWorldRpcMethods[K]>
+  ): Promise<RpcMethodResult<typeof adventureWorldRpcMethods[K]>> {
     const bound = requireBinding();
-    return bound.call<T>(
-      method,
-      method === "publishArtwork" || method === "publishReference"
-        ? { ...input, operationId: input?.["operationId"] ?? bound.operationId }
-        : input,
-    );
+    return bound.call(method, ...args);
   }
   async function execute(
     p: { turnId: string; prompt: string },
@@ -223,12 +222,14 @@ export function adventureSceneTool(
     context.abortSignal?.throwIfAborted();
     let original: OriginalScene;
     if (api.continuation === undefined) {
-      original = await bound.call<OriginalScene>("perspective");
+      const perspective = await bound.call("perspective");
       if (
-        original.pending?.id !== p.turnId ||
-        original.pending.phase !== "artist"
+        perspective.role !== "artist" ||
+        perspective.pending?.id !== p.turnId ||
+        perspective.pending.phase !== "artist"
       )
         throw new Error("No scene is awaiting you");
+      original = perspective;
       await api.retainContinuation(
         {
           kind: "examples.adventure-scene",
@@ -276,10 +277,12 @@ export function adventureSceneTool(
       original = (await owned(api, context))
         .original as unknown as OriginalScene;
     }
+    if (!original.view) throw new Error("The scene snapshot is unavailable");
     const previous = await receipt(p.turnId, "artwork");
     if (previous?.input?.asset) {
       // Acceptance protects the asset; the same original publication also owns any successor delivery debt.
       await worldCall("publishArtwork", {
+        operationId: bound.operationId,
         turnId: p.turnId,
         asset: previous.input.asset,
       });
@@ -400,7 +403,7 @@ export function adventureSceneTool(
         bound.images.wait(id, { signal: context.abortSignal }),
     };
     const state = original,
-      placeId = state.view.location.id;
+      placeId = original.view.location.id;
     try {
       let job;
       if (state.imageJob) {
@@ -462,6 +465,7 @@ export function adventureSceneTool(
               ref.key,
             );
             await worldCall("publishReference", {
+              operationId: bound.operationId,
               turnId: p.turnId,
               key: ref.key,
               asset: done.asset,
@@ -514,6 +518,7 @@ export function adventureSceneTool(
         null,
       );
       await worldCall("publishArtwork", {
+        operationId: bound.operationId,
         turnId: p.turnId,
         asset: done.asset,
       });
@@ -629,9 +634,11 @@ export function adventureSceneTool(
           const original = assets.original as unknown as OriginalScene;
           if (item.purpose === "artwork") {
             await worldCall("publishArtwork", {
+              operationId: bound.operationId,
               turnId: p.turnId,
               asset: published.input.asset,
             });
+            if (!original.view) throw new Error("The scene snapshot is unavailable");
             const placeId = original.view.location.id;
             await prepareAcceptedCleanup(
               api,

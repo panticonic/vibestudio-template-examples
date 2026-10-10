@@ -16,7 +16,15 @@ const schema = Type.Object(
 /** The caller binds the world and invocation once; retries retain the same artifact identity. */
 export function imageTool(
   native: ToolRegistration,
-  call: (method: string, input?: unknown) => Promise<any>,
+  art: {
+    artCatalog(): Promise<Record<string, { path: string }>>;
+    storeArt(input: {
+      id: string;
+      path: string;
+      data: string;
+      mimeType: string;
+    }): Promise<unknown>;
+  },
   game: string,
   commandId: () => string,
 ): ToolRegistration<typeof schema> {
@@ -34,7 +42,7 @@ export function imageTool(
         throw new Error(
           "Artwork requires its actual native invocation identity",
         );
-      const catalog = await call("artCatalog");
+      const catalog = await art.artCatalog();
       const refs = (raw.references ?? []).map((id) => {
         if (!catalog[id]) throw new Error("Unknown reference image.");
         return catalog[id].path;
@@ -69,7 +77,7 @@ export function imageTool(
       const image = result.content?.find((part) => part.type === "image");
       if (!image || image.type !== "image")
         throw new Error("Image generation did not return an image.");
-      await call("storeArt", {
+      await art.storeArt({
         id,
         path,
         data: image.data,

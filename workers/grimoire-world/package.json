@@ -8,7 +8,11 @@
     "@workspace/runtime": "workspace:*",
     "@workspace/grimoire-engine": "workspace:*",
     "acorn": "^8.14.0",
-    "@workspace/living-canvas": "workspace:*"
+    "@workspace/living-canvas": "workspace:*",
+    "@vibestudio/shared": "workspace:*"
+  },
+  "exports": {
+    "./contract": "./contract.ts"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

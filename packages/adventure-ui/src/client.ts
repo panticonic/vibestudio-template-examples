@@ -1,6 +1,7 @@
 import { contextId, images, rpc, workers } from "@workspace/runtime";
-import { initialWorld, type Campaign, type ServiceView } from "@workspace/adventure-engine";
+import { initialWorld, type AdventureRole, type Campaign, type ServiceView } from "@workspace/adventure-engine";
 import { illustrationReferences, sceneSnapshot, type BundledArtwork } from "@workspace/adventure-engine/art";
+import { adventureWorldRpcMethods } from "@workspace-workers/adventure-world/contract";
 
 /** One campaign has one durable world; all participating panels see the same story. */
 export class AdventureClient {
@@ -15,7 +16,7 @@ export class AdventureClient {
     readonly cover?: string,
     readonly artwork?: BundledArtwork
   ) {
-    this.service = workers.durableObjectService("examples.adventure.v1", key);
+    this.service = workers.durableObjectService("examples.adventure.v1", adventureWorldRpcMethods, key);
   }
 
   private initialize() {
@@ -88,7 +89,7 @@ export class AdventureClient {
 
   async get(): Promise<ServiceView> {
     await this.initialize();
-    return this.service.call<ServiceView>("getGame");
+    return this.service.call("getGame");
   }
 
   /** The caller publishes the useful world view before starting optional preparation. */
@@ -117,7 +118,7 @@ export class AdventureClient {
     return this.get();
   }
 
-  private seat(role: string, name: string) {
+  private seat(role: AdventureRole, name: string) {
     const existing = this.seats.get(role);
     if (existing) return existing;
     const creation = this.seatRole(role, name);
@@ -129,7 +130,7 @@ export class AdventureClient {
     return creation;
   }
 
-  private async seatRole(role: string, name: string) {
+  private async seatRole(role: AdventureRole, name: string) {
     if (!contextId) throw new Error("This adventure needs an open workspace.");
     const [{ addAgentToChannel }, { waitForApprovalResolution }] = await Promise.all([
       import("@workspace-skills/agents"),
