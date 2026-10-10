@@ -1,5 +1,13 @@
-import { createEvalExecutor, type EvalCall } from "@vibestudio/service-schemas/eval";
-import { createWorldAPI, validateWorld, type World } from "@workspace/adventure-engine";
+import {
+  createEvalExecutor,
+  type EvalCall,
+} from "@vibestudio/service-schemas/eval";
+import { deserializeRpcFailure, formatRpcFailure } from "@vibestudio/rpc";
+import {
+  createWorldAPI,
+  validateWorld,
+  type World,
+} from "@workspace/adventure-engine";
 import { parse } from "acorn";
 export class AgentProgramError extends Error {
   override name = "AgentProgramError";
@@ -13,20 +21,28 @@ export function simulationSource(
   actorId: string,
   code: string,
   engineSource = defaultEngineSource,
-  privileged = false
+  privileged = false,
 ) {
   try {
-    const actionAst = parse(`async function action(world){${code}\n}`, { ecmaVersion: 2022 });
-    if (actionAst.body.length !== 1 || actionAst.body[0]?.type !== "FunctionDeclaration")
+    const actionAst = parse(`async function action(world){${code}\n}`, {
+      ecmaVersion: 2022,
+    });
+    if (
+      actionAst.body.length !== 1 ||
+      actionAst.body[0]?.type !== "FunctionDeclaration"
+    )
       throw new Error("Supply only an action function body");
   } catch (error) {
     throw new AgentProgramError(String(error));
   }
   const hooks = (privileged ? [] : world.behaviors)
     .map((b) => {
-      const ast = parse(`function behavior(world,state,event,self){${b.code}\n}`, {
-        ecmaVersion: 2022,
-      });
+      const ast = parse(
+        `function behavior(world,state,event,self){${b.code}\n}`,
+        {
+          ecmaVersion: 2022,
+        },
+      );
       if (ast.body.length !== 1 || ast.body[0]?.type !== "FunctionDeclaration")
         throw new Error("Supply only a behavior function body");
       return `${JSON.stringify(b.id)}:function(world,state,event,self){${b.code}\n}`;
@@ -62,7 +78,7 @@ export async function evaluate(
   actorId: string,
   code: string,
   engineSource: string,
-  privileged = false
+  privileged = false,
 ) {
   const execute = createEvalExecutor(call),
     key = "adventure-" + crypto.randomUUID();
@@ -71,12 +87,23 @@ export async function evaluate(
       runId: crypto.randomUUID(),
       scope: { key, lifecycle: "finite" },
       source: { kind: "inline", syntax: "javascript", code },
-      authority: { requests: [], effects: "read-only", approvals: "pregranted-only" },
+      authority: {
+        requests: [],
+        effects: "read-only",
+        approvals: "pregranted-only",
+      },
       timeoutMs: 3000,
     });
   try {
-    const result = await run(simulationSource(world, actorId, code, engineSource, privileged));
-    if (!result.success) throw new Error(String(result.error));
+    const result = await run(
+      simulationSource(world, actorId, code, engineSource, privileged),
+    );
+    if (!result.success)
+      throw new Error(
+        result.error
+          ? formatRpcFailure(deserializeRpcFailure(result.error))
+          : "Eval failed",
+      );
     const length = result.returnValue;
     if (typeof length !== "number" || length > 1000000)
       throw new Error("Invalid simulation result");
@@ -89,8 +116,10 @@ export async function evaluate(
     }
     const parsed = JSON.parse(output);
     if (parsed.failure) {
-      if (parsed.failure.kind === "program") throw new AgentProgramError(parsed.failure.message);
-      if (parsed.failure.kind === "action") throw new WorldActionRefusal(parsed.failure.message);
+      if (parsed.failure.kind === "program")
+        throw new AgentProgramError(parsed.failure.message);
+      if (parsed.failure.kind === "action")
+        throw new WorldActionRefusal(parsed.failure.message);
       throw new Error(parsed.failure.message);
     }
     validateWorld(parsed.world);

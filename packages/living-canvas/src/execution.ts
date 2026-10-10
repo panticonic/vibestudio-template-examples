@@ -2,6 +2,7 @@ import {
   createEvalExecutor,
   type EvalCall,
 } from "@vibestudio/service-schemas/eval";
+import { deserializeRpcFailure, formatRpcFailure } from "@vibestudio/rpc";
 /** One finite, capability-free execution. Durable state is committed by the world owner after validation. */
 export async function runWorldCode(
   call: EvalCall,
@@ -25,7 +26,12 @@ export async function runWorldCode(
     const result = await run(
       `scope.result=JSON.stringify(await (async()=>{${source}\n})());return scope.result.length;`,
     );
-    if (!result.success) throw new Error(String(result.error));
+    if (!result.success)
+      throw new Error(
+        result.error
+          ? formatRpcFailure(deserializeRpcFailure(result.error))
+          : "Eval failed",
+      );
     const length = result.returnValue;
     if (typeof length !== "number" || length > 300000)
       throw new Error("The world change is too large.");
