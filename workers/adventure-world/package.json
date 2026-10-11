@@ -9,7 +9,8 @@
     "@vibestudio/service-schemas": "workspace:*",
     "acorn": "^8.18.0",
     "@workspace/adventure-engine": "workspace:*",
-    "@vibestudio/shared": "workspace:*"
+    "@vibestudio/shared": "workspace:*",
+    "@vibestudio/rpc": "workspace:*"
   },
   "exports": {
     "./contract": "./contract.ts"

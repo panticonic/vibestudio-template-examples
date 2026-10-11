@@ -9,7 +9,9 @@
     "@workspace/regency-engine": "workspace:*",
     "@vibestudio/service-schemas": "workspace:*",
     "@vibestudio/shared": "workspace:*",
-    "acorn": "^8.18.0"
+    "acorn": "^8.18.0",
+    "@workspace/living-canvas": "workspace:*",
+    "@vibestudio/rpc": "workspace:*"
   },
   "exports": {
     "./contract": "./contract.ts"

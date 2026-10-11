@@ -9,7 +9,8 @@
     "@workspace/grimoire-engine": "workspace:*",
     "acorn": "^8.14.0",
     "@workspace/living-canvas": "workspace:*",
-    "@vibestudio/shared": "workspace:*"
+    "@vibestudio/shared": "workspace:*",
+    "@vibestudio/service-schemas": "workspace:*"
   },
   "exports": {
     "./contract": "./contract.ts"
