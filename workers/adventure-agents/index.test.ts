@@ -92,7 +92,8 @@ async function executeOwnedTool(
     if (task.state.outcome.status !== "completed")
       throw new Error("Native game tool did not complete");
     const outcome = task.state.outcome.result;
-    if (!outcome) throw new Error("Native game tool lost its terminal result");
+    if (!outcome || outcome.kind !== "direct")
+      throw new Error("Native game tool lost its direct terminal result");
     const entry = (
       await conversation.entries({}, 100, undefined, BACKGROUND_CONTEXT)
     ).items.find((entry) => entry.id === outcome.entryId);

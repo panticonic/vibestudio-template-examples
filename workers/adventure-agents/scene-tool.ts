@@ -297,7 +297,7 @@ export function adventureSceneTool(
       );
       await cleanup(api, context, p.turnId);
       return {
-        content: [
+        output: [
           {
             type: "text" as const,
             text: JSON.stringify({ asset: previous.input.asset }),
@@ -527,7 +527,7 @@ export function adventureSceneTool(
         await images.release({ assetId: previousAsset.id, owner });
       await images.forgetJob(done.id);
       return {
-        content: [
+        output: [
           {
             type: "text" as const,
             text: JSON.stringify({ asset: done.asset }),
@@ -580,7 +580,7 @@ export function adventureSceneTool(
   ) {
     if (api.continuation === undefined)
       return {
-        content: [
+        output: [
           {
             type: "text" as const,
             text: "Scene cancelled before resource admission.",
@@ -676,7 +676,7 @@ export function adventureSceneTool(
       "Scene cancellation failed to join owned resources",
     );
     return {
-      content: [
+      output: [
         {
           type: "text" as const,
           text: "Owned scene generation cancelled and joined.",

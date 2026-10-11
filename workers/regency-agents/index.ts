@@ -83,7 +83,7 @@ export class RegencyAgentWorker extends AiChatWorker implements RegencyAgentRece
         execute: async (params) => {
           const result = await run(params);
           return {
-            content: [{ type: "text" as const, text: JSON.stringify(result) }],
+            output: [{ type: "text" as const, text: JSON.stringify(result) }],
             details: copyJson(result, {
               omitUndefinedProperties: true,
             }) as JsonValue,
@@ -117,7 +117,7 @@ export class RegencyAgentWorker extends AiChatWorker implements RegencyAgentRece
                 DevelopmentSchema.parse(params),
               );
               return {
-                content: [
+                output: [
                   { type: "text" as const, text: JSON.stringify(result) },
                 ],
                 details: copyJson(result, {

@@ -87,7 +87,7 @@ export class AdventureAgentWorker extends AiChatWorker implements AdventureAgent
         execute: async (p) => {
           const result = await run(p);
           return {
-            content: [{ type: "text", text: JSON.stringify(result) }],
+            output: [{ type: "text", text: JSON.stringify(result) }],
             details: copyJson(result, {
               omitUndefinedProperties: true,
             }) as JsonValue,

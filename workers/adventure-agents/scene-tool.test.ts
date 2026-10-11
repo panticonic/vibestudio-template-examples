@@ -9,9 +9,7 @@ import {
   createRegistry,
   defineExtension,
   MemoryStorage,
-  StorageRejected,
   type Storage,
-  type StorageWrite,
 } from "@panticonic/pi-durable";
 import { openNodeSqliteStorage } from "@panticonic/pi-durable/storage/sqlite/node";
 import type {
@@ -48,27 +46,6 @@ const asset = (id: string): ImageAsset => ({
   byteLength: 1,
   provenance: { provider: "test", imageModel: "test", createdAt: 1 },
 });
-class RejectingStorage extends MemoryStorage {
-  rejectRecipe = false;
-  readonly original = new StorageRejected("Image recipe transaction rejected");
-  override async commit(
-    writes: readonly StorageWrite[],
-    ctx: Parameters<Storage["commit"]>[1],
-  ) {
-    if (
-      this.rejectRecipe &&
-      writes.some(
-        (w) =>
-          w.type === "document.create" &&
-          w.record.kind === "examples.adventure-owned-images",
-      )
-    ) {
-      this.rejectRecipe = false;
-      throw this.original;
-    }
-    return super.commit(writes, ctx);
-  }
-}
 function dependencies(
   options: {
     references?: any[];
@@ -369,15 +346,36 @@ describe("native scene image ownership", () => {
     expect(d.forgets).toEqual([...d.jobs.keys()]);
   });
   it("cannot dispatch an image when storage rejects its retained recipe", async () => {
-    const d = dependencies(),
-      storage = new RejectingStorage();
-    storage.rejectRecipe = true;
-    const f = await fixture(d, storage);
-    const terminal = await f.harness.waitForTask(f.taskId, context);
-    expect(terminal.state.outcome).toMatchObject({
-      status: "failed",
-      error: { message: storage.original.message },
+    const directory = await mkdtemp(join(tmpdir(), "vibestudio-scene-rollback-"));
+    directories.push(directory);
+    const filename = join(directory, "scene.sqlite");
+    const original = new Error("Image recipe transaction rejected");
+    let rejectRecipe = true;
+    const backend = await openNodeSqliteStorage(filename);
+    const storage = new Proxy(backend, {
+      get(target, key) {
+        if (key === "commit") return async (...args: Parameters<Storage["commit"]>) => {
+          if (rejectRecipe && args[0].some((write) => write.type === "document.create" && write.record.kind === "examples.adventure-owned-images")) {
+            rejectRecipe = false;
+            throw original;
+          }
+          return target.commit(...args);
+        };
+        const value = Reflect.get(target, key);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
     });
+    const d = dependencies();
+    const f = await fixture(d, storage);
+    await expect(f.harness.waitForTask(f.taskId, context)).rejects.toMatchObject({ cause: original });
+    expect(await f.harness.closed).toEqual({ reason: "failed", error: original });
+    await f.harness.close(context);
+    const recovered = await Harness.open(await openNodeSqliteStorage(filename), f.options, context);
+    sessions.push(recovered);
+    const task = await recovered.getTask(f.taskId, context);
+    expect(task?.state.status).not.toBe("terminal");
+    await recovered.abortTask(f.taskId, context);
+    await recovered.waitForTask(f.taskId, context);
     expect(d.images.generate).not.toHaveBeenCalled();
   });
   it("reopens actual SQLite ownership and cancels the same uncertain provider admission after losing the heap", async () => {

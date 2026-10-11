@@ -72,7 +72,7 @@ export class GrimoireAgentWorker extends AiChatWorker implements GrimoireAgentRe
         execute: async (params) => {
           const result = await run(params);
           return {
-            content: [{ type: "text" as const, text: JSON.stringify(result) }],
+            output: [{ type: "text" as const, text: JSON.stringify(result) }],
             details: copyJson(result, {
               omitUndefinedProperties: true,
             }) as JsonValue,

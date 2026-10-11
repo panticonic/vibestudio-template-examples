@@ -19,7 +19,7 @@ function fixture(command = "native:owner-one:invocation-one") {
     description: "Actual native imagegen port",
     parameters: Type.Any(),
     execute: vi.fn(async () => ({
-      content: [
+      output: [
         { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" },
       ],
     })),
@@ -99,7 +99,7 @@ describe("native story image tool", () => {
     const f = fixture();
     const failed = {
       isError: true,
-      content: [
+      output: [
         { type: "text" as const, text: "Provider declined the request" },
       ],
     };

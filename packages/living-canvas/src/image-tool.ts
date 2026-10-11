@@ -74,7 +74,7 @@ export function imageTool(
         context,
       );
       if ("wait" in result || result.isError) return result;
-      const image = result.content?.find((part) => part.type === "image");
+      const image = result.output?.find((part) => part.type === "image");
       if (!image || image.type !== "image")
         throw new Error("Image generation did not return an image.");
       await art.storeArt({
@@ -84,7 +84,7 @@ export function imageTool(
         mimeType: image.mimeType,
       });
       return {
-        content: [
+        output: [
           {
             type: "text",
             text: `Saved artwork ${id}. Include it in scene.assets and draw with art.image(${JSON.stringify(id)},x,y,width,height).`,
