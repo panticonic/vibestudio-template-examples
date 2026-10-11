@@ -96,6 +96,7 @@ function dependencies(
   const call = vi.fn(async (method: string, input?: any) => {
     if (method === "perspective")
       return {
+        role: "artist",
         pending: { id: "turn:one", phase: "artist" },
         view: { location: { id: "square" }, entities: [] },
         artDirection: "Oil painting",
