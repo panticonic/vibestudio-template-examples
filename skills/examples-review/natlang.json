@@ -2,5 +2,9 @@
   "schema": "natlang.package/v2",
   "name": "vibestudio-examples-review",
   "version": "0.1.0",
+  "serviceBinding": "explicit",
+  "serviceScopes": {
+    "gardenRead": ["reviewExample/inspectLiveGarden/readGarden.nl"]
+  },
   "targets": { "main": { "entry": "reviewExample.nl" } }
 }

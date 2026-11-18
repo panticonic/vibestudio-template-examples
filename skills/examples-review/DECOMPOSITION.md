@@ -20,3 +20,10 @@ settled, and what an illustration or forecast purports to depict.
 The task bank starts from original Examples assets and deterministic public
 engine operations. The Natlang program receives detached readbacks. Host code
 and template services retain control of durable state and gameplay.
+
+The live Grimoire branch gets its evidence through one caller-bound read leaf. It
+builds each garden comparison using the unchanged observations, calls the existing
+habitat or transition reviewer, and combines every finding in claim order. The
+managed harness owns the actual panel and its unique garden, visits selected
+residents through the UI, reads the installed garden service before and after,
+and runs the independent reference against those receipts.

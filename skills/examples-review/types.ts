@@ -148,3 +148,17 @@ export type ExampleFinding = {
   evidenceIds: string[];
 };
 export type ExampleReview = ExampleFinding & { components?: ExampleFinding[] };
+
+export type LiveGardenClaim =
+  | { kind: "habitat"; check: HabitatCheck }
+  | { kind: "transition"; check: GardenChangeCheck };
+export type LiveGardenRequest = {
+  kind: "live-garden";
+  goal: string;
+  claims: LiveGardenClaim[];
+};
+export type ExampleWorkflowRequest = ExampleReviewRequest | LiveGardenRequest;
+export type GardenObservations = {
+  before: GardenReadback;
+  current: GardenReadback;
+};

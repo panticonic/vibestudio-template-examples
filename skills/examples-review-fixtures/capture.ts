@@ -1,3 +1,4 @@
+import { gardenReadback } from "./garden-readback.js";
 import { createHash } from "node:crypto";
 import { runInNewContext } from "node:vm";
 import {
@@ -17,7 +18,6 @@ import {
   initialGarden,
   pulseGarden,
   visitResident,
-  type Garden,
 } from "@workspace/grimoire-engine";
 import {
   initialGame,
@@ -27,7 +27,6 @@ import {
 import type {
   AdventureObject,
   AdventureView,
-  GardenReadback,
   RealmReadback,
 } from "../examples-review/types.js";
 
@@ -137,42 +136,6 @@ function adventureSnapshots() {
     engine,
     conservatory,
     cupCarried,
-  };
-}
-
-function gardenReadback(id: string, garden: Garden): GardenReadback {
-  return {
-    id,
-    day: garden.day,
-    phase: garden.phase,
-    weather: garden.weather,
-    homes: garden.habitats.map(
-      ({ id, water, shade, bloom, shelter, traits }) => ({
-        id,
-        values: Object.entries({
-          ...traits,
-          water,
-          shade,
-          bloom,
-          shelter,
-        }).flatMap(([key, amount]) =>
-          typeof amount === "number" ? [{ key, amount }] : [],
-        ),
-      }),
-    ),
-    residents: garden.residents.map(
-      ({ id, name, home, needs, energy, attachment, settled, lastVisit }) => ({
-        id,
-        name,
-        home,
-        needs: Object.entries(needs).map(([key, amount]) => ({ key, amount })),
-        energy,
-        attachment,
-        settled,
-        lastVisit,
-      }),
-    ),
-    discoveries: garden.discoveries.map(({ id, title }) => ({ id, title })),
   };
 }
 
