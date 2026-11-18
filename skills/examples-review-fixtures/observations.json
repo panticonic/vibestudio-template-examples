@@ -1,0 +1,3130 @@
+{
+  "adventure": {
+    "landing": {
+      "id": "post-landing",
+      "place": "landing",
+      "tick": 0,
+      "entities": [
+        {
+          "id": "harbour-lamp",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "canvas-cover",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "customs-window",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "harbour-bell",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "oilskin-wrap",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "mara-letter",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": true,
+          "locked": null
+        },
+        {
+          "id": "satchel",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "oilskin-wrap",
+        "mara-letter",
+        "satchel"
+      ],
+      "exits": [
+        "customs",
+        "quay"
+      ],
+      "signature": "c264783dc2d24f5ec66fede2973c4dccc1af3a813c9994e2f051e7e0cfec8ead"
+    },
+    "letterOpened": {
+      "id": "post-letter-opened",
+      "place": "landing",
+      "tick": 1,
+      "entities": [
+        {
+          "id": "harbour-lamp",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "canvas-cover",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "customs-window",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "harbour-bell",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "oilskin-wrap",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "mara-letter",
+          "location": "courier",
+          "kind": "object",
+          "open": true,
+          "sealed": false,
+          "locked": null
+        },
+        {
+          "id": "satchel",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "oilskin-wrap",
+        "mara-letter",
+        "satchel"
+      ],
+      "exits": [
+        "customs",
+        "quay"
+      ],
+      "signature": "a4990db330dcd27ec3ef4b8e4c3356ef37e40ae7853f7d8d54ce1e49f541135e"
+    },
+    "letterRead": {
+      "id": "post-letter-read",
+      "place": "landing",
+      "tick": 1,
+      "entities": [
+        {
+          "id": "harbour-lamp",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "canvas-cover",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "customs-window",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "harbour-bell",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "oilskin-wrap",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "mara-letter",
+          "location": "courier",
+          "kind": "object",
+          "open": true,
+          "sealed": false,
+          "locked": null
+        },
+        {
+          "id": "satchel",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "oilskin-wrap",
+        "mara-letter",
+        "satchel"
+      ],
+      "exits": [
+        "customs",
+        "quay"
+      ],
+      "signature": "a4990db330dcd27ec3ef4b8e4c3356ef37e40ae7853f7d8d54ce1e49f541135e"
+    },
+    "lowTide": {
+      "id": "post-low-tide",
+      "place": "landing",
+      "tick": 3,
+      "entities": [
+        {
+          "id": "harbour-lamp",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "canvas-cover",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "customs-window",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "harbour-bell",
+          "location": "landing",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "oilskin-wrap",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "mara-letter",
+          "location": "courier",
+          "kind": "object",
+          "open": true,
+          "sealed": false,
+          "locked": null
+        },
+        {
+          "id": "satchel",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "oilskin-wrap",
+        "mara-letter",
+        "satchel"
+      ],
+      "exits": [
+        "customs",
+        "quay"
+      ],
+      "signature": "db614d824e159ade244ffc6b9a70a55215b13b560e11db7fc7525b0c09e98867"
+    },
+    "cabinet": {
+      "id": "post-cabinet",
+      "place": "customs",
+      "tick": 1,
+      "entities": [
+        {
+          "id": "elin",
+          "location": "customs",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "sorting-cabinet",
+          "location": "customs",
+          "kind": "object",
+          "open": true,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "salt-street-drawer",
+          "location": "sorting-cabinet",
+          "kind": "object",
+          "open": false,
+          "sealed": null,
+          "locked": true
+        },
+        {
+          "id": "current-post-drawer",
+          "location": "sorting-cabinet",
+          "kind": "object",
+          "open": false,
+          "sealed": null,
+          "locked": true
+        },
+        {
+          "id": "relief-warrant",
+          "location": "customs",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "salt-street-circular",
+          "location": "customs",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "blank-postcard",
+          "location": "customs",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "oilskin-wrap",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "mara-letter",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": true,
+          "locked": null
+        },
+        {
+          "id": "satchel",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "oilskin-wrap",
+        "mara-letter",
+        "satchel"
+      ],
+      "exits": [
+        "landing",
+        "archive"
+      ],
+      "signature": "19cc751eb5a064fc6f32a1f7137409e3a3ec8f2c213354895ea19317df705bf1"
+    },
+    "sorted": {
+      "id": "post-sorted",
+      "place": "customs",
+      "tick": 2,
+      "entities": [
+        {
+          "id": "elin",
+          "location": "customs",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "mara-letter",
+          "location": "salt-street-drawer",
+          "kind": "object",
+          "open": null,
+          "sealed": true,
+          "locked": null
+        },
+        {
+          "id": "sorting-cabinet",
+          "location": "customs",
+          "kind": "object",
+          "open": true,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "salt-street-drawer",
+          "location": "sorting-cabinet",
+          "kind": "object",
+          "open": true,
+          "sealed": null,
+          "locked": false
+        },
+        {
+          "id": "current-post-drawer",
+          "location": "sorting-cabinet",
+          "kind": "object",
+          "open": false,
+          "sealed": null,
+          "locked": true
+        },
+        {
+          "id": "permit",
+          "location": "salt-street-drawer",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "relief-warrant",
+          "location": "customs",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "salt-street-circular",
+          "location": "customs",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "blank-postcard",
+          "location": "customs",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "oilskin-wrap",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "satchel",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "oilskin-wrap",
+        "satchel"
+      ],
+      "exits": [
+        "landing",
+        "archive"
+      ],
+      "signature": "796a562357a3d09c0af8afb576bcf633ca21af01b126d256245586a519ff5d3b"
+    },
+    "permit": {
+      "id": "post-permit",
+      "place": "customs",
+      "tick": 3,
+      "entities": [
+        {
+          "id": "elin",
+          "location": "customs",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "mara-letter",
+          "location": "salt-street-drawer",
+          "kind": "object",
+          "open": null,
+          "sealed": true,
+          "locked": null
+        },
+        {
+          "id": "sorting-cabinet",
+          "location": "customs",
+          "kind": "object",
+          "open": true,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "salt-street-drawer",
+          "location": "sorting-cabinet",
+          "kind": "object",
+          "open": true,
+          "sealed": null,
+          "locked": false
+        },
+        {
+          "id": "current-post-drawer",
+          "location": "sorting-cabinet",
+          "kind": "object",
+          "open": false,
+          "sealed": null,
+          "locked": true
+        },
+        {
+          "id": "relief-warrant",
+          "location": "customs",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "salt-street-circular",
+          "location": "customs",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "blank-postcard",
+          "location": "customs",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "oilskin-wrap",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "satchel",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "permit",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "oilskin-wrap",
+        "satchel",
+        "permit"
+      ],
+      "exits": [
+        "landing",
+        "archive"
+      ],
+      "signature": "608d6c885405528778e1b5e5f6b5447dc8d5c02487749aa324e161844ef7adfa"
+    },
+    "ferryLocked": {
+      "id": "post-ferry-locked",
+      "place": "quay",
+      "tick": 5,
+      "entities": [
+        {
+          "id": "tomas",
+          "location": "quay",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "ferry",
+          "location": "quay",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": true
+        },
+        {
+          "id": "oilskin-wrap",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "satchel",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "permit",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "oilskin-wrap",
+        "satchel",
+        "permit"
+      ],
+      "exits": [
+        "landing",
+        "inn",
+        "drowned-quarter"
+      ],
+      "signature": "552cf90a81629af37eae9d85f1018275c355671889640b7e76684e86057e62eb"
+    },
+    "ferryReleased": {
+      "id": "post-ferry-released",
+      "place": "quay",
+      "tick": 6,
+      "entities": [
+        {
+          "id": "tomas",
+          "location": "quay",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "ferry",
+          "location": "quay",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": false
+        },
+        {
+          "id": "oilskin-wrap",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "satchel",
+          "location": "courier",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "oilskin-wrap",
+        "satchel"
+      ],
+      "exits": [
+        "landing",
+        "inn",
+        "drowned-quarter"
+      ],
+      "signature": "b39b47dd2efb2af80dd24b13586362732b599c509d1fcac100425956be2db819"
+    },
+    "vestibule": {
+      "id": "embassy-vestibule",
+      "place": "vestibule",
+      "tick": 0,
+      "entities": [
+        {
+          "id": "ada",
+          "location": "vestibule",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "guest-book",
+          "location": "vestibule",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "notice",
+          "location": "vestibule",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "telephone",
+          "location": "vestibule",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "embassy-key",
+          "location": "ambassador",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "embassy-key"
+      ],
+      "exits": [
+        "salon",
+        "square"
+      ],
+      "signature": "6926ef8c50d160e6f0c02904ff2032b741a83670df70983fe08dd966a731566e"
+    },
+    "notice": {
+      "id": "embassy-notice",
+      "place": "vestibule",
+      "tick": 0,
+      "entities": [
+        {
+          "id": "ada",
+          "location": "vestibule",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "guest-book",
+          "location": "vestibule",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "notice",
+          "location": "vestibule",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "telephone",
+          "location": "vestibule",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "embassy-key",
+          "location": "ambassador",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "embassy-key"
+      ],
+      "exits": [
+        "salon",
+        "square"
+      ],
+      "signature": "6926ef8c50d160e6f0c02904ff2032b741a83670df70983fe08dd966a731566e"
+    },
+    "salon": {
+      "id": "embassy-salon",
+      "place": "salon",
+      "tick": 1,
+      "entities": [
+        {
+          "id": "ilyan",
+          "location": "salon",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "seal",
+          "location": "salon",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "embassy-key",
+          "location": "ambassador",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "embassy-key"
+      ],
+      "exits": [
+        "vestibule",
+        "map-room",
+        "garden"
+      ],
+      "signature": "e1b3e4c844433dbe99cab8729d0a62d69254346c22185e753c0d8b239fe1cdfc"
+    },
+    "square": {
+      "id": "embassy-square",
+      "place": "square",
+      "tick": 3,
+      "entities": [
+        {
+          "id": "vesper",
+          "location": "square",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "embassy-key",
+          "location": "ambassador",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "embassy-key"
+      ],
+      "exits": [
+        "vestibule",
+        "registry",
+        "station"
+      ],
+      "signature": "97654d27025408b6d1621b3e77e74f80229125bda1bc4c288fc58fc51056b6d0"
+    },
+    "lobby": {
+      "id": "hotel-lobby",
+      "place": "lobby",
+      "tick": 0,
+      "entities": [
+        {
+          "id": "porter",
+          "location": "lobby",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "route-table",
+          "location": "lobby",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "arrival-bell",
+          "location": "lobby",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "route-key",
+          "location": "guest",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "route-key"
+      ],
+      "exits": [
+        "conservatory",
+        "engine-room",
+        "guest-room"
+      ],
+      "signature": "aaf43a002bdccc17780e7d01b55b5f6510e250b28b340ea5f77e8d99930aefc7"
+    },
+    "engine": {
+      "id": "hotel-engine",
+      "place": "engine-room",
+      "tick": 1,
+      "entities": [
+        {
+          "id": "saffron",
+          "location": "engine-room",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "escapement",
+          "location": "engine-room",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "route-key",
+          "location": "guest",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "route-key"
+      ],
+      "exits": [
+        "lobby"
+      ],
+      "signature": "6589e0a4ba544e2cea498ef8f84932fabf9c28c97dd5ea230fb9dfdd196b1130"
+    },
+    "conservatory": {
+      "id": "hotel-conservatory",
+      "place": "conservatory",
+      "tick": 3,
+      "entities": [
+        {
+          "id": "vale",
+          "location": "conservatory",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "teacup",
+          "location": "conservatory",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "route-key",
+          "location": "guest",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "route-key"
+      ],
+      "exits": [
+        "lobby",
+        "balcony"
+      ],
+      "signature": "2047f68443af3a9d329761a21976f0dfe54d9c45032f345e5b10321955e84388"
+    },
+    "cupCarried": {
+      "id": "hotel-cup-carried",
+      "place": "conservatory",
+      "tick": 4,
+      "entities": [
+        {
+          "id": "vale",
+          "location": "conservatory",
+          "kind": "person",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "route-key",
+          "location": "guest",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        },
+        {
+          "id": "teacup",
+          "location": "guest",
+          "kind": "object",
+          "open": null,
+          "sealed": null,
+          "locked": null
+        }
+      ],
+      "inventory": [
+        "route-key",
+        "teacup"
+      ],
+      "exits": [
+        "lobby",
+        "balcony"
+      ],
+      "signature": "4a105fb9bc7d4fadf422ce6b076d6e5a1140299ccd2aedecd1bf3b3c2898d6e0"
+    }
+  },
+  "garden": {
+    "opening": {
+      "id": "garden-opening",
+      "day": 1,
+      "phase": 2,
+      "weather": "a mild evening",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.3
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.15
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.85
+            },
+            {
+              "key": "shade",
+              "amount": 0.3
+            },
+            {
+              "key": "bloom",
+              "amount": 0.35
+            },
+            {
+              "key": "shelter",
+              "amount": 0.15
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.4
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.5
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "hollow",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 0.6,
+          "attachment": 0.05,
+          "settled": 0,
+          "lastVisit": -1
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 0.8,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": []
+    },
+    "firstTap": {
+      "id": "garden-first-visit",
+      "day": 1,
+      "phase": 2,
+      "weather": "a mild evening",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.3
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.15
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.85
+            },
+            {
+              "key": "shade",
+              "amount": 0.3
+            },
+            {
+              "key": "bloom",
+              "amount": 0.35
+            },
+            {
+              "key": "shelter",
+              "amount": 0.15
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.4
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.5
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "hollow",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 0.6,
+          "attachment": 0.15000000000000002,
+          "settled": 0,
+          "lastVisit": 1
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 0.8,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": []
+    },
+    "repeatedTap": {
+      "id": "garden-repeat-visit",
+      "day": 1,
+      "phase": 2,
+      "weather": "a mild evening",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.3
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.15
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.85
+            },
+            {
+              "key": "shade",
+              "amount": 0.3
+            },
+            {
+              "key": "bloom",
+              "amount": 0.35
+            },
+            {
+              "key": "shelter",
+              "amount": 0.15
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.4
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.5
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "hollow",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 0.6,
+          "attachment": 0.15000000000000002,
+          "settled": 0,
+          "lastVisit": 1
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 0.8,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": []
+    },
+    "firstLinger": {
+      "id": "garden-first-linger",
+      "day": 1,
+      "phase": 3,
+      "weather": "a clear, starry night",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.3
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.15
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.85
+            },
+            {
+              "key": "shade",
+              "amount": 0.3
+            },
+            {
+              "key": "bloom",
+              "amount": 0.35
+            },
+            {
+              "key": "shelter",
+              "amount": 0.15
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.4
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.5
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "hollow",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 0.68,
+          "attachment": 0.15000000000000002,
+          "settled": 0,
+          "lastVisit": 1
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 0.88,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": []
+    },
+    "nextDay": {
+      "id": "garden-next-day",
+      "day": 2,
+      "phase": 0,
+      "weather": "dew and birdsong",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.34
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.23
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.89
+            },
+            {
+              "key": "shade",
+              "amount": 0.3
+            },
+            {
+              "key": "bloom",
+              "amount": 0.43
+            },
+            {
+              "key": "shelter",
+              "amount": 0.15
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.44
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.58
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "hollow",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 0.76,
+          "attachment": 0.25,
+          "settled": 0,
+          "lastVisit": 2
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 0.96,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": []
+    },
+    "recognition": {
+      "id": "garden-recognition",
+      "day": 3,
+      "phase": 0,
+      "weather": "dew and birdsong",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.36
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.31
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.87
+            },
+            {
+              "key": "shade",
+              "amount": 0.3
+            },
+            {
+              "key": "bloom",
+              "amount": 0.51
+            },
+            {
+              "key": "shelter",
+              "amount": 0.15
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.42
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.66
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "hollow",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 1,
+          "attachment": 0.35,
+          "settled": 0,
+          "lastVisit": 3
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 1,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": []
+    },
+    "shelterReady": {
+      "id": "garden-shelter-ready",
+      "day": 1,
+      "phase": 2,
+      "weather": "a mild evening",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.3
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.15
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.85
+            },
+            {
+              "key": "shade",
+              "amount": 0.85
+            },
+            {
+              "key": "bloom",
+              "amount": 0.35
+            },
+            {
+              "key": "shelter",
+              "amount": 0.9
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.4
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.5
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "hollow",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 0.6,
+          "attachment": 0.05,
+          "settled": 0,
+          "lastVisit": -1
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 0.8,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": []
+    },
+    "relocated": {
+      "id": "garden-relocated",
+      "day": 1,
+      "phase": 3,
+      "weather": "a clear, starry night",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.3
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.15
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.85
+            },
+            {
+              "key": "shade",
+              "amount": 0.85
+            },
+            {
+              "key": "bloom",
+              "amount": 0.35
+            },
+            {
+              "key": "shelter",
+              "amount": 0.9
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.4
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.5
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "bank",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 0.68,
+          "attachment": 0.05,
+          "settled": 1,
+          "lastVisit": -1
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 0.88,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": []
+    },
+    "gift": {
+      "id": "garden-discovery",
+      "day": 2,
+      "phase": 1,
+      "weather": "warm afternoon light",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.32
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.23
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.88
+            },
+            {
+              "key": "shade",
+              "amount": 0.85
+            },
+            {
+              "key": "bloom",
+              "amount": 0.43
+            },
+            {
+              "key": "shelter",
+              "amount": 0.9
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.38
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.58
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "bank",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 0.84,
+          "attachment": 0.05,
+          "settled": 3,
+          "lastVisit": -1
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 1,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": [
+        {
+          "id": "home-sol",
+          "title": "Sol has chosen a home"
+        }
+      ]
+    },
+    "rainCycle": {
+      "id": "garden-later-cycle",
+      "day": 2,
+      "phase": 2,
+      "weather": "a mild evening",
+      "homes": [
+        {
+          "id": "hollow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.32
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "bloom",
+              "amount": 0.23
+            },
+            {
+              "key": "shelter",
+              "amount": 0.65
+            }
+          ]
+        },
+        {
+          "id": "bank",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.88
+            },
+            {
+              "key": "shade",
+              "amount": 0.85
+            },
+            {
+              "key": "bloom",
+              "amount": 0.43
+            },
+            {
+              "key": "shelter",
+              "amount": 0.9
+            }
+          ]
+        },
+        {
+          "id": "meadow",
+          "values": [
+            {
+              "key": "water",
+              "amount": 0.38
+            },
+            {
+              "key": "shade",
+              "amount": 0.2
+            },
+            {
+              "key": "bloom",
+              "amount": 0.58
+            },
+            {
+              "key": "shelter",
+              "amount": 0.3
+            }
+          ]
+        }
+      ],
+      "residents": [
+        {
+          "id": "sol",
+          "name": "Sol",
+          "home": "bank",
+          "needs": [
+            {
+              "key": "water",
+              "amount": 0.7
+            },
+            {
+              "key": "shade",
+              "amount": 0.8
+            },
+            {
+              "key": "shelter",
+              "amount": 0.7
+            }
+          ],
+          "energy": 0.92,
+          "attachment": 0.05,
+          "settled": 4,
+          "lastVisit": -1
+        },
+        {
+          "id": "pip",
+          "name": "Pip",
+          "home": "meadow",
+          "needs": [
+            {
+              "key": "bloom",
+              "amount": 0.6
+            },
+            {
+              "key": "shelter",
+              "amount": 0.4
+            }
+          ],
+          "energy": 1,
+          "attachment": 0.1,
+          "settled": 0,
+          "lastVisit": -1
+        }
+      ],
+      "discoveries": [
+        {
+          "id": "home-sol",
+          "title": "Sol has chosen a home"
+        }
+      ]
+    }
+  },
+  "realm": {
+    "initial": {
+      "id": "realm-initial",
+      "month": 0,
+      "treasury": 120,
+      "debt": 0,
+      "income": 0,
+      "spending": 0,
+      "serviceCost": 0,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 0,
+          "workers": 0,
+          "cargo": null,
+          "capacity": null
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": null,
+          "capacity": null
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": null,
+          "capacity": null
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": null,
+          "capacity": null
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 30,
+          "population": 120,
+          "confidence": 62
+        },
+        {
+          "id": "eastbank",
+          "grain": 50,
+          "population": 90,
+          "confidence": 48
+        },
+        {
+          "id": "northwood",
+          "grain": 22,
+          "population": 60,
+          "confidence": 57
+        },
+        {
+          "id": "harbor",
+          "grain": 25,
+          "population": 70,
+          "confidence": 66
+        }
+      ],
+      "borderTension": 38
+    },
+    "ordinaryFirst": {
+      "id": "realm-ordinary-first",
+      "month": 1,
+      "treasury": 105.2,
+      "debt": 0,
+      "income": 15.2,
+      "spending": 30,
+      "serviceCost": 6,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2.6
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 19.9,
+          "population": 120,
+          "confidence": 63
+        },
+        {
+          "id": "eastbank",
+          "grain": 55.6,
+          "population": 90,
+          "confidence": 49
+        },
+        {
+          "id": "northwood",
+          "grain": 16.1,
+          "population": 60,
+          "confidence": 58
+        },
+        {
+          "id": "harbor",
+          "grain": 18.2,
+          "population": 70,
+          "confidence": 67
+        }
+      ],
+      "borderTension": 37
+    },
+    "ordinaryThird": {
+      "id": "realm-ordinary-third",
+      "month": 3,
+      "treasury": 76.1,
+      "debt": 0,
+      "income": 15.5,
+      "spending": 30,
+      "serviceCost": 6,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 2.6,
+          "capacity": 2.6
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 2,
+          "capacity": 2
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 8.6,
+          "population": 120,
+          "confidence": 63.5
+        },
+        {
+          "id": "eastbank",
+          "grain": 72.8,
+          "population": 90,
+          "confidence": 51
+        },
+        {
+          "id": "northwood",
+          "grain": 6.8,
+          "population": 60,
+          "confidence": 58.5
+        },
+        {
+          "id": "harbor",
+          "grain": 7.3,
+          "population": 70,
+          "confidence": 67.5
+        }
+      ],
+      "borderTension": 35
+    },
+    "ferryFirst": {
+      "id": "realm-ferry-first",
+      "month": 1,
+      "treasury": 100.2,
+      "debt": 0,
+      "income": 15.2,
+      "spending": 35,
+      "serviceCost": 11,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2.6
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 5,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 12
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 19.9,
+          "population": 120,
+          "confidence": 63
+        },
+        {
+          "id": "eastbank",
+          "grain": 55.6,
+          "population": 90,
+          "confidence": 49
+        },
+        {
+          "id": "northwood",
+          "grain": 16.1,
+          "population": 60,
+          "confidence": 58
+        },
+        {
+          "id": "harbor",
+          "grain": 18.2,
+          "population": 70,
+          "confidence": 67
+        }
+      ],
+      "borderTension": 37
+    },
+    "ferryThird": {
+      "id": "realm-ferry-third",
+      "month": 3,
+      "treasury": 61.2,
+      "debt": 0,
+      "income": 15.6,
+      "spending": 35,
+      "serviceCost": 11,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 2.6,
+          "capacity": 2.6
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 5,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 2.7,
+          "capacity": 12
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 8.6,
+          "population": 120,
+          "confidence": 63.5
+        },
+        {
+          "id": "eastbank",
+          "grain": 72.1,
+          "population": 90,
+          "confidence": 52
+        },
+        {
+          "id": "northwood",
+          "grain": 6.8,
+          "population": 60,
+          "confidence": 58.5
+        },
+        {
+          "id": "harbor",
+          "grain": 8,
+          "population": 70,
+          "confidence": 69
+        }
+      ],
+      "borderTension": 35
+    },
+    "worksFirst": {
+      "id": "realm-works-first",
+      "month": 1,
+      "treasury": 93.2,
+      "debt": 0,
+      "income": 15.2,
+      "spending": 42,
+      "serviceCost": 6,
+      "worksCost": 12,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 12,
+          "workers": 6,
+          "cargo": 0,
+          "capacity": 2.6
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 19.9,
+          "population": 120,
+          "confidence": 63
+        },
+        {
+          "id": "eastbank",
+          "grain": 50.3,
+          "population": 90,
+          "confidence": 49
+        },
+        {
+          "id": "northwood",
+          "grain": 16.1,
+          "population": 60,
+          "confidence": 58
+        },
+        {
+          "id": "harbor",
+          "grain": 18.2,
+          "population": 70,
+          "confidence": 67
+        }
+      ],
+      "borderTension": 37
+    },
+    "worksSecond": {
+      "id": "realm-works-second",
+      "month": 2,
+      "treasury": 66.6,
+      "debt": 0,
+      "income": 15.4,
+      "spending": 42,
+      "serviceCost": 6,
+      "worksCost": 12,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 24,
+          "workers": 0,
+          "cargo": 3,
+          "capacity": 22
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 14,
+          "population": 120,
+          "confidence": 64
+        },
+        {
+          "id": "eastbank",
+          "grain": 50.7,
+          "population": 90,
+          "confidence": 50
+        },
+        {
+          "id": "northwood",
+          "grain": 11.1,
+          "population": 60,
+          "confidence": 59
+        },
+        {
+          "id": "harbor",
+          "grain": 11.8,
+          "population": 70,
+          "confidence": 68
+        }
+      ],
+      "borderTension": 36
+    },
+    "mobilized": {
+      "id": "realm-mobilized",
+      "month": 1,
+      "treasury": 105.2,
+      "debt": 0,
+      "income": 15.2,
+      "spending": 30,
+      "serviceCost": 6,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2.6
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 19.9,
+          "population": 120,
+          "confidence": 63
+        },
+        {
+          "id": "eastbank",
+          "grain": 55.6,
+          "population": 90,
+          "confidence": 49
+        },
+        {
+          "id": "northwood",
+          "grain": 15.6,
+          "population": 60,
+          "confidence": 58
+        },
+        {
+          "id": "harbor",
+          "grain": 18.2,
+          "population": 70,
+          "confidence": 67
+        }
+      ],
+      "borderTension": 42
+    },
+    "treaty": {
+      "id": "realm-treaty",
+      "month": 1,
+      "treasury": 105.2,
+      "debt": 0,
+      "income": 15.2,
+      "spending": 30,
+      "serviceCost": 6,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2.6
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 19.9,
+          "population": 120,
+          "confidence": 63
+        },
+        {
+          "id": "eastbank",
+          "grain": 55.6,
+          "population": 90,
+          "confidence": 49
+        },
+        {
+          "id": "northwood",
+          "grain": 16.1,
+          "population": 60,
+          "confidence": 58
+        },
+        {
+          "id": "harbor",
+          "grain": 18.2,
+          "population": 70,
+          "confidence": 67
+        }
+      ],
+      "borderTension": 34
+    },
+    "migration": {
+      "id": "realm-migration",
+      "month": 1,
+      "treasury": 105.2,
+      "debt": 0,
+      "income": 15.2,
+      "spending": 30,
+      "serviceCost": 6,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 22
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 9
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 19.9,
+          "population": 118.4,
+          "confidence": 63
+        },
+        {
+          "id": "eastbank",
+          "grain": 55.6,
+          "population": 91.6,
+          "confidence": 49
+        },
+        {
+          "id": "northwood",
+          "grain": 16.1,
+          "population": 60,
+          "confidence": 58
+        },
+        {
+          "id": "harbor",
+          "grain": 18.2,
+          "population": 70,
+          "confidence": 67
+        }
+      ],
+      "borderTension": 37
+    },
+    "borrowing": {
+      "id": "realm-borrowing",
+      "month": 1,
+      "treasury": 104.4,
+      "debt": 55,
+      "income": 15.2,
+      "spending": 30.8,
+      "serviceCost": 6.8,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2.6
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 19.9,
+          "population": 120,
+          "confidence": 63
+        },
+        {
+          "id": "eastbank",
+          "grain": 55.6,
+          "population": 90,
+          "confidence": 49
+        },
+        {
+          "id": "northwood",
+          "grain": 16.1,
+          "population": 60,
+          "confidence": 58
+        },
+        {
+          "id": "harbor",
+          "grain": 18.2,
+          "population": 70,
+          "confidence": 67
+        }
+      ],
+      "borderTension": 37
+    },
+    "arrears": {
+      "id": "realm-arrears",
+      "month": 1,
+      "treasury": -50.8,
+      "debt": 0,
+      "income": 15.2,
+      "spending": 66,
+      "serviceCost": 6,
+      "worksCost": 0,
+      "routes": [
+        {
+          "id": "east-crossing",
+          "subsidy": 0,
+          "condition": 0.12,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2.6
+        },
+        {
+          "id": "east-ferry",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 2
+        },
+        {
+          "id": "port-road",
+          "subsidy": 0,
+          "condition": 1,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 20
+        },
+        {
+          "id": "timber-road",
+          "subsidy": 0,
+          "condition": 0.8,
+          "progress": 0,
+          "workers": 0,
+          "cargo": 0,
+          "capacity": 7
+        }
+      ],
+      "regions": [
+        {
+          "id": "crownlands",
+          "grain": 19.9,
+          "population": 120,
+          "confidence": 63
+        },
+        {
+          "id": "eastbank",
+          "grain": 55.6,
+          "population": 90,
+          "confidence": 49
+        },
+        {
+          "id": "northwood",
+          "grain": 16.1,
+          "population": 60,
+          "confidence": 58
+        },
+        {
+          "id": "harbor",
+          "grain": 18.2,
+          "population": 70,
+          "confidence": 67
+        }
+      ],
+      "borderTension": 37
+    }
+  }
+}

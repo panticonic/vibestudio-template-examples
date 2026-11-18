@@ -1,0 +1,856 @@
+import s from "./observations.json" with { type: "json" };
+import type {
+  AdventureAccessCheck,
+  AdventureContinuityCheck,
+  AdventureView,
+  ExampleDecision,
+  ExampleReviewLeaf,
+  ExampleReview,
+  ExampleReviewRequest,
+  ExistingArt,
+  GardenChangeCheck,
+  GardenReadback,
+  HabitatCheck,
+  RealmCurrentCheck,
+  RealmReadback,
+  RealmTrendCheck,
+} from "../examples-review/types.js";
+
+type Verdict = [ExampleDecision, string];
+export type ExampleWorld = {
+  id: string;
+  sourceGroup: string;
+  sourceGroups?: string[];
+  request: ExampleReviewRequest;
+  expected: ExampleReview;
+};
+
+type ExampleLeafWorld = ExampleWorld & { request: ExampleReviewLeaf };
+
+function scenario(
+  id: string,
+  family: string,
+  request: ExampleReviewLeaf,
+  [decision, finding]: Verdict,
+  ...evidenceIds: string[]
+): ExampleLeafWorld {
+  return {
+    id: `examples-${id}`,
+    sourceGroup: `vibestudio:examples:${family}`,
+    request,
+    expected: { decision, finding, evidenceIds },
+  };
+}
+
+function access(
+  id: string,
+  family: string,
+  goal: string,
+  current: AdventureView,
+  check: AdventureAccessCheck,
+  expected: Verdict,
+) {
+  return scenario(
+    id,
+    family,
+    { kind: "adventure", goal, review: { kind: "access", check, current } },
+    expected,
+    current.id,
+  );
+}
+
+function journey(
+  id: string,
+  family: string,
+  goal: string,
+  before: AdventureView,
+  after: AdventureView,
+  check: AdventureContinuityCheck,
+  expected: Verdict,
+) {
+  return scenario(
+    id,
+    family,
+    {
+      kind: "adventure",
+      goal,
+      review: { kind: "continuity", check, before, after },
+    },
+    expected,
+    before.id,
+    after.id,
+  );
+}
+
+function artwork(
+  id: string,
+  family: string,
+  goal: string,
+  current: AdventureView,
+  captured: AdventureView | null,
+  expected: Verdict,
+) {
+  const artwork: ExistingArt | null = captured && {
+    id: `art-${captured.id}`,
+    place: captured.place,
+    signature: captured.signature,
+  };
+  return scenario(
+    id,
+    family,
+    { kind: "adventure", goal, review: { kind: "artwork", current, artwork } },
+    expected,
+    ...[current.id, ...(artwork ? [artwork.id] : [])],
+  );
+}
+
+function habitat(
+  id: string,
+  family: string,
+  goal: string,
+  current: GardenReadback,
+  check: HabitatCheck,
+  expected: Verdict,
+) {
+  return scenario(
+    id,
+    family,
+    { kind: "garden", goal, review: { kind: "habitat", check, current } },
+    expected,
+    current.id,
+  );
+}
+
+function garden(
+  id: string,
+  family: string,
+  goal: string,
+  before: GardenReadback,
+  after: GardenReadback,
+  check: GardenChangeCheck,
+  expected: Verdict,
+) {
+  return scenario(
+    id,
+    family,
+    {
+      kind: "garden",
+      goal,
+      review: { kind: "transition", check, before, after },
+    },
+    expected,
+    before.id,
+    after.id,
+  );
+}
+
+function settlement(
+  id: string,
+  family: string,
+  goal: string,
+  current: RealmReadback,
+  check: RealmCurrentCheck,
+  expected: Verdict,
+) {
+  return scenario(
+    id,
+    family,
+    { kind: "realm", goal, review: { kind: "settlement", check, current } },
+    expected,
+    current.id,
+  );
+}
+
+function economy(
+  id: string,
+  family: string,
+  goal: string,
+  before: RealmReadback,
+  after: RealmReadback,
+  check: RealmTrendCheck,
+  expected: Verdict,
+  basis: "forecast" | "observed" = "observed",
+  assertCommitted = true,
+) {
+  return scenario(
+    id,
+    family,
+    {
+      kind: "realm",
+      goal,
+      review: { kind: "compare", check, before, after, basis, assertCommitted },
+    },
+    expected,
+    before.id,
+    after.id,
+  );
+}
+
+const { adventure: a, garden: g, realm: r } = s;
+
+const individualWorlds: ExampleLeafWorld[] = [
+  access(
+    "post-cover-visible",
+    "post-opening",
+    "Can I see the spare canvas cover from the landing?",
+    a.landing,
+    { kind: "visible", target: "canvas-cover" },
+    ["supported", "visible-object"],
+  ),
+  access(
+    "post-wrap-in-satchel",
+    "post-opening",
+    "Does my current inventory include the oilskin wrap?",
+    a.landing,
+    { kind: "carried", target: "oilskin-wrap" },
+    ["supported", "carried-object"],
+  ),
+  access(
+    "post-ferry-beyond-view",
+    "post-opening",
+    "Does the quay ferry appear among the objects I can inspect here at the landing?",
+    a.landing,
+    { kind: "visible", target: "ferry" },
+    ["contradicted", "visible-object"],
+  ),
+  access(
+    "post-unopened-enclosure",
+    "post-letter",
+    "Before reading the letter, has its double wax seal already been removed?",
+    a.landing,
+    { kind: "unsealed", target: "mara-letter" },
+    ["contradicted", "document-unsealed"],
+  ),
+  access(
+    "post-broken-seal",
+    "post-letter",
+    "Can I report that the envelope is unsealed after opening it?",
+    a.letterOpened,
+    { kind: "unsealed", target: "mara-letter" },
+    ["supported", "document-unsealed"],
+  ),
+  access(
+    "post-unknown-seal",
+    "post-opening",
+    "Can the courier observe whether the distant relief warrant is unsealed from the landing?",
+    a.landing,
+    { kind: "unsealed", target: "relief-warrant" },
+    ["not-observed", "document-unsealed"],
+  ),
+  journey(
+    "post-reading-free",
+    "post-letter",
+    "Did the act of reading the open letter itself advance time, separate from opening it?",
+    a.letterOpened,
+    a.letterRead,
+    { kind: "time-advanced" },
+    ["contradicted", "journey-time"],
+  ),
+  journey(
+    "post-bells-without-travel",
+    "post-tide",
+    "Did the two bell actions leave me in the same place?",
+    a.letterRead,
+    a.lowTide,
+    { kind: "same-place" },
+    ["supported", "same-location"],
+  ),
+  access(
+    "post-records-route",
+    "post-cabinet",
+    "Is the archive listed as an exit from the cabinet room?",
+    a.cabinet,
+    { kind: "exit", target: "archive" },
+    ["supported", "available-exit"],
+  ),
+  access(
+    "post-cabinet-frame",
+    "post-cabinet",
+    "Is the cabinet frame open before the letter is inserted?",
+    a.cabinet,
+    { kind: "open", target: "sorting-cabinet" },
+    ["supported", "container-open"],
+  ),
+  access(
+    "post-permit-hidden",
+    "post-cabinet",
+    "Can I see the still-enclosed permit before addressing a drawer?",
+    a.cabinet,
+    { kind: "visible", target: "permit" },
+    ["contradicted", "visible-object"],
+  ),
+  access(
+    "post-correct-drawer",
+    "post-cabinet",
+    "Did inserting addressed mail open the Salt Street drawer?",
+    a.sorted,
+    { kind: "open", target: "salt-street-drawer" },
+    ["supported", "container-open"],
+  ),
+  access(
+    "post-other-drawer",
+    "post-cabinet",
+    "Did that same addressed delivery open the Current Post drawer too?",
+    a.sorted,
+    { kind: "open", target: "current-post-drawer" },
+    ["contradicted", "container-open"],
+  ),
+  journey(
+    "post-sorted-letter-left-custody",
+    "post-cabinet",
+    "Did the courier retain Mara’s letter after feeding it into the cabinet?",
+    a.cabinet,
+    a.sorted,
+    { kind: "still-carried", target: "mara-letter" },
+    ["contradicted", "retained-inventory"],
+  ),
+  journey(
+    "post-permit-carried-across-rooms",
+    "post-ferry",
+    "Did I keep the recovered permit while moving from the office to the ferryman?",
+    a.permit,
+    a.ferryLocked,
+    { kind: "still-carried", target: "permit" },
+    ["supported", "retained-inventory"],
+  ),
+  journey(
+    "post-authorization-not-movement",
+    "post-ferry",
+    "Does the readback confirm that the courier stayed on the quay while handing over the permit?",
+    a.ferryLocked,
+    a.ferryReleased,
+    { kind: "same-place" },
+    ["supported", "same-location"],
+  ),
+  artwork(
+    "post-tide-repaint",
+    "post-tide",
+    "Does the falling-tide painting still depict the low-tide landing after ringing the bell?",
+    a.lowTide,
+    a.letterRead,
+    ["contradicted", "illustration-stale"],
+  ),
+  artwork(
+    "post-reading-keeps-scene",
+    "post-letter",
+    "Is the painting from opening the letter still current after subsequently reading it?",
+    a.letterRead,
+    a.letterOpened,
+    ["supported", "illustration-current"],
+  ),
+  access(
+    "embassy-passport-custody",
+    "embassy-vestibule",
+    "Has the embassy visitor’s passport passed into the player’s inventory?",
+    a.vestibule,
+    { kind: "carried", target: "passport" },
+    ["contradicted", "carried-object"],
+  ),
+  journey(
+    "embassy-notice-no-clock",
+    "embassy-vestibule",
+    "Did reading the registry notice, without crossing a threshold, use up a moment?",
+    a.vestibule,
+    a.notice,
+    { kind: "time-advanced" },
+    ["contradicted", "journey-time"],
+  ),
+  access(
+    "embassy-salon-map-listed",
+    "embassy-salon",
+    "Is the map room offered among the salon exits?",
+    a.salon,
+    { kind: "exit", target: "map-room" },
+    ["supported", "available-exit"],
+  ),
+  access(
+    "embassy-seal-offsite",
+    "embassy-square",
+    "Is the salon's moth seal currently visible in Registry Square?",
+    a.square,
+    { kind: "visible", target: "seal" },
+    ["contradicted", "visible-object"],
+  ),
+  artwork(
+    "embassy-use-right-architecture",
+    "embassy-salon",
+    "Can we reuse the vestibule painting as an exact depiction of the salon?",
+    a.salon,
+    a.vestibule,
+    ["contradicted", "illustration-other-place"],
+  ),
+  access(
+    "hotel-frontier-unlisted",
+    "hotel-lobby",
+    "While the walking hotel is moving, is the orchard listed as a lobby exit?",
+    a.lobby,
+    { kind: "exit", target: "outside" },
+    ["contradicted", "available-exit"],
+  ),
+  journey(
+    "hotel-engine-arrival",
+    "hotel-engine",
+    "Did descending the engine stair reach the navigation machinery room?",
+    a.lobby,
+    a.engine,
+    { kind: "moved-to", target: "engine-room" },
+    ["supported", "destination-reached"],
+  ),
+  access(
+    "hotel-mechanical-object",
+    "hotel-engine",
+    "Can the player inspect the navigation escapement from the machinery room?",
+    a.engine,
+    { kind: "visible", target: "escapement" },
+    ["supported", "visible-object"],
+  ),
+  access(
+    "hotel-material-salvaged",
+    "hotel-conservatory",
+    "Is the chipped cup now in hand as a possible source of ceramic?",
+    a.cupCarried,
+    { kind: "carried", target: "teacup" },
+    ["supported", "carried-object"],
+  ),
+  artwork(
+    "hotel-illustration-pending",
+    "hotel-conservatory",
+    "With no conservatory artwork receipt, can we say that the current scene already has an illustration?",
+    a.conservatory,
+    null,
+    ["not-observed", "illustration-missing"],
+  ),
+
+  habitat(
+    "garden-hollow-home",
+    "garden-opening",
+    "Where does Sol currently live, and is the old hollow his public home?",
+    g.opening,
+    { kind: "is-home", resident: "sol", home: "hollow" },
+    ["supported", "chosen-home"],
+  ),
+  habitat(
+    "garden-hollow-comfort",
+    "garden-opening",
+    "Does the old hollow already meet Sol’s water, shade and shelter minimums?",
+    g.opening,
+    { kind: "meets-needs", resident: "sol", home: "hollow" },
+    ["contradicted", "habitat-comfort"],
+  ),
+  habitat(
+    "garden-bank-too-exposed",
+    "garden-opening",
+    "The stream has enough water. Does its exposed bank nevertheless meet all of Sol’s needs now?",
+    g.opening,
+    { kind: "meets-needs", resident: "sol", home: "bank" },
+    ["contradicted", "habitat-comfort"],
+  ),
+  habitat(
+    "garden-robin-uninvented-resident",
+    "garden-opening",
+    "Is there public evidence that a ladybug named Ada has settled into the moonflower bed?",
+    g.opening,
+    { kind: "settled", resident: "ada", home: "meadow" },
+    ["not-observed", "settled-resident"],
+  ),
+  garden(
+    "garden-first-attachment",
+    "garden-visits",
+    "Does the first gentle touch build any attachment with Sol?",
+    g.opening,
+    g.firstTap,
+    { kind: "attachment-grew", resident: "sol" },
+    ["supported", "attachment-change"],
+  ),
+  garden(
+    "garden-repeat-is-idempotent",
+    "garden-visits",
+    "Does a second touch on the same day add more attachment?",
+    g.firstTap,
+    g.repeatedTap,
+    { kind: "attachment-grew", resident: "sol" },
+    ["contradicted", "attachment-change"],
+  ),
+  garden(
+    "garden-early-familiarity",
+    "garden-visits",
+    "Does Sol already recognize the player after a single visit, in the game’s threshold sense?",
+    g.opening,
+    g.firstTap,
+    { kind: "recognized", resident: "sol" },
+    ["contradicted", "resident-recognition"],
+  ),
+  garden(
+    "garden-recognition-matured",
+    "garden-visits",
+    "Did the subsequent days of visits bring Sol over the public recognition threshold?",
+    g.nextDay,
+    g.recognition,
+    { kind: "recognized", resident: "sol" },
+    ["supported", "resident-recognition"],
+  ),
+  garden(
+    "garden-linger-phase-only",
+    "garden-ecology",
+    "Did the first Linger action roll the garden into a new day, or only change the phase?",
+    g.repeatedTap,
+    g.firstLinger,
+    { kind: "day-advanced" },
+    ["contradicted", "garden-day"],
+  ),
+  garden(
+    "garden-day-boundary",
+    "garden-ecology",
+    "Did the next Linger observation cross a day boundary?",
+    g.firstLinger,
+    g.nextDay,
+    { kind: "day-advanced" },
+    ["supported", "garden-day"],
+  ),
+  garden(
+    "garden-weather-shift",
+    "garden-ecology",
+    "Did the public weather move away from the opening mild evening after the first Linger?",
+    g.opening,
+    g.firstLinger,
+    { kind: "weather-changed" },
+    ["supported", "garden-weather"],
+  ),
+  habitat(
+    "garden-improved-roof-comfort",
+    "garden-shelter",
+    "Does the amended bank satisfy Sol’s minimum conditions even though its shelter is greater than requested?",
+    g.shelterReady,
+    { kind: "meets-needs", resident: "sol", home: "bank" },
+    ["supported", "habitat-comfort"],
+  ),
+  habitat(
+    "garden-build-before-occupation",
+    "garden-shelter",
+    "Did building the shelter already move Sol’s reported home to the bank before life settled?",
+    g.shelterReady,
+    { kind: "is-home", resident: "sol", home: "bank" },
+    ["contradicted", "chosen-home"],
+  ),
+  garden(
+    "garden-voluntary-move",
+    "garden-shelter",
+    "Did the next ecology pass move Sol from the hollow in response to the sheltered bank?",
+    g.shelterReady,
+    g.relocated,
+    { kind: "relocated", resident: "sol" },
+    ["supported", "resident-relocation"],
+  ),
+  habitat(
+    "garden-settled-in-bank",
+    "garden-shelter",
+    "After the move, has the public garden recorded that Sol has begun settling at the bank?",
+    g.relocated,
+    { kind: "settled", resident: "sol", home: "bank" },
+    ["supported", "settled-resident"],
+  ),
+  garden(
+    "garden-keepsake-unlocked",
+    "garden-discoveries",
+    "Did staying comfortable for several passes produce a newly recorded discovery?",
+    g.relocated,
+    g.gift,
+    { kind: "new-discovery" },
+    ["supported", "garden-discovery"],
+  ),
+  garden(
+    "garden-gift-not-duplicated",
+    "garden-discoveries",
+    "Does another pass create a second discovery for the same settled home?",
+    g.gift,
+    g.rainCycle,
+    { kind: "new-discovery" },
+    ["contradicted", "garden-discovery"],
+  ),
+
+  settlement(
+    "realm-ferry-paid-idle",
+    "realm-ferry",
+    "Was the newly subsidized first-month ferry paid for while carrying no grain?",
+    r.ferryFirst,
+    { kind: "subsidy-paid-and-idle", route: "east-ferry" },
+    ["supported", "paid-unused-capacity"],
+  ),
+  settlement(
+    "realm-ferry-later-active",
+    "realm-ferry",
+    "Is the subsidized ferry still idle once the third-month market readback exists?",
+    r.ferryThird,
+    { kind: "subsidy-paid-and-idle", route: "east-ferry" },
+    ["contradicted", "paid-unused-capacity"],
+  ),
+  settlement(
+    "realm-ferry-capacity",
+    "realm-ferry",
+    "Does the actual third-month cargo stay at or below the observed available ferry capacity?",
+    r.ferryThird,
+    { kind: "cargo-under-capacity", route: "east-ferry" },
+    ["supported", "route-bounded-cargo"],
+  ),
+  settlement(
+    "realm-no-cargo-before-time",
+    "realm-opening",
+    "Before a month has settled, do we know whether ferry cargo respected a counted capacity?",
+    r.initial,
+    { kind: "cargo-under-capacity", route: "east-ferry" },
+    ["not-observed", "route-bounded-cargo"],
+  ),
+  settlement(
+    "realm-bridge-still-closed",
+    "realm-bridge",
+    "Does one monthly interval with six workers suffice to reopen the flood-damaged crossing?",
+    r.worksFirst,
+    { kind: "crossing-reopened", route: "east-crossing" },
+    ["contradicted", "crossing-open"],
+  ),
+  settlement(
+    "realm-bridge-finished",
+    "realm-bridge",
+    "Has the actual second settlement reopened the eastern crossing and released its workers?",
+    r.worksSecond,
+    { kind: "crossing-reopened", route: "east-crossing" },
+    ["supported", "crossing-open"],
+  ),
+  economy(
+    "realm-bridge-work-confirmed",
+    "realm-bridge",
+    "Is there observed progress on the eastern crossing between the first and second settlements?",
+    r.worksFirst,
+    r.worksSecond,
+    { kind: "route-works-progressed", route: "east-crossing" },
+    ["supported", "works-progress"],
+  ),
+  economy(
+    "realm-ferry-harbor-stock-effect",
+    "realm-ferry",
+    "Does the ferry projection place more grain in Riverport than its unsubsidized comparison?",
+    r.ordinaryThird,
+    r.ferryThird,
+    { kind: "regional-grain-grew", region: "harbor" },
+    ["supported", "reserve-change"],
+    "forecast",
+    false,
+  ),
+  economy(
+    "realm-ferry-claim-cannot-commit",
+    "realm-ferry",
+    "Can I describe the projected third-month increase in Riverport grain as a change that has happened in the saved realm?",
+    r.ordinaryThird,
+    r.ferryThird,
+    { kind: "regional-grain-grew", region: "harbor" },
+    ["not-observed", "forecast-not-committed"],
+    "forecast",
+  ),
+  economy(
+    "realm-mobilization-tension",
+    "realm-border",
+    "Relative to an ordinary settlement, did mobilization raise observed foreign tension?",
+    r.ordinaryFirst,
+    r.mobilized,
+    { kind: "border-tension-grew" },
+    ["supported", "border-tension-change"],
+  ),
+  economy(
+    "realm-treaty-not-heightened",
+    "realm-border",
+    "Compared with an ordinary settlement, did the nonaggression treaty increase tension?",
+    r.ordinaryFirst,
+    r.treaty,
+    { kind: "border-tension-grew" },
+    ["contradicted", "border-tension-change"],
+  ),
+  economy(
+    "realm-migration-source",
+    "realm-migration",
+    "Did the unrest-prone Crownlands lose households on the migration readback?",
+    r.initial,
+    r.migration,
+    { kind: "population-fell", region: "crownlands" },
+    ["supported", "population-change"],
+  ),
+  settlement(
+    "realm-opening-stock-local",
+    "realm-opening",
+    "Does Eastbank begin with at least forty units of local grain?",
+    r.initial,
+    { kind: "region-grain-at-least", region: "eastbank", amount: 40 },
+    ["supported", "regional-reserves"],
+  ),
+  settlement(
+    "realm-missing-region",
+    "realm-opening",
+    "Do we have a local reserve measurement for a region called Southbank?",
+    r.initial,
+    { kind: "region-grain-at-least", region: "southbank", amount: 40 },
+    ["not-observed", "regional-reserves"],
+  ),
+  settlement(
+    "realm-first-budget-deficit",
+    "realm-treasury",
+    "Did the ordinary first month actually bring in more than was spent?",
+    r.ordinaryFirst,
+    { kind: "net-positive" },
+    ["contradicted", "positive-settlement"],
+  ),
+  economy(
+    "realm-first-treasury",
+    "realm-treasury",
+    "Has the available treasury grown compared with the initial 120 crowns?",
+    r.initial,
+    r.ordinaryFirst,
+    { kind: "treasury-grew" },
+    ["contradicted", "treasury-change"],
+  ),
+  settlement(
+    "realm-real-arrears",
+    "realm-treasury",
+    "The ledger closes in arrears. Does the economy actually record outstanding debt?",
+    r.arrears,
+    { kind: "has-debt" },
+    ["contradicted", "outstanding-debt"],
+  ),
+  settlement(
+    "realm-cash-with-borrowing",
+    "realm-treasury",
+    "Does the economy record an explicit debt even with funds in the treasury?",
+    r.borrowing,
+    { kind: "has-debt" },
+    ["supported", "outstanding-debt"],
+  ),
+  settlement(
+    "realm-initial-no-debt",
+    "realm-opening",
+    "Is there any recorded outstanding debt in the initial council snapshot?",
+    r.initial,
+    { kind: "has-debt" },
+    ["contradicted", "outstanding-debt"],
+  ),
+];
+
+function combined(
+  id: string,
+  lineage: string,
+  goal: string,
+  claims: string[],
+  decision: ExampleDecision,
+  finding: string,
+  evidenceIds: string[],
+): ExampleWorld {
+  const sources = claims.map((claim) => {
+    const source = individualWorlds.find(
+      (world) => world.id === `examples-${claim}`,
+    );
+    if (!source) throw new Error(`Unknown Examples claim: ${claim}`);
+    return source;
+  });
+  const sourceGroup = `vibestudio:examples:${lineage}`;
+  return {
+    id: `examples-${id}`,
+    sourceGroup,
+    sourceGroups: [
+      ...new Set([sourceGroup, ...sources.map((source) => source.sourceGroup)]),
+    ],
+    request: {
+      kind: "composed",
+      goal,
+      work: sources.map((source) => source.request),
+    },
+    expected: {
+      decision,
+      finding,
+      evidenceIds,
+      components: sources.map((source) => source.expected),
+    },
+  };
+}
+
+export const exampleWorlds = [
+  ...individualWorlds,
+  combined(
+    "post-illustration-release",
+    "post-letter",
+    "Review three captions before reusing the coastal artwork. The editor says reading the opened letter consumed a moment, that the reading kept its then-current illustration, and that the older artwork depicts the later low-tide landing.",
+    ["post-reading-free", "post-reading-keeps-scene", "post-tide-repaint"],
+    "contradicted",
+    "criteria-contradicted",
+    [
+      a.letterOpened.id,
+      a.letterRead.id,
+      `art-${a.letterOpened.id}`,
+      a.lowTide.id,
+      `art-${a.letterRead.id}`,
+    ],
+  ),
+  combined(
+    "cabinet-routing-caption",
+    "post-cabinet",
+    "Review a caption that claims depositing one envelope opened both drawers and retained the letter. Cite each readback once in the overall summary.",
+    [
+      "post-correct-drawer",
+      "post-other-drawer",
+      "post-sorted-letter-left-custody",
+    ],
+    "contradicted",
+    "criteria-contradicted",
+    [a.sorted.id, a.cabinet.id],
+  ),
+  combined(
+    "garden-relocation-caption",
+    "garden-shelter",
+    "Review the demonstration's complete causal chain: communal shelter met the minimum conditions, then Sol moved after ecology and began settling.",
+    [
+      "garden-improved-roof-comfort",
+      "garden-voluntary-move",
+      "garden-settled-in-bank",
+    ],
+    "supported",
+    "all-criteria-supported",
+    [g.shelterReady.id, g.relocated.id],
+  ),
+  combined(
+    "realm-forecast-caveat",
+    "realm-ferry",
+    "Prepare the fact-check for a projected ferry benefit. Identify both what the numbers project and whether those effects are already recorded in the realm.",
+    ["realm-ferry-harbor-stock-effect", "realm-ferry-claim-cannot-commit"],
+    "not-observed",
+    "criteria-unobserved",
+    [r.ordinaryThird.id, r.ferryThird.id],
+  ),
+  combined(
+    "three-demos-release-check",
+    "multi-demo-release",
+    "Fact-check three examples for a release note: the postal reading kept the current illustration, the garden registered relocation, and the bridge reopened after the second work settlement.",
+    [
+      "post-reading-keeps-scene",
+      "garden-voluntary-move",
+      "realm-bridge-finished",
+    ],
+    "supported",
+    "all-criteria-supported",
+    [
+      a.letterRead.id,
+      `art-${a.letterOpened.id}`,
+      g.shelterReady.id,
+      g.relocated.id,
+      r.worksSecond.id,
+    ],
+  ),
+  combined(
+    "three-demos-evidence-gap",
+    "multi-demo-release",
+    "Verify a gallery update that pairs the real conservatory material salvage with a ready illustration and a measured first-month ferry capacity claim.",
+    [
+      "hotel-material-salvaged",
+      "hotel-illustration-pending",
+      "realm-no-cargo-before-time",
+    ],
+    "not-observed",
+    "criteria-unobserved",
+    [a.cupCarried.id, a.conservatory.id, r.initial.id],
+  ),
+];

@@ -1,0 +1,15 @@
+{
+  "name": "@workspace-skills/examples-review-fixtures",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "vitest": "^3.2.7",
+    "@workspace/natlang": "workspace:*"
+  },
+  "dependencies": {
+    "@workspace/adventure-campaigns": "workspace:*",
+    "@workspace/adventure-engine": "workspace:*",
+    "@workspace/grimoire-engine": "workspace:*",
+    "@workspace/regency-engine": "workspace:*"
+  }
+}
