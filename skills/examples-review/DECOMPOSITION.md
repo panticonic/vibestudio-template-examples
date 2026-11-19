@@ -24,6 +24,9 @@ and template services retain control of durable state and gameplay.
 The live Grimoire branch gets its evidence through one caller-bound read leaf. It
 builds each garden comparison using the unchanged observations, calls the existing
 habitat or transition reviewer, and combines every finding in claim order. The
-managed harness owns the actual panel and its unique garden, visits selected
-residents through the UI, reads the installed garden service before and after,
-and runs the independent reference against those receipts.
+managed harness runs visits and clock changes through the actual panel. The
+quiet observation action advances the installed garden without waking a
+storyteller. The live tasks read
+the persisted garden before and after. The independent reference verifies
+the elapsed phases, attachment gained on distinct days, and each authored
+claim about recognition, settlement, weather, or discoveries.

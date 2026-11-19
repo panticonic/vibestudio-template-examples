@@ -54,8 +54,8 @@ export class StoryClient {
       artworks: this.artworks,
     };
   }
-  linger(id: string) {
-    return this.service.call("linger", { id }).then(() => this.get());
+  linger(id: string, quiet = false) {
+    return this.service.call("linger", { id, quiet }).then(() => this.get());
   }
   visit(residentId: string) {
     return this.service.call("visit", { residentId }).then(() => this.get());

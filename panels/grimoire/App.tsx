@@ -157,12 +157,20 @@ function GrimoireWorld({ worldKey }: { worldKey: string }) {
       </section>
       <section className="garden-observations" aria-label="Life in the garden">
         <p aria-live="polite">{story.view?.notice || garden.traces[0]}</p>
-        <button
-          disabled={busy || !story.view}
-          onClick={() => void story.linger()}
-        >
-          Linger a little <span>◷</span>
-        </button>
+        <div className="garden-observation-actions">
+          <button
+            disabled={busy || !story.view}
+            onClick={() => void story.linger()}
+          >
+            Linger a little <span>◷</span>
+          </button>
+          <button
+            disabled={busy || !story.view}
+            onClick={() => void story.linger(true)}
+          >
+            Observe quietly
+          </button>
+        </div>
       </section>
       <section className="wish-card" aria-label="Conversation with Moth">
         <div className="conversation-heading">

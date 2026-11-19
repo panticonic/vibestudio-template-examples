@@ -114,15 +114,16 @@ export function useStory(key: string) {
       lifecycle.uncertain = null;
       return next;
     });
-  const linger = () =>
+  const linger = (quiet = false) =>
     run(async () => {
+      const wish = quiet ? "observe quietly" : "linger";
       const request =
-        lifecycle.uncertain?.wish === "linger"
+        lifecycle.uncertain?.wish === wish
           ? lifecycle.uncertain
-          : { id: crypto.randomUUID(), wish: "linger" };
+          : { id: crypto.randomUUID(), wish };
       lifecycle.uncertain = request;
-      if (!view?.seated) await client.seat();
-      const next = await client.linger(request.id);
+      if (!quiet && !view?.seated) await client.seat();
+      const next = await client.linger(request.id, quiet);
       lifecycle.uncertain = null;
       return next;
     });

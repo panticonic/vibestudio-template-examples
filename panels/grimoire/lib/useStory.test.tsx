@@ -11,6 +11,25 @@ vi.mock("./client.js", () => ({
   },
 }));
 afterEach(cleanup);
+it("observes quietly before storytellers join an estate", async () => {
+  const view = { game: { id: "quiet" }, pending: null, seated: false };
+  const seat = vi.fn();
+  const linger = vi.fn(async () => view);
+  mocks.clients.set("quiet", {
+    get: async () => view,
+    getArt: async () => view,
+    seat,
+    linger,
+  });
+  const hook = renderHook(() => useStory("quiet"));
+  await waitFor(() => expect(hook.result.current.view).toEqual(view));
+  await act(async () => {
+    expect(await hook.result.current.linger(true)).toBe(true);
+  });
+  expect(seat).not.toHaveBeenCalled();
+  expect(linger).toHaveBeenCalledWith(expect.any(String), true);
+});
+
 it("keeps the current world's state and action lock when a previous world finishes", async () => {
   let finish!: (view: any) => void;
   const previousAction = new Promise((resolve) => {

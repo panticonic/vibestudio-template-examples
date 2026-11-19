@@ -69,6 +69,7 @@ type GardenChangeCheck = | { kind: "recognized"; resident: string }
   | { kind: "attachment-grew"; resident: string }
   | { kind: "relocated"; resident: string }
   | { kind: "day-advanced" }
+  | { kind: "phase-advanced" }
   | { kind: "weather-changed" }
   | { kind: "new-discovery" };
 type GardenCheck = | { kind: "habitat"; check: HabitatCheck; current: GardenReadback }

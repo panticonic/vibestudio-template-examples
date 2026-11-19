@@ -71,6 +71,7 @@ export type GardenChangeCheck =
   | { kind: "attachment-grew"; resident: string }
   | { kind: "relocated"; resident: string }
   | { kind: "day-advanced" }
+  | { kind: "phase-advanced" }
   | { kind: "weather-changed" }
   | { kind: "new-discovery" };
 export type GardenCheck =

@@ -125,6 +125,12 @@ function garden(review: GardenCheck): ExampleReview {
   switch (check.kind) {
     case "day-advanced":
       return result(after.day > before.day, "garden-day", ...ids);
+    case "phase-advanced":
+      return result(
+        after.day * 4 + after.phase > before.day * 4 + before.phase,
+        "garden-phase",
+        ...ids,
+      );
     case "weather-changed":
       return result(after.weather !== before.weather, "garden-weather", ...ids);
     case "new-discovery": {

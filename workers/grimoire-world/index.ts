@@ -266,7 +266,7 @@ export class GrimoireWorldDO extends DurableObjectBase {
     tier: "open",
     sensitivity: "write",
   })
-  async linger(input: { id: string }) {
+  async linger(input: { id: string; quiet?: boolean }) {
     this.player();
     const s = this.load();
     if (s.pending) throw new Error("Let this conversation finish first.");
@@ -308,9 +308,10 @@ export class GrimoireWorldDO extends DurableObjectBase {
         "linger",
       );
     });
-    await this.wakeWild(
-      "The player lingered and observed: " + garden.traces.join(" "),
-    );
+    if (!input.quiet)
+      await this.wakeWild(
+        "The player lingered and observed: " + garden.traces.join(" "),
+      );
     return this.getGame();
   }
   @rpc({
