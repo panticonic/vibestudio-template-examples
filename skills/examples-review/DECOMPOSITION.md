@@ -36,5 +36,6 @@ current view through one caller-bound service. It passes each claim into the
 existing access, continuity or illustration lambda and combines the findings.
 The worker provides the actor-visible projection and canonical scene signature.
 The managed harness opens the assigned campaign panel and independently joins
-its loaded image to the worker's stored illustration. The Embassy case denies
-image import in the owned context and checks the readback for missing artwork.
+its loaded image to the worker's stored illustration. The Embassy case removes
+the optional artwork configuration in the owned context and checks the
+installed worker's readback for missing artwork.

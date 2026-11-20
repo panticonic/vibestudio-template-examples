@@ -65,7 +65,6 @@ export function prepareAdventureReview(
     location: string;
     asset: string;
     tick: number;
-    importDenied: boolean;
   },
   world: {
     campaign: string;
@@ -135,13 +134,10 @@ export function prepareAdventureReview(
         panel.tick === 0 &&
         (world.painted
           ? Boolean(
-              !panel.importDenied &&
               observation?.artwork?.id === panel.asset &&
               observation.artwork.signature === observation.view.signature,
             )
-          : panel.importDenied &&
-            panel.asset === "" &&
-            observation?.artwork === null),
+          : panel.asset === "" && observation?.artwork === null),
       persisted: isDeepStrictEqual(persisted, observation),
       assignedClaims: isDeepStrictEqual(
         reference?.components?.map(({ decision }) => decision),
