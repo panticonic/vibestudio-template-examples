@@ -30,3 +30,11 @@ storyteller. The live tasks read
 the persisted garden before and after. The independent reference verifies
 the elapsed phases, attachment gained on distinct days, and each authored
 claim about recognition, settlement, weather, or discoveries.
+
+The live Adventure branch reads the same journey's opening baseline and saved
+current view through one caller-bound service. It passes each claim into the
+existing access, continuity or illustration lambda and combines the findings.
+The worker provides the actor-visible projection and canonical scene signature.
+The managed harness opens the assigned campaign panel when artwork is expected
+and independently joins its loaded image to the worker's stored illustration.
+An unpainted opening supplies a separate check for missing artwork.

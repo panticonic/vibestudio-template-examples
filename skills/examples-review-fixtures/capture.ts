@@ -1,11 +1,10 @@
 import { gardenReadback } from "./garden-readback.js";
-import { createHash } from "node:crypto";
+import { adventureReadback } from "./adventure-readback.js";
 import { runInNewContext } from "node:vm";
 import {
   createWorldAPI,
   initialWorld,
   type Campaign,
-  type Entity,
   type World,
 } from "@workspace/adventure-engine";
 import { sceneSnapshot } from "@workspace/adventure-engine/art";
@@ -24,36 +23,16 @@ import {
   settleRealmMonth,
   type World as Realm,
 } from "@workspace/regency-engine";
-import type {
-  AdventureObject,
-  AdventureView,
-  RealmReadback,
-} from "../examples-review/types.js";
-
-const digest = (source: string) =>
-  createHash("sha256").update(source).digest("hex");
-const readFlag = (value: unknown) =>
-  typeof value === "boolean" ? value : null;
+import type { AdventureView, RealmReadback } from "../examples-review/types.js";
 
 function adventureView(id: string, world: World): AdventureView {
   const view = createWorldAPI(world, world.playerId).observe();
-  const entity = (item: Entity): AdventureObject => ({
-    id: item.id,
-    location: item.location ?? null,
-    kind: item.kind,
-    open: readFlag(item.components.open),
-    sealed: readFlag(item.components.sealed),
-    locked: readFlag(item.components.locked),
-  });
-  return {
+  return adventureReadback(
     id,
-    place: view.location.id,
-    tick: world.tick,
-    entities: [...view.entities, ...view.inventory].map(entity),
-    inventory: view.inventory.map((item) => item.id),
-    exits: Object.values(view.exits),
-    signature: digest(sceneSnapshot(world).signature),
-  };
+    view,
+    world.tick,
+    sceneSnapshot(world).signature,
+  );
 }
 
 function journey(campaign: Campaign) {

@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./live-garden": "./live-garden.ts"
+    "./live-garden": "./live-garden.ts",
+    "./live-adventure": "./live-adventure.ts"
   },
   "devDependencies": {
     "vitest": "^3.2.7",
@@ -12,6 +13,7 @@
   "dependencies": {
     "@workspace/runtime": "workspace:*",
     "@workspace-workers/grimoire-world": "workspace:*",
+    "@workspace-workers/adventure-world": "workspace:*",
     "@workspace/adventure-campaigns": "workspace:*",
     "@workspace/adventure-engine": "workspace:*",
     "@workspace/grimoire-engine": "workspace:*",

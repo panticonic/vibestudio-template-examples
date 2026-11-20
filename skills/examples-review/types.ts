@@ -158,7 +158,24 @@ export type LiveGardenRequest = {
   goal: string;
   claims: LiveGardenClaim[];
 };
-export type ExampleWorkflowRequest = ExampleReviewRequest | LiveGardenRequest;
+export type LiveAdventureClaim =
+  | { kind: "access"; check: AdventureAccessCheck }
+  | { kind: "continuity"; check: AdventureContinuityCheck }
+  | { kind: "artwork" };
+export type AdventureObservations = {
+  before: AdventureView;
+  current: AdventureView;
+  artwork: ExistingArt | null;
+};
+export type LiveAdventureRequest = {
+  kind: "live-adventure";
+  goal: string;
+  claims: LiveAdventureClaim[];
+};
+export type ExampleWorkflowRequest =
+  | ExampleReviewRequest
+  | LiveGardenRequest
+  | LiveAdventureRequest;
 export type GardenObservations = {
   before: GardenReadback;
   current: GardenReadback;
