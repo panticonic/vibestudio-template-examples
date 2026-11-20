@@ -1,0 +1,12 @@
+{
+  "schema": "natlang.package/v2",
+  "name": "vibestudio-open-adventure-journey",
+  "version": "0.1.0",
+  "targets": { "main": { "entry": "reviewAdventureJourney.nl" } },
+  "serviceBinding": "explicit",
+  "serviceScopes": {
+    "adventureSaveCatalog": ["reviewAdventureJourney/locateJourney/listSaves.nl"],
+    "adventurePlayerView": ["reviewAdventureJourney/locateJourney/readSave.nl"],
+    "adventurePlayerTurn": ["reviewAdventureJourney/resolveTurn/changeTurn.nl"]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@workspace-skills/open-adventure-journey-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./index.ts" },
+  "dependencies": {
+    "@workspace/runtime": "workspace:*",
+    "@workspace/adventure-campaigns": "workspace:*",
+    "@workspace/adventure-engine": "workspace:*",
+    "@workspace-workers/adventure-world": "workspace:*"
+  }
+}
