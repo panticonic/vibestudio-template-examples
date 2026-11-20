@@ -55,7 +55,11 @@ function opening(
 }
 
 export async function inspectAdventureOpening(journey: string) {
-  return opening(journey, "before", await owner(journey).call("getGame"));
+  return opening(journey, "before", await readAdventureGame(journey));
+}
+
+export function readAdventureGame(journey: string) {
+  return owner(journey).call("getGame");
 }
 
 export function prepareAdventureReview(

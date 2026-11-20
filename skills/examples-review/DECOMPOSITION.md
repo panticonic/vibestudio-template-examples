@@ -40,6 +40,13 @@ its loaded image to the worker's stored illustration. The Embassy case removes
 the optional artwork configuration in the owned context and checks the
 installed worker's readback for missing artwork.
 
+The programmed Adventure review uses the original lamp system test to drive
+the installed game and reload the panel. The Natlang call tree follows the
+committed change through four paths. It compares elapsed time and location,
+inspects the physical covering, reviews the old and new illustrations, and
+checks that the reloaded panel presents the same change. The game actors
+still own the original turn and artwork generation.
+
 The live Regency branch reads the assigned realm's current accounts and a
 bounded forecast computed by the worker's policy engine. It ties each review
 claim to either the saved accounts or the forecast and invokes the existing

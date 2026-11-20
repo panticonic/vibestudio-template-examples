@@ -178,6 +178,29 @@ export type LiveAdventureRequest = {
   goal: string;
   claims: LiveAdventureClaim[];
 };
+export type AdventureTransitionFrame = {
+  location: string;
+  asset: string;
+  tick: number;
+  narration: string;
+  light: string;
+};
+export type AdventureTransitionObservations = {
+  before: AdventureView;
+  current: AdventureView;
+  openingArtwork: ExistingArt;
+  replacementArtwork: ExistingArt;
+  covering: { id: string; from: string; to: string } | null;
+  effectiveLight: boolean | null;
+  repaint: AdventureTransitionFrame;
+  reload: AdventureTransitionFrame & { id: string };
+};
+export type LiveAdventureTransitionRequest = {
+  kind: "live-adventure-transition";
+  goal: string;
+  covering: string;
+  lamp: string;
+};
 export type LiveRealmClaim =
   | {
       kind: "settlement";
@@ -207,6 +230,7 @@ export type ExampleWorkflowRequest =
   | ExampleReviewRequest
   | LiveGardenRequest
   | LiveAdventureRequest
+  | LiveAdventureTransitionRequest
   | LiveRealmRequest
   | LivePortfolioRequest;
 export type GardenObservations = {
