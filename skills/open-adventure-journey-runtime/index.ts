@@ -113,7 +113,8 @@ function nativeSummary(data: ServiceView) {
     campaign: data.world.campaign, place: data.view.location.id, tick: data.world.tick,
     revision: data.world.revision, scene: data.visual.signature, artwork: data.world.artwork,
     seated: data.seated, pending: pending(data), journal: data.world.journal,
-    background: data.background.scene,
+    location: data.view.location, visible: data.view.entities, inventory: data.view.inventory,
+    exits: data.view.exits, background: data.background.scene,
   };
 }
 
@@ -172,6 +173,7 @@ export async function prepareOpenAdventureGoal(
     saves.push({ public: { id: "save-" + randomUUID(), title: campaign.title, label: seed.label }, native, before: await native.read() });
   }
   const selected = saves[world.expected.save];
+  const aliases = saves.filter(save => save !== selected && save.public.label === selected.public.label);
   const compareIndices = world.expected.compared ?? [];
   const readbacks: PlayerJourney[] = [];
   const catalogs: SavedJourney[][] = [];
@@ -216,7 +218,7 @@ export async function prepareOpenAdventureGoal(
   const services = {
     adventureSaveCatalog: {
       list: async () => {
-        const found = saves.map(entry => entry.public);
+        const found = saves.map(entry => entry.public).sort((left, right) => left.id.localeCompare(right.id));
         catalogs.push(found);
         return found;
       },
@@ -271,7 +273,8 @@ export async function prepareOpenAdventureGoal(
     const successfulActions = actions.filter(item => ["staged", "withdrawn"].includes(item.result.status));
     const checks = {
       discoveredAssignedAdventureSave: catalogs.some(catalog => catalog.some(save => save.id === selected.public.id))
-        && readbacks.some(view => view.save.id === selected.public.id),
+        && readbacks.some(view => view.save.id === selected.public.id)
+        && aliases.every(alias => readbacks.some(view => view.save.id === alias.public.id)),
       readComparedAdventureSaves: compareIndices.every(index => readbacks.some(view => view.save.id === saves[index].public.id)),
       attestedAdventurePlayerEvidence: expected.evidence.every(fact => verifyFact(fact, final, native) === fact.verdict)
         && evidenceMatches(resolved.evidence ?? [], expectedEvidence)
@@ -284,6 +287,8 @@ export async function prepareOpenAdventureGoal(
       preservedNativeAdventureScene: !final.seated && final.world.tick === before.world.tick
         && final.world.revision === before.world.revision && final.view.location.id === before.view.location.id
         && final.visual.signature === before.visual.signature && isDeepStrictEqual(final.world.artwork, before.world.artwork)
+        && isDeepStrictEqual(final.view.exits, before.view.exits) && isDeepStrictEqual(final.view.inventory, before.view.inventory)
+        && isDeepStrictEqual(final.view.entities, before.view.entities) && isDeepStrictEqual(final.view.location, before.view.location)
         && (withdrawals ? final.background.scene?.status === "queued" : isDeepStrictEqual(final.background.scene, before.background.scene)),
       isolatedSiblingAdventureSaves: saves.every((save, index) => index === expected.save
         || isDeepStrictEqual(nativeSummary(native[index]), nativeSummary(save.before))),
@@ -302,6 +307,7 @@ export async function prepareOpenAdventureGoal(
   async function qualify() {
     await services.adventureSaveCatalog.list();
     let current = await services.adventurePlayerView.read(selected.public.id);
+    for (const alias of aliases) await services.adventurePlayerView.read(alias.public.id);
     const compared = [];
     for (const index of compareIndices) compared.push((await services.adventurePlayerView.read(saves[index].public.id)).save.id);
     const stale = await services.adventurePlayerTurn.withdraw(current.save.id, "unobserved");
