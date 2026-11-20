@@ -1,0 +1,14 @@
+{
+  "schema":"natlang.package/v2",
+  "name":"vibestudio-open-regency-briefing",
+  "version":"0.1.0",
+  "targets":{"main":{"entry":"findRegencyRealm.nl"}},
+  "serviceBinding":"explicit",
+  "serviceScopes":{
+    "regencyAssignment":["findRegencyRealm.nl"],
+    "regencySaved":["readRegencyAccounts.nl"],
+    "regencyForecast":["previewRegencySettlement.nl"],
+    "regencyAdvance":["advanceOwnedRegency.nl"],
+    "regencyNote":["stageRegencyNote.nl"]
+  }
+}

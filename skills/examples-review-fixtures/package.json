@@ -6,6 +6,7 @@
     "./live-garden": "./live-garden.ts",
     "./live-adventure": "./live-adventure.ts",
     "./live-programmed-adventure": "./live-programmed-adventure.ts",
+    "./open-regency-owner": "./open-regency-owner.ts",
     "./live-realm": "./live-realm.ts",
     "./live-portfolio": "./live-portfolio.ts"
   },
