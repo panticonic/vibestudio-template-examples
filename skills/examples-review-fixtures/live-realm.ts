@@ -95,6 +95,7 @@ export function prepareRealmReview(
   }
   return {
     services: { realmRead: { observe } },
+    expected,
     verify,
     async qualify() {
       let wrongHorizonDenied = false;

@@ -1,6 +1,7 @@
 import type {
   AdventureCheck,
   ExampleDecision,
+  ExampleFinding,
   ExampleReview,
   ExampleReviewRequest,
   GardenCheck,
@@ -263,6 +264,26 @@ function realm(review: RealmCheck): ExampleReview {
   }
 }
 
+export function combineExampleFindings(
+  components: ExampleFinding[],
+): ExampleReview & { components: ExampleFinding[] } {
+  const evidenceIds = [
+    ...new Set(components.flatMap((item) => item.evidenceIds)),
+  ];
+  const ruledOut = components.some((item) => item.decision === "contradicted");
+  const incomplete = components.some(
+    (item) => item.decision === "not-observed",
+  );
+  return {
+    ...(ruledOut
+      ? result(false, "criteria-contradicted", ...evidenceIds)
+      : incomplete || components.length === 0
+        ? result(null, "criteria-unobserved", ...evidenceIds)
+        : result(true, "all-criteria-supported", ...evidenceIds)),
+    components,
+  };
+}
+
 export function exampleReference(request: ExampleReviewRequest): ExampleReview {
   switch (request.kind) {
     case "adventure":
@@ -271,26 +292,8 @@ export function exampleReference(request: ExampleReviewRequest): ExampleReview {
       return garden(request.review);
     case "realm":
       return realm(request.review);
-    case "composed": {
-      const components = request.work.map(exampleReference);
-      const evidenceIds = [
-        ...new Set(components.flatMap((item) => item.evidenceIds)),
-      ];
-      const ruledOut = components.some(
-        (item) => item.decision === "contradicted",
-      );
-      const incomplete = components.some(
-        (item) => item.decision === "not-observed",
-      );
-      return {
-        ...(ruledOut
-          ? result(false, "criteria-contradicted", ...evidenceIds)
-          : incomplete || components.length === 0
-            ? result(null, "criteria-unobserved", ...evidenceIds)
-            : result(true, "all-criteria-supported", ...evidenceIds)),
-        components,
-      };
-    }
+    case "composed":
+      return combineExampleFindings(request.work.map(exampleReference));
   }
 }
 

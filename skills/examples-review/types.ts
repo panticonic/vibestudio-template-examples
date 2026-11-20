@@ -148,7 +148,13 @@ export type ExampleFinding = {
   finding: string;
   evidenceIds: string[];
 };
-export type ExampleReview = ExampleFinding & { components?: ExampleFinding[] };
+export type ExampleReview = ExampleFinding & {
+  components?: ExampleFinding[];
+  demos?: {
+    garden: ExampleFinding & { components: ExampleFinding[] };
+    realm: ExampleFinding & { components: ExampleFinding[] };
+  };
+};
 
 export type LiveGardenClaim =
   | { kind: "habitat"; check: HabitatCheck }
@@ -189,11 +195,20 @@ export type RealmObservations = {
   saved: RealmReadback;
   forecast: RealmReadback;
 };
+export type DemoCriteria = { demo: "garden" | "realm"; claimIndex: number }[];
+export type LivePortfolioRequest = {
+  kind: "live-portfolio";
+  goal: string;
+  garden: LiveGardenRequest;
+  realm: LiveRealmRequest;
+  criteria: DemoCriteria;
+};
 export type ExampleWorkflowRequest =
   | ExampleReviewRequest
   | LiveGardenRequest
   | LiveAdventureRequest
-  | LiveRealmRequest;
+  | LiveRealmRequest
+  | LivePortfolioRequest;
 export type GardenObservations = {
   before: GardenReadback;
   current: GardenReadback;

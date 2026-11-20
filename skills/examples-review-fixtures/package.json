@@ -5,7 +5,8 @@
   "exports": {
     "./live-garden": "./live-garden.ts",
     "./live-adventure": "./live-adventure.ts",
-    "./live-realm": "./live-realm.ts"
+    "./live-realm": "./live-realm.ts",
+    "./live-portfolio": "./live-portfolio.ts"
   },
   "devDependencies": {
     "vitest": "^3.2.7",

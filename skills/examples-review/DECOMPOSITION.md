@@ -45,3 +45,9 @@ bounded forecast computed by the worker's policy engine. It ties each review
 claim to either the saved accounts or the forecast and invokes the existing
 settlement and economy lambdas. A separate check rereads the realm to verify
 that planning did not advance its calendar or change the committed accounts.
+
+A live demo readiness review combines a saved Grimoire estate and a Regency
+forecast. The portfolio lambda calls each installed game subtree. A separate
+decision lambda selects the assigned acceptance criteria and combines their
+findings in order. The report retains both full game reviews so observations
+that are outside those criteria stay available to the next reviewer.
