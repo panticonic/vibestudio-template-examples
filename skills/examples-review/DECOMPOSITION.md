@@ -35,6 +35,6 @@ The live Adventure branch reads the same journey's opening baseline and saved
 current view through one caller-bound service. It passes each claim into the
 existing access, continuity or illustration lambda and combines the findings.
 The worker provides the actor-visible projection and canonical scene signature.
-The managed harness opens the assigned campaign panel when artwork is expected
-and independently joins its loaded image to the worker's stored illustration.
-An unpainted opening supplies a separate check for missing artwork.
+The managed harness opens the assigned campaign panel and independently joins
+its loaded image to the worker's stored illustration. The Embassy case denies
+image import in the owned context and checks the readback for missing artwork.

@@ -1,9 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
 import { workers } from "@workspace/runtime";
-import {
-  deadLetterOffice,
-  missingCountry,
-} from "@workspace/adventure-campaigns";
 import type { ServiceView } from "@workspace/adventure-engine";
 import { adventureWorldRpcMethods } from "@workspace-workers/adventure-world/contract";
 import type {
@@ -14,11 +10,6 @@ import type {
 } from "../examples-review/types.js";
 import { adventureReadback, sceneDigest } from "./adventure-readback.js";
 import { exampleReference } from "./oracle.js";
-
-const campaigns = {
-  "dead-letter-office": deadLetterOffice,
-  "missing-country": missingCountry,
-};
 
 function owner(journey: string) {
   if (!/^natlang-adventure-[0-9a-f-]{36}$/u.test(journey))
@@ -63,25 +54,21 @@ function opening(
   };
 }
 
-export async function seedAdventure(
-  journey: string,
-  campaign: keyof typeof campaigns,
-) {
-  return opening(
-    journey,
-    "before",
-    await owner(journey).call("init", {
-      campaign: campaigns[campaign],
-    }),
-  );
+export async function inspectAdventureOpening(journey: string) {
+  return opening(journey, "before", await owner(journey).call("getGame"));
 }
 
 export function prepareAdventureReview(
   journey: string,
-  before: Awaited<ReturnType<typeof seedAdventure>>,
-  panel: { location: string; asset: string; tick: number } | null,
+  before: Awaited<ReturnType<typeof inspectAdventureOpening>>,
+  panel: {
+    location: string;
+    asset: string;
+    tick: number;
+    importDenied: boolean;
+  },
   world: {
-    campaign: keyof typeof campaigns;
+    campaign: string;
     place: string;
     painted: boolean;
     request: LiveAdventureRequest;
@@ -95,8 +82,7 @@ export function prepareAdventureReview(
     before.campaign !== world.campaign ||
     before.view.id !== `${journey}:before` ||
     before.view.place !== world.place ||
-    before.view.tick !== 0 ||
-    before.artwork !== null
+    before.view.tick !== 0
   )
     throw new Error("Adventure baseline does not match the assigned opening");
   let observation: ReturnType<typeof opening> | undefined;
@@ -139,19 +125,23 @@ export function prepareAdventureReview(
         observation?.campaign === world.campaign &&
         observation.revision === before.revision &&
         observation.view.place === world.place &&
+        isDeepStrictEqual(observation.artwork, before.artwork) &&
         isDeepStrictEqual(observation.view, {
           ...before.view,
           id: `${journey}:current`,
         }),
-      artwork: world.painted
-        ? Boolean(
-            panel &&
-            observation?.artwork?.id === panel.asset &&
-            observation.artwork.signature === observation.view.signature &&
-            panel.location === observation.view.place &&
-            panel.tick === observation.view.tick,
-          )
-        : panel === null && observation?.artwork === null,
+      artwork:
+        panel.location === world.place &&
+        panel.tick === 0 &&
+        (world.painted
+          ? Boolean(
+              !panel.importDenied &&
+              observation?.artwork?.id === panel.asset &&
+              observation.artwork.signature === observation.view.signature,
+            )
+          : panel.importDenied &&
+            panel.asset === "" &&
+            observation?.artwork === null),
       persisted: isDeepStrictEqual(persisted, observation),
       assignedClaims: isDeepStrictEqual(
         reference?.components?.map(({ decision }) => decision),
