@@ -36,7 +36,7 @@ function adventureView(id: string, world: World): AdventureView {
   );
 }
 
-function journey(campaign: Campaign) {
+export function startExampleJourney(campaign: Campaign) {
   const world = initialWorld(campaign);
   // These are the trusted original Examples campaign behavior bodies. Actions
   // still exercise the same actor-scoped world API used by the game.
@@ -55,7 +55,7 @@ function journey(campaign: Campaign) {
 }
 
 function adventureSnapshots() {
-  const post = journey(deadLetterOffice);
+  const post = startExampleJourney(deadLetterOffice);
   const landing = post.at("post-landing");
   post.player.open("mara-letter");
   const letterOpened = post.at("post-letter-opened");
@@ -65,7 +65,7 @@ function adventureSnapshots() {
   post.player.act("harbour-bell", "Ring the bell");
   const lowTide = post.at("post-low-tide");
 
-  const routed = journey(deadLetterOffice);
+  const routed = startExampleJourney(deadLetterOffice);
   routed.player.move("customs");
   const cabinet = routed.at("post-cabinet");
   routed.player.act("sorting-cabinet", "Insert a letter");
@@ -78,7 +78,7 @@ function adventureSnapshots() {
   routed.player.give("permit", "tomas");
   const ferryReleased = routed.at("post-ferry-released");
 
-  const embassy = journey(missingCountry);
+  const embassy = startExampleJourney(missingCountry);
   const vestibule = embassy.at("embassy-vestibule");
   embassy.player.read("notice");
   const notice = embassy.at("embassy-notice");
@@ -88,7 +88,7 @@ function adventureSnapshots() {
   embassy.player.move("square");
   const square = embassy.at("embassy-square");
 
-  const hotel = journey(wanderingHouse);
+  const hotel = startExampleJourney(wanderingHouse);
   const lobby = hotel.at("hotel-lobby");
   hotel.player.move("engine-room");
   const engine = hotel.at("hotel-engine");

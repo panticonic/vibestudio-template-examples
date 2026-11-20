@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { deadLetterOffice } from "@workspace/adventure-campaigns";
 import type {
   AdventureTransitionObservations,
   LiveAdventureTransitionRequest,
@@ -6,6 +7,7 @@ import type {
 
 vi.mock("@workspace/runtime", () => ({ workers: {} }));
 import { programmedAdventureReference } from "./live-programmed-adventure.js";
+import { startExampleJourney } from "./capture.js";
 
 const request: LiveAdventureTransitionRequest = {
   kind: "live-adventure-transition",
@@ -36,6 +38,42 @@ const observed: AdventureTransitionObservations = {
   reload: { ...frame, id: "reloaded" },
 };
 describe("reviewing the programmed Adventure transition", () => {
+  it("recognizes the real campaign's changed light and scene signature after covering the lamp", () => {
+    const { player, at } = startExampleJourney(deadLetterOffice);
+    const before = at("before");
+    const lamp = player.inspect(request.lamp);
+    player.setComponent(request.covering, "fold", { layers: 2 });
+    player.transfer(request.covering, lamp.location!);
+    const covering = player.link(request.covering, request.lamp, "covers");
+    const current = at("current");
+    expect(current.tick).toBeGreaterThan(before.tick);
+    expect(current.signature).not.toBe(before.signature);
+    const effectiveLight = player.getComponent(request.lamp, "effectiveLight");
+    expect(effectiveLight).toBe(false);
+    const report = programmedAdventureReference(request, {
+      ...observed,
+      before,
+      current,
+      covering,
+      effectiveLight: effectiveLight as boolean,
+      openingArtwork: {
+        ...observed.openingArtwork,
+        signature: before.signature,
+      },
+      replacementArtwork: {
+        ...observed.replacementArtwork,
+        signature: current.signature,
+      },
+    });
+    expect(report.components.map(({ decision }) => decision)).toEqual([
+      "supported",
+      "supported",
+      "supported",
+      "contradicted",
+      "supported",
+      "supported",
+    ]);
+  });
   it("joins changed scene, worker relation and reloaded panel without merging their evidence", () => {
     const report = programmedAdventureReference(request, observed);
     expect(
