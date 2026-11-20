@@ -111,7 +111,7 @@ export function prepareProgrammedAdventure(
       ({ from, to, kind }) =>
         from === request.covering && to === request.lamp && kind === "covers",
     );
-    const narration = data.world.journal.findLast(
+    const narration = data.world.journal.slice().reverse().find(
       ({ kind }) => kind === "narration",
     )?.id;
     settled =
