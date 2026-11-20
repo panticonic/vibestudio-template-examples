@@ -4,6 +4,7 @@ import { workers } from "@workspace/runtime";
 import { campaigns } from "@workspace/adventure-campaigns";
 import type { Campaign, Entity, ServiceView } from "@workspace/adventure-engine";
 import { adventureWorldRpcMethods } from "@workspace-workers/adventure-world/contract";
+import { openOwnedAdventurePlayer } from "./owned-player.js";
 import type {
   JourneyEvidence, JourneyOutcome, PlayerJourney, PlayerObject, SavedJourney, TurnProposal, TurnReceipt,
 } from "../open-adventure-journey/types.js";
@@ -39,13 +40,13 @@ type Assignment = { public: SavedJourney; native: Port; before: ServiceView };
 type Action = { method: "stage" | "withdraw"; args: unknown[]; result: TurnReceipt };
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
-function nativeAdventure(id: string): Port {
+function nativeAdventure(id: string, player: Awaited<ReturnType<typeof openOwnedAdventurePlayer>>): Port {
   const owner = workers.durableObjectService("examples.adventure.v1", adventureWorldRpcMethods, id);
   return {
-    start: campaign => owner.call("init", { campaign }),
+    start: () => player.start(id),
     read: () => owner.call("getGame"),
-    play: input => owner.call("play", input),
-    cancel: () => owner.call("cancel"),
+    play: input => player.play(id, input),
+    cancel: () => player.cancel(id),
   };
 }
 
@@ -158,20 +159,43 @@ function evidenceMatches(actual: JourneyEvidence[], expected: JourneyEvidence[])
 export async function prepareOpenAdventureGoal(
   input: { caseId: string; contextId: string },
   world: AdventureGoalCase,
-  makePort = nativeAdventure,
+  makePort?: (id: string) => Port,
 ) {
   if (input.caseId !== world.id) throw new Error("Unexpected Adventure goal");
   const campaign = campaigns.find(entry => entry.id === world.campaign);
   if (!campaign) throw new Error("Adventure campaign is not installed");
-  const saves: Assignment[] = [];
-  for (const seed of world.saves) {
-    const native = makePort("natlang-adventure-" + randomUUID());
-    const initial = await native.start(seedCampaign(campaign, seed));
-    if (initial.seated || initial.pending || initial.world.tick !== 0)
-      throw new Error("Assigned Adventure journey is already active");
-    if (seed.input) await native.play({ id: "opening-" + randomUUID(), text: seed.input });
-    saves.push({ public: { id: "save-" + randomUUID(), title: campaign.title, label: seed.label }, native, before: await native.read() });
+  const journeys = world.saves.map(seed => ({
+    seed, id: "natlang-adventure-" + randomUUID(), campaign: seedCampaign(campaign, seed),
+  }));
+  const player = makePort ? null : await openOwnedAdventurePlayer(input.contextId, campaign.id, journeys);
+  const close = async () => { await player?.close(); };
+  try {
+    const saves: Assignment[] = [];
+    for (const journey of journeys) {
+      const native = player ? nativeAdventure(journey.id, player) : makePort!(journey.id);
+      const initial = await native.start(journey.campaign);
+      if (initial.seated || initial.pending || initial.world.tick !== 0)
+        throw new Error("Assigned Adventure journey is already active");
+      if (journey.seed.input) await native.play({ id: "opening-" + randomUUID(), text: journey.seed.input });
+      saves.push({
+        public: { id: "save-" + randomUUID(), title: campaign.title, label: journey.seed.label },
+        native, before: await native.read(),
+      });
+    }
+    return prepareAssignedAdventureGoal(input, world, saves, close);
+  } catch (error) {
+    try { await close(); }
+    catch (cleanup) { throw new AggregateError([error, cleanup], "Adventure assignment and cleanup failed"); }
+    throw error;
   }
+}
+
+function prepareAssignedAdventureGoal(
+  input: { caseId: string; contextId: string },
+  world: AdventureGoalCase,
+  saves: Assignment[],
+  close: () => Promise<void>,
+) {
   const selected = saves[world.expected.save];
   const aliases = saves.filter(save => save !== selected && save.public.label === selected.public.label);
   const compareIndices = world.expected.compared ?? [];
@@ -263,8 +287,9 @@ export async function prepareOpenAdventureGoal(
     let retiredInputIsIdempotent = !withdrawals;
     if (withdrawals && before.pending && final.pending?.id !== before.pending.id) {
       try {
-        const replay = await selected.native.play({ id: before.pending.id, text: before.pending.text });
-        retiredInputIsIdempotent = isDeepStrictEqual(nativeSummary(replay), nativeSummary(final));
+        await selected.native.play({ id: before.pending.id, text: before.pending.text });
+        const replayed = await selected.native.read();
+        retiredInputIsIdempotent = isDeepStrictEqual(nativeSummary(replayed), nativeSummary(final));
       } catch {
         retiredInputIsIdempotent = false;
       }
@@ -336,5 +361,5 @@ export async function prepareOpenAdventureGoal(
     return { ...result, passed: result.passed && passedScopeControl, checks: { ...result.checks, passedScopeControl } };
   }
 
-  return { goal: world.goal, services, verify, qualify, close: async () => {} };
+  return { goal: world.goal, services, verify, qualify, close };
 }
