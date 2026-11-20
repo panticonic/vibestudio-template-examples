@@ -172,10 +172,28 @@ export type LiveAdventureRequest = {
   goal: string;
   claims: LiveAdventureClaim[];
 };
+export type LiveRealmClaim =
+  | {
+      kind: "settlement";
+      source: "saved" | "forecast";
+      check: RealmCurrentCheck;
+    }
+  | { kind: "compare"; check: RealmTrendCheck; assertCommitted: boolean };
+export type LiveRealmRequest = {
+  kind: "live-realm";
+  goal: string;
+  months: number;
+  claims: LiveRealmClaim[];
+};
+export type RealmObservations = {
+  saved: RealmReadback;
+  forecast: RealmReadback;
+};
 export type ExampleWorkflowRequest =
   | ExampleReviewRequest
   | LiveGardenRequest
-  | LiveAdventureRequest;
+  | LiveAdventureRequest
+  | LiveRealmRequest;
 export type GardenObservations = {
   before: GardenReadback;
   current: GardenReadback;

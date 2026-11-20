@@ -78,6 +78,17 @@ async function boot(fail = false) {
   return { ...t, player, deliveries, outbound, wireCall };
 }
 describe("regency durable turns", () => {
+  it("forecasts using the live settlement law without advancing the saved realm", async () => {
+    const t = await boot();
+    const before = await t.player("getGame");
+    await expect(t.player("previewSettlement", { months: 4 })).rejects.toThrow(/one and three/);
+    const { basis, forecast } = await t.player("previewSettlement", { months: 3 });
+    expect(basis).toEqual(before.game.world);
+    expect(forecast.month).toBe(basis.month + 3);
+    expect(forecast.ledger.find(({ id }) => id === "treasury")?.amount).toBe(76.1);
+    expect(await t.player("getGame")).toEqual(before);
+    expect(t.deliveries).toEqual([]);
+  });
   it("builds a persistent mechanism, executes its scene action once and preserves consequences on cancellation", async () => {
     const t = await boot(), mara = {...AGENT, callerId:"do:mara"}, builder = {...AGENT,callerId:"do:builder"};
     await t.player("play", {id:"mill",wish:"Visit the mill and open its sluice."});

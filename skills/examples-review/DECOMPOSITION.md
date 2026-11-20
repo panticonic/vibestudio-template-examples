@@ -39,3 +39,9 @@ The managed harness opens the assigned campaign panel and independently joins
 its loaded image to the worker's stored illustration. The Embassy case removes
 the optional artwork configuration in the owned context and checks the
 installed worker's readback for missing artwork.
+
+The live Regency branch reads the assigned realm's current accounts and a
+bounded forecast computed by the worker's policy engine. It ties each review
+claim to either the saved accounts or the forecast and invokes the existing
+settlement and economy lambdas. A separate check rereads the realm to verify
+that planning did not advance its calendar or change the committed accounts.

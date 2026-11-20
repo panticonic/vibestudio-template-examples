@@ -1,5 +1,5 @@
 ---
-description: Assess a claim about one committed Regency settlement.
+description: Assess a claim about one Regency settlement snapshot.
 args:
   check: RealmCurrentCheck
   current: RealmReadback

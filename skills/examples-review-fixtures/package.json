@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     "./live-garden": "./live-garden.ts",
-    "./live-adventure": "./live-adventure.ts"
+    "./live-adventure": "./live-adventure.ts",
+    "./live-realm": "./live-realm.ts"
   },
   "devDependencies": {
     "vitest": "^3.2.7",
@@ -14,6 +15,7 @@
     "@workspace/runtime": "workspace:*",
     "@workspace-workers/grimoire-world": "workspace:*",
     "@workspace-workers/adventure-world": "workspace:*",
+    "@workspace-workers/regency-realm": "workspace:*",
     "@workspace/adventure-campaigns": "workspace:*",
     "@workspace/adventure-engine": "workspace:*",
     "@workspace/grimoire-engine": "workspace:*",

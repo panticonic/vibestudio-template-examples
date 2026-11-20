@@ -237,6 +237,27 @@ export class RegencyGameDO extends DurableObjectBase {
     };
   }
   @rpc({
+    website: { kind: "closed", reason: "Preview for installed realm reviews." },
+    principals: ["host", "user", "code"],
+    effect: { kind: "open" },
+    tier: "open",
+    sensitivity: "read",
+  })
+  async previewSettlement(input: { months: number }) {
+    const { months } = input;
+    if (!Number.isInteger(months) || months < 1 || months > 3)
+      throw new Error("Forecast between one and three whole months.");
+    const { world, programs } = this.load().game;
+    const basis = JSON.stringify({ world, programs });
+    const preview = await runPolicies(
+      createMainRpcCaller(this.rpc), world, programs, undefined, months,
+    );
+    const current = this.load().game;
+    if (JSON.stringify({ world: current.world, programs: current.programs }) !== basis)
+      throw new Error("The realm changed during the forecast. Read its latest state and retry.");
+    return { basis: world, forecast: preview.world };
+  }
+  @rpc({
     website: {
       kind: "closed",
       reason:
