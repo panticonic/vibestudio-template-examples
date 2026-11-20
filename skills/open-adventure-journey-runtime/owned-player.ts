@@ -56,7 +56,8 @@ export async function openOwnedAdventurePlayer(contextId: string, campaign: stri
     if (identity.contextId !== contextId || identity.source !== source || identity.requestedRef !== `ctx:${contextId}`)
       throw new Error("The player runtime belongs to another context or campaign");
     session = await panel.cdp.session();
-    await session.page.waitForSelector('[data-owned-adventure-player="ready"]');
+    // This blank marker attests that the player binding mounted, independent of layout.
+    await session.page.waitForSelector('[data-owned-adventure-player="ready"]', { state: "attached" });
     const { page, receipt } = session;
     const ready = await panel.observe();
     if (!receipt || receipt.generation.panelId !== panel.id ||

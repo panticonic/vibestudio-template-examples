@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": { ".": "./index.ts" },
+  "devDependencies": { "vitest": "^3.2.7" },
   "dependencies": {
     "@workspace/runtime": "workspace:*",
     "@workspace/adventure-campaigns": "workspace:*",
