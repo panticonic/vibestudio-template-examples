@@ -11,7 +11,7 @@ import { gardenReadback } from "./garden-readback.js";
 import { exampleReference } from "./oracle.js";
 
 type GardenAction = "sol" | "pip" | "linger";
-const gardenOwner = (garden: string) =>
+export const gardenOwner = (garden: string) =>
   workers.durableObjectService(
     "examples.grimoire.v1",
     grimoireWorldRpcMethods,

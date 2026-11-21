@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./open-grimoire-scene-owner": "./open-grimoire-scene-owner.ts",
     "./live-garden": "./live-garden.ts",
     "./live-adventure": "./live-adventure.ts",
     "./live-programmed-adventure": "./live-programmed-adventure.ts",
@@ -22,6 +23,7 @@
     "@workspace-workers/regency-realm": "workspace:*",
     "@workspace/adventure-campaigns": "workspace:*",
     "@workspace/adventure-engine": "workspace:*",
+    "@workspace/living-canvas": "workspace:*",
     "@workspace/grimoire-engine": "workspace:*",
     "@workspace/regency-engine": "workspace:*"
   }
