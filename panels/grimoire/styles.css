@@ -526,7 +526,7 @@ footer {
 .garden-observations {
   max-width: 800px;
   width: 88%;
-  margin: -20px auto 48px;
+  margin: 12px auto 48px;
   position: relative;
   z-index: 4;
   display: flex;
@@ -623,7 +623,7 @@ footer {
 }
 @media (max-width: 700px) {
   .garden-observations {
-    margin: -5px 5% 25px;
+    margin: 8px 5% 25px;
     padding: 16px 20px;
     gap: 14px;
     flex-wrap: wrap;

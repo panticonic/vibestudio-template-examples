@@ -170,6 +170,15 @@ function GrimoireWorld({ worldKey }: { worldKey: string }) {
           >
             Observe quietly
           </button>
+          {garden.residents.map((resident) => (
+            <button
+              key={resident.id}
+              disabled={busy}
+              onClick={() => void story.visit(resident.id)}
+            >
+              Visit {resident.name}
+            </button>
+          ))}
         </div>
       </section>
       <section className="wish-card" aria-label="Conversation with Moth">
