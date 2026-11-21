@@ -1,0 +1,13 @@
+{
+  "schema":"natlang.package/v2",
+  "name":"vibestudio-open-demo-portfolio",
+  "version":"0.1.0",
+  "targets":{"main":{"entry":"findPortfolio.nl"}},
+  "serviceBinding":"explicit",
+  "serviceScopes":{
+    "demoPortfolioIndex":["findPortfolio.nl"],
+    "demoPortfolioState":["readPortfolioFrame.nl"],
+    "demoPortfolioForecast":["readPortfolioForecast.nl"],
+    "demoPortfolioHandoff":["stagePortfolioHandoff.nl"]
+  }
+}
