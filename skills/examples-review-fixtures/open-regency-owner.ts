@@ -12,9 +12,6 @@ export const openRegencyInstalled = {
     return {
       read:()=>worker.call("getGame"),
       preview:(months:1|2|3)=>worker.call("previewSettlement",{months}),
-      seat:(targetId:string,channelId:string)=>worker.call("registerParticipant",{role:"storyteller",targetId,channelId}),
-      advance:(id:string,months:number)=>worker.call("advance",{id,months}),
-      cancel:()=>worker.call("cancel"),
     };
   },
   readback(id:string,world:unknown) { return realmReadback(id,world as World); },

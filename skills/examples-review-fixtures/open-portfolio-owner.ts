@@ -13,8 +13,6 @@ export const pairedPortfolioInstalled = {
     const worker=workers.durableObjectService("examples.grimoire.v1",grimoireWorldRpcMethods,id);
     return {
       read:()=>worker.call("getGame"),
-      pulse:(id:string)=>worker.call("linger",{id,quiet:true}),
-      visit:(residentId:string)=>worker.call("visit",{residentId}),
     };
   },
   readGarden:(id:string,garden:unknown)=>gardenReadback(id,garden as Garden),
