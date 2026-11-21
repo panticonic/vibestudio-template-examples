@@ -9,7 +9,6 @@ export function openOwnedGrimoireScene(id: string) {
   return {
     read: () => owner.call("getGame"),
     catalog: () => owner.call("artCatalog"),
-    advanceFixture: (id: string) => owner.call("linger", { id, quiet: true }),
   };
 }
 
