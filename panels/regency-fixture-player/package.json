@@ -1,0 +1,33 @@
+{
+  "name": "@workspace-panels/regency-fixture-player",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Exercise Regency player actions for managed local references without seating model-backed advisors.",
+  "vibestudio": {
+    "title": "Regency fixture player",
+    "entry": "index.tsx",
+    "stateArgs": {
+      "type": "object",
+      "properties": { "realm": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "authority": {
+      "provides": [],
+      "serviceRequests": [{ "protocol": "examples.regency.v1", "availability": "required" }],
+      "requests": [{
+        "capability": "workspace-service:regency",
+        "resource": { "kind": "prefix", "prefix": "do:workers/regency-realm:RegencyGameDO:natlang-realm-" },
+        "tier": "gated",
+        "evidence": "bounded-dynamic"
+      }]
+    }
+  },
+  "dependencies": {
+    "@workspace/runtime": "workspace:*",
+    "@workspace/react": "workspace:*",
+    "@workspace-workers/regency-realm": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
