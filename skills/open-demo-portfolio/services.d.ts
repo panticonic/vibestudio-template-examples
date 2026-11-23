@@ -1,8 +1,6 @@
-import type { Horizon, PortfolioFrame, PortfolioIndex, PortfolioNote, PortfolioProjection, PortfolioReport } from "./types.js";
-
 declare module "natlang:services" {
-  export const demoPortfolioIndex: { list():Promise<PortfolioIndex> };
-  export const demoPortfolioState: { read(portfolio:string):Promise<PortfolioFrame|null> };
-  export const demoPortfolioForecast: { preview(portfolio:string,basis:string,months:Horizon):Promise<PortfolioProjection|null> };
-  export const demoPortfolioHandoff: { stage(report:PortfolioReport):Promise<PortfolioNote|null> };
+  export const demoPortfolioIndex: { list():Promise<import("./types.js").PortfolioIndex> };
+  export const demoPortfolioState: { read(portfolio:string):Promise<import("./types.js").PortfolioFrame|null> };
+  export const demoPortfolioForecast: { preview(portfolio:string,basis:string,months:import("./types.js").Horizon):Promise<import("./types.js").PortfolioProjection|null> };
+  export const demoPortfolioHandoff: { stage(report:import("./types.js").PortfolioReport):Promise<import("./types.js").PortfolioNote|null> };
 }

@@ -4,10 +4,14 @@
   "version": "0.1.0",
   "serviceBinding": "explicit",
   "serviceScopes": {
-    "gardenRead": ["reviewExample/inspectLiveGarden/readGarden.nl"],
-    "adventureRead": ["reviewExample/inspectLiveAdventure/readJourney.nl"],
-    "adventureTransitionRead": ["reviewExample/reviewProgrammedAdventure/readTurn.nl"],
-    "realmRead": ["reviewExample/inspectLiveRealm/readSettlement.nl"]
+    "gardenRead": [],
+    "adventureRead": [],
+    "adventureTransitionRead": [],
+    "realmRead": []
   },
-  "targets": { "main": { "entry": "reviewExample.nl" } }
+  "targets": {
+    "main": {
+      "entry": "reviewExample.nl"
+    }
+  }
 }

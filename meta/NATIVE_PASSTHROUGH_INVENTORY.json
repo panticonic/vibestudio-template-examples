@@ -1,0 +1,336 @@
+{
+  "schema": "natlang.native-passthrough-inventory/1",
+  "root": "/home/werg/data/vibestudio-open-goal-live/full-luna-campaign-yci2LB1N/rejection-audit/native-passthrough-examples",
+  "rows": [
+    {
+      "path": "skills/examples-review/reviewExample/inspectLiveAdventure/readJourney.nl",
+      "line": 1,
+      "body_line": 6,
+      "source_sha256": "eefef72b0b034cf9f68ee36ce41731c4c73cf570706da11b3792df09e69576d6",
+      "service": "adventureRead",
+      "method": "observe",
+      "arguments": "",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/examples-review",
+      "metadata": {
+        "description": "Read the assigned actor-visible Adventure scene and its opening baseline.",
+        "args": {},
+        "returns": "AdventureObservations"
+      },
+      "output": "skills/examples-review/reviewExample/inspectLiveAdventure/readJourney.ts",
+      "generated": "import {adventureRead} from \"natlang:services\";\nimport type {AdventureObservations} from \"../../types.js\";\n/** Read the assigned actor-visible Adventure scene and its opening baseline. */\nexport default async function readJourney():Promise<AdventureObservations>{\n return adventureRead.observe();\n}\n",
+      "source_body": "Call adventureRead.observe. Return its result unchanged."
+    },
+    {
+      "path": "skills/examples-review/reviewExample/inspectLiveGarden/readGarden.nl",
+      "line": 1,
+      "body_line": 6,
+      "source_sha256": "793cee3c80a947ef59563197646684c0526c521802663137f3c4fd67166484a0",
+      "service": "gardenRead",
+      "method": "observe",
+      "arguments": "",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/examples-review",
+      "metadata": {
+        "description": "Read the actual garden observations furnished by the caller.",
+        "returns": "GardenObservations",
+        "args": {}
+      },
+      "output": "skills/examples-review/reviewExample/inspectLiveGarden/readGarden.ts",
+      "generated": "import {gardenRead} from \"natlang:services\";\nimport type {GardenObservations} from \"../../types.js\";\n/** Read the actual garden observations furnished by the caller. */\nexport default async function readGarden():Promise<GardenObservations>{\n return gardenRead.observe();\n}\n",
+      "source_body": "Call gardenRead.observe and return its result unchanged."
+    },
+    {
+      "path": "skills/examples-review/reviewExample/inspectLiveRealm/readSettlement.nl",
+      "line": 1,
+      "body_line": 7,
+      "source_sha256": "276566471d73fa94870d9f623dd211f3b1f8d6d5c09bdaf3d61c1e271ffd0847",
+      "service": "realmRead",
+      "method": "observe",
+      "arguments": "months",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/examples-review",
+      "metadata": {
+        "description": "Read the assigned saved settlement and forecast for the requested horizon.",
+        "args": {
+          "months": "number"
+        },
+        "returns": "RealmObservations"
+      },
+      "output": "skills/examples-review/reviewExample/inspectLiveRealm/readSettlement.ts",
+      "generated": "import {realmRead} from \"natlang:services\";\nimport type {RealmObservations} from \"../../types.js\";\n/** Read the assigned saved settlement and forecast for the requested horizon. */\nexport default async function readSettlement(months: number):Promise<RealmObservations>{\n return realmRead.observe(months);\n}\n",
+      "source_body": "Call realmRead.observe with months. Return the readback unchanged."
+    },
+    {
+      "path": "skills/examples-review/reviewExample/reviewProgrammedAdventure/readTurn.nl",
+      "line": 1,
+      "body_line": 6,
+      "source_sha256": "e335d586bdf3cebb44dce325374843e5c41e65d7c23590439426facc14ed2362",
+      "service": "adventureTransitionRead",
+      "method": "observe",
+      "arguments": "",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/examples-review",
+      "metadata": {
+        "description": "Read the committed scene and the corresponding browser observations.",
+        "args": {},
+        "returns": "AdventureTransitionObservations"
+      },
+      "output": "skills/examples-review/reviewExample/reviewProgrammedAdventure/readTurn.ts",
+      "generated": "import {adventureTransitionRead} from \"natlang:services\";\nimport type {AdventureTransitionObservations} from \"../../types.js\";\n/** Read the committed scene and the corresponding browser observations. */\nexport default async function readTurn():Promise<AdventureTransitionObservations>{\n return adventureTransitionRead.observe();\n}\n",
+      "source_body": "Call adventureTransitionRead.observe and return the result unchanged."
+    },
+    {
+      "path": "skills/open-adventure-journey/reviewAdventureJourney/locateJourney/listSaves.nl",
+      "line": 1,
+      "body_line": 6,
+      "source_sha256": "ceae2edb9bee30357600c516e56935aa6e448eb4ce852b48779f289cb0bdddb0",
+      "service": "adventureSaveCatalog",
+      "method": "list",
+      "arguments": "",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-adventure-journey",
+      "metadata": {
+        "description": "List the entitled saved journeys in this workspace.",
+        "args": {},
+        "returns": "SavedJourney[]"
+      },
+      "output": "skills/open-adventure-journey/reviewAdventureJourney/locateJourney/listSaves.ts",
+      "generated": "import {adventureSaveCatalog} from \"natlang:services\";\nimport type {SavedJourney} from \"../../types.js\";\n/** List the entitled saved journeys in this workspace. */\nexport default async function listSaves():Promise<SavedJourney[]>{\n return adventureSaveCatalog.list();\n}\n",
+      "source_body": "Call services.adventureSaveCatalog.list with no arguments. Return its results unchanged."
+    },
+    {
+      "path": "skills/open-adventure-journey/reviewAdventureJourney/locateJourney/readSave.nl",
+      "line": 1,
+      "body_line": 7,
+      "source_sha256": "3e2fb63a39fd0ef6bf0c8c3d267435b86930400b5f0454533d319ed7ad699372",
+      "service": "adventurePlayerView",
+      "method": "read",
+      "arguments": "save",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-adventure-journey",
+      "metadata": {
+        "description": "Get the current player-scoped evidence from a discovered save.",
+        "args": {
+          "save": "string"
+        },
+        "returns": "PlayerJourney"
+      },
+      "output": "skills/open-adventure-journey/reviewAdventureJourney/locateJourney/readSave.ts",
+      "generated": "import {adventurePlayerView} from \"natlang:services\";\nimport type {PlayerJourney} from \"../../types.js\";\n/** Get the current player-scoped evidence from a discovered save. */\nexport default async function readSave(save: string):Promise<PlayerJourney>{\n return adventurePlayerView.read(save);\n}\n",
+      "source_body": "Call services.adventurePlayerView.read with the save handle. Return the exact native projection."
+    },
+    {
+      "path": "skills/open-demo-portfolio/findPortfolio.nl",
+      "line": 1,
+      "body_line": 5,
+      "source_sha256": "1ea222a92ede3249551d8c400e6b00bf523bb0a4ea62d75dbcc1ea3b374e23f3",
+      "service": "demoPortfolioIndex",
+      "method": "list",
+      "arguments": "",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-demo-portfolio",
+      "metadata": {
+        "description": "Resolve the assigned paired Grimoire estate and Regency realm.",
+        "returns": "PortfolioIndex"
+      },
+      "output": "skills/open-demo-portfolio/findPortfolio.ts",
+      "generated": "import {demoPortfolioIndex} from \"natlang:services\";\nimport type {PortfolioIndex} from \"./types.js\";\n/** Resolve the assigned paired Grimoire estate and Regency realm. */\nexport default async function findPortfolio():Promise<PortfolioIndex>{\n return demoPortfolioIndex.list();\n}\n",
+      "source_body": "Call demoPortfolioIndex.list and return its exact installed assignment."
+    },
+    {
+      "path": "skills/open-demo-portfolio/readPortfolioForecast.nl",
+      "line": 1,
+      "body_line": 9,
+      "source_sha256": "8686b9eb351a330406dd51ec7401b6b38fba199777ed8ca156fb2b500f18f4e0",
+      "service": "demoPortfolioForecast",
+      "method": "preview",
+      "arguments": "portfolio, basis, months",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-demo-portfolio",
+      "metadata": {
+        "description": "Observe the native Regency projection on the current paired checkpoint.",
+        "args": {
+          "portfolio": "string",
+          "basis": "string",
+          "months": "Horizon"
+        },
+        "returns": "PortfolioProjection | null"
+      },
+      "output": "skills/open-demo-portfolio/readPortfolioForecast.ts",
+      "generated": "import {demoPortfolioForecast} from \"natlang:services\";\nimport type {Horizon, PortfolioProjection} from \"./types.js\";\n/** Observe the native Regency projection on the current paired checkpoint. */\nexport default async function readPortfolioForecast(portfolio: string, basis: string, months: Horizon):Promise<PortfolioProjection | null>{\n return demoPortfolioForecast.preview(portfolio, basis, months);\n}\n",
+      "source_body": "Call demoPortfolioForecast.preview with the exact portfolio, basis and months. Return its result unchanged."
+    },
+    {
+      "path": "skills/open-demo-portfolio/readPortfolioFrame.nl",
+      "line": 1,
+      "body_line": 7,
+      "source_sha256": "6df3610118bce76159c251a1002db526829114d7c4e006463a5237fbf532370e",
+      "service": "demoPortfolioState",
+      "method": "read",
+      "arguments": "portfolio",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-demo-portfolio",
+      "metadata": {
+        "description": "Read both native applications and the assigned current acceptance card.",
+        "args": {
+          "portfolio": "string"
+        },
+        "returns": "PortfolioFrame | null"
+      },
+      "output": "skills/open-demo-portfolio/readPortfolioFrame.ts",
+      "generated": "import {demoPortfolioState} from \"natlang:services\";\nimport type {PortfolioFrame} from \"./types.js\";\n/** Read both native applications and the assigned current acceptance card. */\nexport default async function readPortfolioFrame(portfolio: string):Promise<PortfolioFrame | null>{\n return demoPortfolioState.read(portfolio);\n}\n",
+      "source_body": "Call demoPortfolioState.read with the exact portfolio id and return its result unchanged."
+    },
+    {
+      "path": "skills/open-demo-portfolio/stagePortfolioHandoff.nl",
+      "line": 1,
+      "body_line": 7,
+      "source_sha256": "fb5cfca18db79a36b7f75396aa406443171c81cbafcd44b078d2b19d45ed551d",
+      "service": "demoPortfolioHandoff",
+      "method": "stage",
+      "arguments": "report",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-demo-portfolio",
+      "metadata": {
+        "description": "Write one authorized private readiness or diagnostic handoff.",
+        "args": {
+          "report": "PortfolioReport"
+        },
+        "returns": "PortfolioNote | null"
+      },
+      "output": "skills/open-demo-portfolio/stagePortfolioHandoff.ts",
+      "generated": "import {demoPortfolioHandoff} from \"natlang:services\";\nimport type {PortfolioNote, PortfolioReport} from \"./types.js\";\n/** Write one authorized private readiness or diagnostic handoff. */\nexport default async function stagePortfolioHandoff(report: PortfolioReport):Promise<PortfolioNote | null>{\n return demoPortfolioHandoff.stage(report);\n}\n",
+      "source_body": "Call demoPortfolioHandoff.stage with the exact report. Return the verified receipt."
+    },
+    {
+      "path": "skills/open-regency-briefing/advanceOwnedRegency.nl",
+      "line": 1,
+      "body_line": 9,
+      "source_sha256": "7a6f5c82d66e318b8ebbc2a9971ff3955a02afdaaee734ed487427c4e3d5fcf0",
+      "service": "regencyAdvance",
+      "method": "commit",
+      "arguments": "realm, basis, months",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-regency-briefing",
+      "metadata": {
+        "description": "Make the one authorized calendar advance on the exact saved basis.",
+        "args": {
+          "realm": "string",
+          "basis": "string",
+          "months": "Horizon"
+        },
+        "returns": "RegencyAdvance | null"
+      },
+      "output": "skills/open-regency-briefing/advanceOwnedRegency.ts",
+      "generated": "import {regencyAdvance} from \"natlang:services\";\nimport type {Horizon, RegencyAdvance} from \"./types.js\";\n/** Make the one authorized calendar advance on the exact saved basis. */\nexport default async function advanceOwnedRegency(realm: string, basis: string, months: Horizon):Promise<RegencyAdvance | null>{\n return regencyAdvance.commit(realm, basis, months);\n}\n",
+      "source_body": "Call regencyAdvance.commit with realm, basis and months. Return the exact committed receipt."
+    },
+    {
+      "path": "skills/open-regency-briefing/findRegencyRealm.nl",
+      "line": 1,
+      "body_line": 5,
+      "source_sha256": "ddb333def0595854c077260deb679656970bcd1bf77f2902ee23c212efa37097",
+      "service": "regencyAssignment",
+      "method": "list",
+      "arguments": "",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-regency-briefing",
+      "metadata": {
+        "description": "Identify the exact privately assigned Regency realm and installed route names.",
+        "returns": "RegencyIndex"
+      },
+      "output": "skills/open-regency-briefing/findRegencyRealm.ts",
+      "generated": "import {regencyAssignment} from \"natlang:services\";\nimport type {RegencyIndex} from \"./types.js\";\n/** Identify the exact privately assigned Regency realm and installed route names. */\nexport default async function findRegencyRealm():Promise<RegencyIndex>{\n return regencyAssignment.list();\n}\n",
+      "source_body": "Call regencyAssignment.list and return the result unchanged."
+    },
+    {
+      "path": "skills/open-regency-briefing/previewRegencySettlement.nl",
+      "line": 1,
+      "body_line": 9,
+      "source_sha256": "ba25acd9b69ff2f7cffa28ca9c28bffef8d4e12a18d558e138ce52743494d1fc",
+      "service": "regencyForecast",
+      "method": "preview",
+      "arguments": "realm, basis, months",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-regency-briefing",
+      "metadata": {
+        "description": "Ask the installed Regency worker for a read-only projection on one exact persisted basis.",
+        "args": {
+          "realm": "string",
+          "basis": "string",
+          "months": "Horizon"
+        },
+        "returns": "RegencyForecast | null"
+      },
+      "output": "skills/open-regency-briefing/previewRegencySettlement.ts",
+      "generated": "import {regencyForecast} from \"natlang:services\";\nimport type {Horizon, RegencyForecast} from \"./types.js\";\n/** Ask the installed Regency worker for a read-only projection on one exact persisted basis. */\nexport default async function previewRegencySettlement(realm: string, basis: string, months: Horizon):Promise<RegencyForecast | null>{\n return regencyForecast.preview(realm, basis, months);\n}\n",
+      "source_body": "Call regencyForecast.preview with the exact realm, basis and months. Return the result unchanged."
+    },
+    {
+      "path": "skills/open-regency-briefing/readRegencyAccounts.nl",
+      "line": 1,
+      "body_line": 7,
+      "source_sha256": "7bbb4f6586e9818e80c9aac3cd47d556a8630844edd069ad65d0d46a7a0fd170",
+      "service": "regencySaved",
+      "method": "read",
+      "arguments": "realm",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-regency-briefing",
+      "metadata": {
+        "description": "Read a persisted Regency checkpoint and its own pending-turn status.",
+        "args": {
+          "realm": "string"
+        },
+        "returns": "RegencySnapshot | null"
+      },
+      "output": "skills/open-regency-briefing/readRegencyAccounts.ts",
+      "generated": "import {regencySaved} from \"natlang:services\";\nimport type {RegencySnapshot} from \"./types.js\";\n/** Read a persisted Regency checkpoint and its own pending-turn status. */\nexport default async function readRegencyAccounts(realm: string):Promise<RegencySnapshot | null>{\n return regencySaved.read(realm);\n}\n",
+      "source_body": "Call regencySaved.read with realm and return its result unchanged."
+    },
+    {
+      "path": "skills/open-regency-briefing/stageRegencyNote.nl",
+      "line": 1,
+      "body_line": 7,
+      "source_sha256": "e8148ca5b859a64ad14c4054b6751711a9bd493b44f178edf0a04f67e1bc6dba",
+      "service": "regencyNote",
+      "method": "stage",
+      "arguments": "report",
+      "status": "converted",
+      "reason": "Exact native service call, typed signature, no semantic judgment or child subtree",
+      "package": "skills/open-regency-briefing",
+      "metadata": {
+        "description": "Stage one private Regency note supported by exact observed and projected receipts.",
+        "args": {
+          "report": "RegencyReport"
+        },
+        "returns": "RegencyNote | null"
+      },
+      "output": "skills/open-regency-briefing/stageRegencyNote.ts",
+      "generated": "import {regencyNote} from \"natlang:services\";\nimport type {RegencyNote, RegencyReport} from \"./types.js\";\n/** Stage one private Regency note supported by exact observed and projected receipts. */\nexport default async function stageRegencyNote(report: RegencyReport):Promise<RegencyNote | null>{\n return regencyNote.stage(report);\n}\n",
+      "source_body": "Call regencyNote.stage with report and return its result unchanged."
+    }
+  ],
+  "verification": {
+    "compiler": "actual VibeStudio compileProgram and workspaceModules, all affected packages plus every public entry root",
+    "packages": 81,
+    "aggregate_linked_files": 3708,
+    "ledger_unit": "native-passthrough-compile-20261123c",
+    "teacher_calls": 0,
+    "runtime_capture_dependency": "Deploy with Core native-service frame recording fix; raw service frame binding is insufficient."
+  }
+}

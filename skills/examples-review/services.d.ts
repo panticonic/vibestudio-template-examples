@@ -1,17 +1,10 @@
-import type {
-  AdventureObservations,
-  AdventureTransitionObservations,
-  GardenObservations,
-  RealmObservations,
-} from "./types.js";
-
 declare module "natlang:services" {
-  export const gardenRead: { observe(): Promise<GardenObservations> };
-  export const adventureRead: { observe(): Promise<AdventureObservations> };
+  export const gardenRead: { observe(): Promise<import("./types.js").GardenObservations> };
+  export const adventureRead: { observe(): Promise<import("./types.js").AdventureObservations> };
   export const adventureTransitionRead: {
-    observe(): Promise<AdventureTransitionObservations>;
+    observe(): Promise<import("./types.js").AdventureTransitionObservations>;
   };
   export const realmRead: {
-    observe(months: number): Promise<RealmObservations>;
+    observe(months: number): Promise<import("./types.js").RealmObservations>;
   };
 }
