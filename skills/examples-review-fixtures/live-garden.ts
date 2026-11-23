@@ -1,3 +1,4 @@
+import { issuedObservation } from "./issued-observation.js";
 import { workers } from "@workspace/runtime";
 import { grimoireWorldRpcMethods } from "@workspace-workers/grimoire-world/contract";
 import type {
@@ -46,11 +47,7 @@ export function prepareGardenReview(
   if (before.id !== `${garden}:before`)
     throw new Error("Garden baseline belongs to another session");
   let observed: GardenObservations | undefined;
-  let readStarted = false;
-  async function observe() {
-    if (readStarted)
-      throw new Error("Read the live garden once for the joint claim review");
-    readStarted = true;
+  const observe = issuedObservation(async () => {
     observed = {
       before,
       current: await observeGarden(
@@ -60,7 +57,7 @@ export function prepareGardenReview(
       ),
     };
     return structuredClone(observed);
-  }
+  });
   function expected() {
     if (!observed)
       throw new Error("A garden review needs the installed service readback");

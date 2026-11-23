@@ -1,3 +1,4 @@
+import { issuedObservation } from "./issued-observation.js";
 import { isDeepStrictEqual } from "node:util";
 import type {
   AdventureTransitionFrame,
@@ -91,10 +92,7 @@ export function prepareProgrammedAdventure(
   const openingArtwork = before.artwork;
   let observed: AdventureTransitionObservations | undefined;
   let settled = false;
-  let read = false;
-  async function observe() {
-    if (read) throw new Error("Read the assigned Adventure transition once");
-    read = true;
+  const observe = issuedObservation(async () => {
     const data = await readAdventureGame(journey);
     const current = adventureReadback(
       `${journey}:current`,
@@ -136,7 +134,7 @@ export function prepareProgrammedAdventure(
       reload: { ...frames.reload, id: `${journey}:reloaded` },
     };
     return structuredClone(observed);
-  }
+  });
   function verify(report: ExampleReview | null) {
     const expected = observed
       ? programmedAdventureReference(request, observed)

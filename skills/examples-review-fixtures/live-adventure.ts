@@ -1,3 +1,4 @@
+import { issuedObservation } from "./issued-observation.js";
 import { isDeepStrictEqual } from "node:util";
 import { workers } from "@workspace/runtime";
 import type { ServiceView } from "@workspace/adventure-engine";
@@ -90,10 +91,7 @@ export function prepareAdventureReview(
     throw new Error("Adventure baseline does not match the assigned opening");
   let observation: ReturnType<typeof opening> | undefined;
   let observed: AdventureObservations | undefined;
-  let readStarted = false;
-  async function observe() {
-    if (readStarted) throw new Error("Read the assigned journey once");
-    readStarted = true;
+  const observe = issuedObservation(async () => {
     observation = await readCurrent();
     observed = {
       before: before.view,
@@ -101,7 +99,7 @@ export function prepareAdventureReview(
       artwork: observation.artwork,
     };
     return structuredClone(observed);
-  }
+  });
   function expected(): ExampleReview {
     if (!observed) throw new Error("Read the installed Adventure worker first");
     const { before, current, artwork } = observed;

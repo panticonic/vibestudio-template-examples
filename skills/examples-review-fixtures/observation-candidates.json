@@ -1,0 +1,35 @@
+{
+  "scope": "All supplied candidates in this template classified; explicit once/issued-state guards additionally inspected. This does not claim an arbitrary text scan proves absence of every semantic guard.",
+  "candidates": [
+    {
+      "file": "examples/skills/examples-review-fixtures/live-realm.ts",
+      "line": 76,
+      "text": "      exactBasis,\n      openingIntact: isDeepStrictEqual(await read(), before),\n      exactForecast:\n        observed?.saved.month === 0 &&\n        observed.saved.treasury === 120 &&\n        observed.forecast.month === request.months &&\n        observed.forecast.treasury === assignment.projectedTreasury,",
+      "classification": "typed-domain-result-or-native-protected-state; not-teacher-read-count"
+    },
+    {
+      "file": "examples/skills/examples-review-fixtures/live-adventure.ts",
+      "line": 131,
+      "text": "        observation.view.place === world.place &&\n        isDeepStrictEqual(observation.artwork, before.artwork) &&\n        isDeepStrictEqual(observation.view, {\n          ...before.view,\n          id: `${journey}:current`,\n        }),\n      artwork:",
+      "classification": "typed-domain-result-or-native-protected-state; not-teacher-read-count"
+    },
+    {
+      "file": "examples/skills/examples-review-fixtures/live-adventure.ts",
+      "line": 132,
+      "text": "        isDeepStrictEqual(observation.artwork, before.artwork) &&\n        isDeepStrictEqual(observation.view, {\n          ...before.view,\n          id: `${journey}:current`,\n        }),\n      artwork:\n        panel.location === world.place &&",
+      "classification": "typed-domain-result-or-native-protected-state; not-teacher-read-count"
+    },
+    {
+      "file": "examples/skills/examples-review-fixtures/live-adventure.ts",
+      "line": 145,
+      "text": "          : panel.asset === \"\" && observation?.artwork === null),\n      persisted: isDeepStrictEqual(persisted, observation),\n      assignedClaims: isDeepStrictEqual(\n        reference?.components?.map(({ decision }) => decision),\n        world.expected,\n      ),\n      exactReport: reference !== null && isDeepStrictEqual(report, reference),",
+      "classification": "typed-domain-result-or-native-protected-state; not-teacher-read-count"
+    },
+    {
+      "file": "examples/skills/open-adventure-journey-runtime/index.ts",
+      "line": 311,
+      "text": "        && (!stages || isDeepStrictEqual(successfulActions.at(-1)?.args[2], expected.proposal)),\n      verifiedAdventureJournal: isDeepStrictEqual(final.world.journal, expectedJournal) && retiredInputIsIdempotent,\n      preservedNativeAdventureScene: !final.seated && final.world.tick === before.world.tick\n        && final.world.revision === before.world.revision && final.view.location.id === before.view.location.id\n        && final.visual.signature === before.visual.signature && isDeepStrictEqual(final.world.artwork, before.world.artwork)\n        && isDeepStrictEqual(final.view.exits, before.view.exits) && isDeepStrictEqual(final.view.inventory, before.view.inventory)\n        && isDeepStrictEqual(final.view.entities, before.view.entities) && isDeepStrictEqual(final.view.location, before.view.location)",
+      "classification": "typed-domain-result-or-native-protected-state; not-teacher-read-count"
+    }
+  ]
+}

@@ -3,4 +3,4 @@ description: Read the assigned actor-visible Adventure scene and its opening bas
 args: {}
 returns: AdventureObservations
 ---
-Call adventureRead.observe exactly once. Return its result unchanged.
+Call adventureRead.observe. Return its result unchanged.

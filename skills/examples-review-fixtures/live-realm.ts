@@ -1,3 +1,4 @@
+import { issuedObservation } from "./issued-observation.js";
 import { isDeepStrictEqual } from "node:util";
 import { workers } from "@workspace/runtime";
 import { regencyRealmRpcMethods } from "@workspace-workers/regency-realm/contract";
@@ -30,12 +31,8 @@ export function prepareRealmReview(
   let before: Awaited<ReturnType<typeof read>> | undefined;
   let observed: RealmObservations | undefined;
   let exactBasis = false;
-  let started = false;
-  async function observe(months: number) {
-    if (months !== request.months)
-      throw new Error("Use the assigned forecast horizon");
-    if (started) throw new Error("Observe the assigned realm once");
-    started = true;
+  const readObservation = issuedObservation(async () => {
+    const months = request.months;
     before = await read();
     if (before.pending || before.painting || before.seated)
       throw new Error("The fixture needs a quiet Regency opening");
@@ -48,6 +45,10 @@ export function prepareRealmReview(
       forecast: realmReadback(`${realm}:forecast:${months}`, forecast),
     };
     return structuredClone(observed);
+  });
+  async function observe(months: number) {
+    if (months !== request.months) throw new Error("Use the assigned forecast horizon");
+    return readObservation();
   }
   function expected() {
     if (!observed) throw new Error("Read the live realm first");
