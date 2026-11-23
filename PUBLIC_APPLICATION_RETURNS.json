@@ -1,0 +1,30 @@
+[
+  {
+    "template": "examples",
+    "entry": "skills/open-adventure-journey/reviewAdventureJourney.nl",
+    "resultType": "JourneyOutcome",
+    "decision": "retain requested domain value",
+    "fields": {
+      "save": "requested application value",
+      "compared": "requested application value",
+      "observation": "requested application value",
+      "disposition": "requested application value",
+      "evidence": "requested player-view propositions/verdicts; no world snapshots",
+      "pending": "requested application value",
+      "reason": "requested application value"
+    },
+    "evidence": [
+      "skills/open-adventure-journey/reviewAdventureJourney.nl",
+      "skills/open-adventure-journey/types.ts"
+    ],
+    "consumers": [
+      "/home/werg/vibe-app-values-examples/skills/open-adventure-journey/natlang.json:7:      \"entry\": \"reviewAdventureJourney.nl\"",
+      "/home/werg/vibe-app-values-examples/skills/open-adventure-journey/natlang.json:15:      \"reviewAdventureJourney/resolveTurn/changeTurn.nl\""
+    ],
+    "nativeConsumers": [
+      "/home/werg/vibe-app-values-examples/skills/open-adventure-journey/types.ts:33:export type JourneyOutcome = {",
+      "/home/werg/vibe-app-values-examples/skills/open-adventure-journey-runtime/index.ts:9:  JourneyEvidence, JourneyOutcome, PlayerJourney, PlayerObject, SavedJourney, TurnProposal, TurnReceipt,",
+      "/home/werg/vibe-app-values-examples/skills/open-adventure-journey-runtime/index.ts:268:    const outcome = report as Partial<Extract<JourneyOutcome, { save: string }>> & { status?: string; skill?: string };"
+    ]
+  }
+]
