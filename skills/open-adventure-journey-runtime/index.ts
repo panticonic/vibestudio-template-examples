@@ -1,5 +1,6 @@
+import {assessObservedApplicationOutcome} from "@workspace-skills/system-testing/observed-application-outcome";
 import type {InvocationObservations} from "@workspace-skills/system-testing/observed-invocation";
-import {assessSemanticOutcome,type SemanticOutcomeContract} from "@workspace-skills/system-testing/semantic-outcome-contract";
+import type {SemanticOutcomeContract} from "@workspace-skills/system-testing/semantic-outcome-contract";
 import { createHash, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { workers } from "@workspace/runtime";
@@ -324,12 +325,14 @@ function prepareAssignedAdventureGoal(
         && isDeepStrictEqual([...resolved.compared].sort(), compareIndices.map(index => saves[index].public.id).sort()),
     };
     const contract:SemanticOutcomeContract={effects:{checks:["discoveredAssignedAdventureSave", "readComparedAdventureSaves", "verifiedExactAdventureTurn", "verifiedAdventureJournal", "preservedNativeAdventureScene", "isolatedSiblingAdventureSaves"],rationale:"Independent native observations, authority and persisted state establish application effects."},returnedValue:{checks:["attestedAdventurePlayerEvidence", "matchedAdventureHandoff"],required:expected.turn==="preserved",rationale:"These are the actual requested domain findings or query values; mutation-only calls retain their separately observed effects."},incidentalValues:{checks:[],rationale:"Optional incorrect mutation returns are recorded against the actual invocation, without invalidating correct native effects."}};
-    const incorrectReturnValues=!contract.returnedValue.required&&contract.returnedValue.checks.some(name=>!(checks as Record<string,boolean>)[name])&&invocation ? (await invocation.returns(call=>call.parentCallId===null)).filter(row=>isDeepStrictEqual(row.value,report)).map(({definition,value})=>({definition,value,required:contract.returnedValue.required&&contract.returnedValue.checks.some(name=>!(checks as Record<string,boolean>)[name])})) : [];
-    return assessSemanticOutcome({incorrectReturnValues,
+
+    const assessed=await assessObservedApplicationOutcome({
       passed: Object.values(checks).every(Boolean),
       contextId: input.contextId, caseId: input.caseId, goal: world.goal, checks,
       catalogs, readbacks, actions, final: finalView, selected: selected.public.id, retiredInputIsIdempotent,
-    },contract);
+    },contract,report,invocation,[]);
+    const {observedChecks,...dimensions}=assessed;
+    return {...dimensions,checks:observedChecks};
   }
 
   async function qualify() {
@@ -361,7 +364,8 @@ function prepareAssignedAdventureGoal(
     });
     const passedScopeControl = stale.status === "stale" && aliasDenied && invalid.status === "unavailable"
       && invalid.view.observation === beforeInvalid.observation;
-    return { ...result, passed: result.passed && passedScopeControl, checks: { ...result.checks, passedScopeControl } };
+    return {
+      outcomeContract:{...result.outcomeContract,effects:{...result.outcomeContract.effects,checks:[...result.outcomeContract.effects.checks,"passedScopeControl"]}}, ...result, passed: result.passed && passedScopeControl, checks: { ...result.checks, passedScopeControl } };
   }
 
   return { goal: world.goal, services, verify, qualify, close };
