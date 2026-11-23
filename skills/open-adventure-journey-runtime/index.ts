@@ -266,8 +266,7 @@ function prepareAssignedAdventureGoal(
     const final = native[world.expected.save];
     const before = selected.before;
     const outcome = report as Partial<Extract<JourneyOutcome, { save: string }>> & { status?: string; skill?: string };
-    const resolved = (outcome?.status === "workspace-skill-reviewed" && outcome.skill === "adventureJourney"
-      ? (report as { outcome?: Partial<Extract<JourneyOutcome, { save: string }>> }).outcome : outcome) ?? {};
+    const resolved = (report) ?? {};
     const expected = world.expected;
     const withdrawals = expected.turn === "withdrawn" || expected.turn === "replaced";
     const stages = expected.turn === "staged" || expected.turn === "replaced";
