@@ -25,6 +25,7 @@
       "/home/werg/vibe-app-values-examples/skills/open-adventure-journey/types.ts:33:export type JourneyOutcome = {",
       "/home/werg/vibe-app-values-examples/skills/open-adventure-journey-runtime/index.ts:9:  JourneyEvidence, JourneyOutcome, PlayerJourney, PlayerObject, SavedJourney, TurnProposal, TurnReceipt,",
       "/home/werg/vibe-app-values-examples/skills/open-adventure-journey-runtime/index.ts:268:    const outcome = report as Partial<Extract<JourneyOutcome, { save: string }>> & { status?: string; skill?: string };"
-    ]
+    ],
+    "functionalStructure": "semantic NL coordinator retained"
   }
 ]

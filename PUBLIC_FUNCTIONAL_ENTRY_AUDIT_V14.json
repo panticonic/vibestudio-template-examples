@@ -1,0 +1,18 @@
+{
+  "publicEntries": 1,
+  "entries": [
+    {
+      "entry": "skills/open-adventure-journey/reviewAdventureJourney.nl",
+      "kind": "semantic NL coordinator retained",
+      "rationale": "The coordinator interprets action authorization and recovery after native action failures; these choices are not a fixed pipeline.",
+      "sourceSha256": "1c3eec463393ae7a7f4ae34b613e58348edc005b29ade925682bd2bcf3297f32"
+    }
+  ],
+  "sourceConversions": [],
+  "validation": {
+    "unit": "vibe-v14-local-nonbase-types-20261123c",
+    "scope": "Actual static native compilation and declaration regeneration of all38 discovered programs across six templates; no model execution or training data.",
+    "memoryPeakMiB": 287.7
+  },
+  "taskGoalsChanged": false
+}
