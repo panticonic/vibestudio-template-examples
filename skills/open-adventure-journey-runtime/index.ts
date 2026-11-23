@@ -1,3 +1,5 @@
+import type {InvocationObservations} from "@workspace-skills/system-testing/observed-invocation";
+import {assessSemanticOutcome,type SemanticOutcomeContract} from "@workspace-skills/system-testing/semantic-outcome-contract";
 import { createHash, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { workers } from "@workspace/runtime";
@@ -261,7 +263,7 @@ function prepareAssignedAdventureGoal(
     },
   };
 
-  async function verify(report: unknown) {
+  async function verify(report: unknown,invocation?:InvocationObservations) {
     const native = await Promise.all(saves.map(save => save.native.read()));
     const final = native[world.expected.save];
     const before = selected.before;
@@ -321,11 +323,13 @@ function prepareAssignedAdventureGoal(
         && isDeepStrictEqual(resolved.pending, pending(final)) && Array.isArray(resolved.compared)
         && isDeepStrictEqual([...resolved.compared].sort(), compareIndices.map(index => saves[index].public.id).sort()),
     };
-    return {
+    const contract:SemanticOutcomeContract={effects:{checks:["discoveredAssignedAdventureSave", "readComparedAdventureSaves", "verifiedExactAdventureTurn", "verifiedAdventureJournal", "preservedNativeAdventureScene", "isolatedSiblingAdventureSaves"],rationale:"Independent native observations, authority and persisted state establish application effects."},returnedValue:{checks:["attestedAdventurePlayerEvidence", "matchedAdventureHandoff"],required:expected.turn==="preserved",rationale:"These are the actual requested domain findings or query values; mutation-only calls retain their separately observed effects."},incidentalValues:{checks:[],rationale:"Optional incorrect mutation returns are recorded against the actual invocation, without invalidating correct native effects."}};
+    const incorrectReturnValues=!contract.returnedValue.required&&contract.returnedValue.checks.some(name=>!(checks as Record<string,boolean>)[name])&&invocation ? (await invocation.returns(call=>call.parentCallId===null)).filter(row=>isDeepStrictEqual(row.value,report)).map(({definition,value})=>({definition,value,required:contract.returnedValue.required&&contract.returnedValue.checks.some(name=>!(checks as Record<string,boolean>)[name])})) : [];
+    return assessSemanticOutcome({incorrectReturnValues,
       passed: Object.values(checks).every(Boolean),
       contextId: input.contextId, caseId: input.caseId, goal: world.goal, checks,
       catalogs, readbacks, actions, final: finalView, selected: selected.public.id, retiredInputIsIdempotent,
-    };
+    },contract);
   }
 
   async function qualify() {
