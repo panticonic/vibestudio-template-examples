@@ -3,12 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./index.ts" },
-  "devDependencies": { "vitest": "^3.2.7" },
+  "exports": {
+    ".": "./index.ts"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  },
   "dependencies": {
     "@workspace/runtime": "workspace:*",
     "@workspace/adventure-campaigns": "workspace:*",
     "@workspace/adventure-engine": "workspace:*",
-    "@workspace-workers/adventure-world": "workspace:*"
+    "@workspace-workers/adventure-world": "workspace:*",
+    "@workspace/application-outcomes": "workspace:*"
   }
 }
