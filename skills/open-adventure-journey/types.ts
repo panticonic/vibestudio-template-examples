@@ -30,11 +30,5 @@ export type JourneyEvidence = {
   verdict: "confirmed" | "refuted" | "unknown";
 };
 export type JourneyFocus = { selected: PlayerJourney; comparison: PlayerJourney[] } | null;
-export type JourneyOutcome = {
-  save: string;
-  compared: string[];
-  observation: string;
-  disposition: "preserved" | "withdrawn" | "staged" | "replaced";
-  evidence: JourneyEvidence[];
-  pending: { text: string; id: string } | null;
-} | { disposition: "blocked"; reason: string };
+/** Requested player findings; native authority tokens stay on service views. */
+export type JourneyFindings = { evidence: JourneyEvidence[] } | { disposition: "blocked"; reason: string };

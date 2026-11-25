@@ -2,16 +2,11 @@
   {
     "template": "examples",
     "entry": "skills/open-adventure-journey/reviewAdventureJourney.nl",
-    "resultType": "JourneyOutcome",
+    "resultType": "JourneyFindings",
     "decision": "retain requested domain value",
     "fields": {
-      "save": "requested application value",
-      "compared": "requested application value",
-      "observation": "requested application value",
-      "disposition": "requested application value",
-      "evidence": "requested player-view propositions/verdicts; no world snapshots",
-      "pending": "requested application value",
-      "reason": "requested application value"
+      "evidence": "requested player-view propositions and verdicts, with meaningful subject wording",
+      "reason": "explanation when the requested save cannot be identified"
     },
     "evidence": [
       "skills/open-adventure-journey/reviewAdventureJourney.nl",

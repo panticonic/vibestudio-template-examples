@@ -9,7 +9,7 @@ import type { Campaign, Entity, ServiceView } from "@workspace/adventure-engine"
 import { adventureWorldRpcMethods } from "@workspace-workers/adventure-world/contract";
 import { openOwnedAdventurePlayer } from "./owned-player.js";
 import type {
-  JourneyEvidence, JourneyOutcome, PlayerJourney, PlayerObject, SavedJourney, TurnProposal, TurnReceipt,
+  JourneyEvidence, PlayerJourney, PlayerObject, SavedJourney, TurnProposal, TurnReceipt,
 } from "../open-adventure-journey/types.js";
 
 export type SaveSeed = {
@@ -153,10 +153,11 @@ function verifyFact(fact: Evidence, native: ServiceView, comparison: ServiceView
   }
 }
 
-function evidenceMatches(actual: JourneyEvidence[], expected: JourneyEvidence[]) {
-  return Array.isArray(actual) && expected.every(fact => actual.some(candidate =>
-    candidate?.topic === fact.topic && candidate.verdict === fact.verdict && typeof candidate.subject === "string"
-    && nativeName(candidate.subject) === nativeName(fact.subject)));
+function validJourneyEvidence(value: unknown): value is JourneyEvidence[] {
+  const topics = new Set(["place", "exit", "carried", "visible", "sealed", "open", "locked", "contents", "scene", "same-place", "same-time", "same-scene"]);
+  return Array.isArray(value) && value.length > 0 && value.every(fact =>
+    fact && topics.has(fact.topic) && typeof fact.subject === "string" && fact.subject.trim().length > 0
+    && ["confirmed", "refuted", "unknown"].includes(fact.verdict));
 }
 
 export async function prepareOpenAdventureGoal(
@@ -268,15 +269,11 @@ function prepareAssignedAdventureGoal(
     const native = await Promise.all(saves.map(save => save.native.read()));
     const final = native[world.expected.save];
     const before = selected.before;
-    const outcome = report as Partial<Extract<JourneyOutcome, { save: string }>> & { status?: string; skill?: string };
-    const resolved = (report) ?? {};
+    const resolved = (report ?? {}) as { evidence?: unknown };
     const expected = world.expected;
     const withdrawals = expected.turn === "withdrawn" || expected.turn === "replaced";
     const stages = expected.turn === "staged" || expected.turn === "replaced";
     const finalView = project(selected.public, final);
-    const expectedEvidence = expected.evidence.map(fact => ({
-      ...fact, subject: typeof fact.subject === "number" ? saves[fact.subject].public.id : fact.subject,
-    }));
     const expectedPending = stages
       ? final.pending && final.pending.text === expected.text && final.pending.id !== before.pending?.id
       : isDeepStrictEqual(pending(final), withdrawals ? null : pending(before));
@@ -300,12 +297,10 @@ function prepareAssignedAdventureGoal(
     const successfulActions = actions.filter(item => ["staged", "withdrawn"].includes(item.result.status));
     const checks = {
       discoveredAssignedAdventureSave: catalogs.some(catalog => catalog.some(save => save.id === selected.public.id))
-        && readbacks.some(view => view.save.id === selected.public.id)
-        && aliases.every(alias => readbacks.some(view => view.save.id === alias.public.id)),
+        && [...readbacks, ...actions.map(action => action.result.view)].some(view => view.save.id === selected.public.id),
       readComparedAdventureSaves: compareIndices.every(index => readbacks.some(view => view.save.id === saves[index].public.id)),
-      attestedAdventurePlayerEvidence: expected.evidence.every(fact => verifyFact(fact, final, native) === fact.verdict)
-        && evidenceMatches(resolved.evidence ?? [], expectedEvidence)
-        && (resolved.evidence ?? []).length === expectedEvidence.length,
+      attestedNativeAdventureFacts: expected.evidence.every(fact => verifyFact(fact, final, native) === fact.verdict),
+      returnedAdventureFindings: validJourneyEvidence(resolved.evidence),
       verifiedExactAdventureTurn: Boolean(expectedPending)
         && isDeepStrictEqual(successfulActions.map(action => action.result.status), expectedActionKinds)
         && successfulActions.every(action => action.args[0] === selected.public.id)
@@ -319,17 +314,29 @@ function prepareAssignedAdventureGoal(
         && (withdrawals ? final.background.scene?.status === "queued" : isDeepStrictEqual(final.background.scene, before.background.scene)),
       isolatedSiblingAdventureSaves: saves.every((save, index) => index === expected.save
         || isDeepStrictEqual(nativeSummary(native[index]), nativeSummary(save.before))),
-      matchedAdventureHandoff: resolved.save === selected.public.id && resolved.disposition === expected.turn
-        && resolved.observation === finalView.observation && readbacks.some(view => view.observation === finalView.observation)
-        && isDeepStrictEqual(resolved.pending, pending(final)) && Array.isArray(resolved.compared)
-        && isDeepStrictEqual([...resolved.compared].sort(), compareIndices.map(index => saves[index].public.id).sort()),
+      readCurrentAdventureView: [...readbacks, ...actions.map(action => action.result.view)]
+        .some(view => view.save.id === selected.public.id && view.observation === finalView.observation),
     };
-    const contract:SemanticOutcomeContract={effects:{checks:["discoveredAssignedAdventureSave", "readComparedAdventureSaves", "verifiedExactAdventureTurn", "verifiedAdventureJournal", "preservedNativeAdventureScene", "isolatedSiblingAdventureSaves"],rationale:"Independent native observations, authority and persisted state establish application effects."},returnedValue:{checks:["attestedAdventurePlayerEvidence", "matchedAdventureHandoff"],required:expected.turn==="preserved",rationale:"These are the actual requested domain findings or query values; mutation-only calls retain their separately observed effects."},incidentalValues:{checks:[],rationale:"Optional incorrect mutation returns are recorded against the actual invocation, without invalidating correct native effects."}};
+    const contract:SemanticOutcomeContract={effects:{checks:["discoveredAssignedAdventureSave", "readComparedAdventureSaves", "attestedNativeAdventureFacts", "readCurrentAdventureView", "verifiedExactAdventureTurn", "verifiedAdventureJournal", "preservedNativeAdventureScene", "isolatedSiblingAdventureSaves"],rationale:"Independent native observations, authority and persisted state establish application effects."},returnedValue:{checks:["returnedAdventureFindings"],required:true,rationale:"Every assigned journey goal requests player findings, including goals that also authorize a native turn change; their meaning requires independent bound review."},incidentalValues:{checks:[],rationale:"Internal observation and save identifiers authorize native services, not a required returned bookkeeping format."}};
+    const journeyObservations = {
+      assigned: saves.map(save => save.public),
+      before: saves.map(save => project(save.public, save.before)),
+      final: saves.map((save, index) => project(save.public, native[index])),
+      readbacks, actions, selected: selected.public.id,
+      comparison: compareIndices.map(index => saves[index].public.id),
+    };
+    const semanticReviewInput = {
+      actual: { goal: world.goal, observations: journeyObservations, requestedReturn: report },
+      expected: { goal: world.goal, requestedReturnRequired: true },
+      rubric: "Judge whether the actual returned player findings answer every question in the user's goal, supported by the actual actor-visible readbacks or mutation receipts and independently verified native player snapshots. Accept meaningful entity names, save labels, combined subjects and equivalent fact selections; no opaque subject identifier, exact evidence count, extra report format or tool trajectory is required. Reject false, contradictory, unsupported or missing requested findings. Distinguish same place, fictional time and scene signature; an absent or stale illustration is not a current painted reference. Unspecified properties and inaccessible contents remain unknown. A queued player intention does not move anyone or perform an inspection. Native checks independently establish authorized turn effects and protected sibling/state preservation.",
+    };
 
     const assessed=await assessObservedApplicationOutcome({
       passed: Object.values(checks).every(Boolean),
       contextId: input.contextId, caseId: input.caseId, goal: world.goal, checks,
       catalogs, readbacks, actions, final: finalView, selected: selected.public.id, retiredInputIsIdempotent,
+      assigned: journeyObservations.assigned, initial: journeyObservations.before, nativeReadback: journeyObservations.final,
+      journeyObservations, semanticReviewRequired: true, semanticReviewInput,
     },contract,report,invocation,[]);
     const {observedChecks,...dimensions}=assessed;
     return {...dimensions,checks:observedChecks};
@@ -339,8 +346,7 @@ function prepareAssignedAdventureGoal(
     await services.adventureSaveCatalog.list();
     let current = await services.adventurePlayerView.read(selected.public.id);
     for (const alias of aliases) await services.adventurePlayerView.read(alias.public.id);
-    const compared = [];
-    for (const index of compareIndices) compared.push((await services.adventurePlayerView.read(saves[index].public.id)).save.id);
+    for (const index of compareIndices) await services.adventurePlayerView.read(saves[index].public.id);
     const stale = await services.adventurePlayerTurn.withdraw(current.save.id, "unobserved");
     let aliasDenied = false;
     try {
@@ -354,18 +360,22 @@ function prepareAssignedAdventureGoal(
     const invalid = await services.adventurePlayerTurn.stage(current.save.id, current.observation, { intent: "inspect", target: "unobserved" });
     if (world.expected.proposal)
       await services.adventurePlayerTurn.stage(current.save.id, current.observation, world.expected.proposal);
-    const final = await services.adventurePlayerView.read(selected.public.id);
+    await services.adventurePlayerView.read(selected.public.id);
     const result = await verify({
-      save: final.save.id, compared, observation: final.observation, disposition: world.expected.turn,
       evidence: world.expected.evidence.map(fact => ({
         ...fact, subject: typeof fact.subject === "number" ? saves[fact.subject].public.id : fact.subject,
       })),
-      pending: final.pending,
     });
     const passedScopeControl = stale.status === "stale" && aliasDenied && invalid.status === "unavailable"
       && invalid.view.observation === beforeInvalid.observation;
-    return {
-      outcomeContract:{...result.outcomeContract,effects:{...result.outcomeContract.effects,checks:[...result.outcomeContract.effects.checks,"passedScopeControl"]}}, ...result, passed: result.passed && passedScopeControl, checks: { ...result.checks, passedScopeControl } };
+    const assessed = await assessObservedApplicationOutcome({ ...result,
+      passed: result.passed && passedScopeControl,
+      checks: { ...result.checks, passedScopeControl },
+    }, { ...result.outcomeContract, effects: { ...result.outcomeContract.effects,
+      checks: [...result.outcomeContract.effects.checks, "passedScopeControl"],
+    } }, undefined);
+    const { observedChecks, ...dimensions } = assessed;
+    return { ...dimensions, checks: observedChecks };
   }
 
   return { goal: world.goal, services, verify, qualify, close };
