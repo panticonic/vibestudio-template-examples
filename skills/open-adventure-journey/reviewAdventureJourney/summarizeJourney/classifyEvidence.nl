@@ -6,6 +6,8 @@ args:
   current: PlayerJourney
 returns: JourneyEvidence[]
 ---
-1. Compare the current place, direct inventory, visible objects and nearby exits. Visibility covers the inventory and the player-visible surroundings. Carrying requires direct inventory. An absent object or exit is refuted as currently visible or accessible, while an unobserved property is unknown.
-2. Read explicit flags only. A sealed item or a closed or locked container does not reveal contents. Make a contents claim on the container or sealed item's subject ID when requested.
-3. Compare player position, fictional time or the exact scene signature separately when the request refers to another save. For a current illustration, establish whether it matches the scene from the current artwork state. Select the clauses that answer the user.
+Return the propositions needed to answer the user's actual questions from the supplied player snapshots. Describe each proposition clearly in its topic and identify its subject; topics are not a closed registry. Include action occurrence or pending state when the question asks about it, without adding a generic action report when none was requested.
+
+Visibility covers inventory and player-visible surroundings; carrying requires direct inventory. An absent object or exit refutes its current presence or accessibility. An unobserved property is unknown. Read explicit flags only; a sealed item or closed/locked container does not reveal its contents.
+
+Compare position, fictional time and scene signature separately when relevant. A current illustration must match the observed current artwork state. Use the original view, current view and actual pending input to distinguish an intention that is only queued from an action that has actually happened. Do not infer that staging or withdrawing an instruction advanced the world.

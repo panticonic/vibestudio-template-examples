@@ -65,3 +65,11 @@ it("authorized mutations still require the user's requested findings",async()=>{
 it("qualification retains scope controls in the shared normalized effects contract",async()=>{
  const f=fixture(continuity),p=await f.prepared;const proof=await p.qualify();expect(proof.passed).toBe(true);expect(proof.checks.passedScopeControl).toBe(true);expect(proof.outcomeContract.effects.checks).toContain("passedScopeControl");expect(proof.outcomeDimensions.effects.passed).toBe(true);
 });
+
+it("represents requested action occurrence as an open proposition rather than a receipt echo",async()=>{
+ const world:AdventureGoalCase={id:"action-question",campaign:"dead-letter-office",goal:"Plan to inspect the lamp and tell me whether the closer look has already happened.",saves:[{label:"Lamp plan"}],expected:{save:0,turn:"staged",proposal:{intent:"inspect",target:"harbour-lamp"},text:"I'd like to take a closer look at The harbour lamp.",evidence:[{topic:"visible",subject:"harbour-lamp",verdict:"confirmed"}]}};
+ const {p,saves}=await observed(world);const current=await p.services.adventurePlayerView.read(saves[0].id);await p.services.adventurePlayerTurn.stage(current.save.id,current.observation,world.expected.proposal!);
+ const report={evidence:[{topic:"Whether the requested closer look has already happened",subject:"the harbour lamp inspection",verdict:"refuted"}]};
+ const proof=await p.verify(report);expect(proof.passed).toBe(true);expect(proof.semanticReviewRequired).toBe(true);expect(proof.semanticReviewInput.actual.requestedReturn).toEqual(report);expect(proof.final.pending).not.toBeNull();expect(proof.final.tick).toBe(current.tick);
+});
+it("still rejects empty proposition names",async()=>{const {p}=await observed();const proof=await p.verify({evidence:[{topic:" ",subject:"Front Steps",verdict:"confirmed"}]});expect(proof.checks.returnedAdventureFindings).toBe(false);});

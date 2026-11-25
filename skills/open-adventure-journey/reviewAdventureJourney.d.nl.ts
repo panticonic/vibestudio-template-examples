@@ -29,7 +29,8 @@ type TurnProposal = { intent: "approach" | "inspect" | "bring" | "speak"; target
 type TurnDecision = { kind: "preserve" | "withdraw" } | { kind: "stage" | "replace"; proposal: TurnProposal };
 type TurnReceipt = { status: "staged" | "withdrawn" | "stale" | "unavailable"; view: PlayerJourney };
 type JourneyEvidence = {
-  topic: "place" | "exit" | "carried" | "visible" | "sealed" | "open" | "locked" | "contents" | "scene" | "same-place" | "same-time" | "same-scene";
+  /** A meaningful requested proposition, not a fixed fixture taxonomy. */
+  topic: string;
   subject: string;
   verdict: "confirmed" | "refuted" | "unknown";
 };

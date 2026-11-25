@@ -90,3 +90,20 @@ Actual expanded check vibe-adventure-projected-facts-final-20261125a passed35
 Node +28Vitest checks, including ALL16original frozen journey worlds through
 the real engine projection and existing native transport seam (627.8MiB peak,
 expected1/hard2GiB,reserve5.5LOW). No model or native UI claim.
+
+Open proposition follow-up: no real consumer dispatches on the returned
+JourneyEvidence.topic after separating the native oracle. Only the NL
+classifier/summarizer, structural validator, generated schema and Host byte
+binder consume it. The old12-tag public enum could not directly state whether
+a requested inspection happened; there is no other answer/claim-text channel.
+Public topic is now a meaningful nonempty proposition string. NativeFixtureFact
+keeps the exact closed12-tag mechanical oracle independently. No action-finding
+requirement is added to goals that did not ask one; actual meaning remains
+mandatory native-bound independent review. Frozen V31/a09 is untouched.
+
+Actual follow-up check vibe-open-journey-propositions-20261125a passed65
+checks (35 Host admission/export +30 application/original-world controls),
+with zero diagnostics from the actual declaration compiler and645.1MiB peak
+under expected1/hard2GiB,reserve5.5LOW. The new action-occurrence control
+binds a staged pending inspection and unchanged tick to the actual returned
+proposition; empty proposition names remain rejected. No model calls.

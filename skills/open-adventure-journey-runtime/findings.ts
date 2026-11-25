@@ -1,5 +1,8 @@
 import type {JourneyEvidence,PlayerJourney,PlayerObject,TurnReceipt} from "../open-adventure-journey/types.js";
-export type JourneyFact = Omit<JourneyEvidence,"subject"> & {subject:string|number};
+export type NativeFixtureFact = {
+  topic:"place"|"exit"|"carried"|"visible"|"sealed"|"open"|"locked"|"contents"|"scene"|"same-place"|"same-time"|"same-scene";
+  subject:string|number; verdict:JourneyEvidence["verdict"];
+};
 export type JourneyObservations = {
   assigned: PlayerJourney["save"][]; before: PlayerJourney[]; final: PlayerJourney[];
   readbacks: PlayerJourney[]; actions: {method:"stage"|"withdraw";args:unknown[];result:TurnReceipt}[];
@@ -7,7 +10,7 @@ export type JourneyObservations = {
 };
 const nativeName = (value:string) => value.toLowerCase().replace(/^the\s+/u,"").replace(/[-\s]+/gu," ").trim();
 /** Domain facts use the same canonical player projection live and in archived reassessment. */
-export function verifyJourneyFact(fact:JourneyFact, native:PlayerJourney, comparison:PlayerJourney[]):JourneyEvidence["verdict"] {
+export function verifyJourneyFact(fact:NativeFixtureFact, native:PlayerJourney, comparison:PlayerJourney[]):JourneyEvidence["verdict"] {
   const subject=nativeName(String(fact.subject));
   const same=(candidate:string)=>nativeName(candidate)===subject;
   const namesEntity=(entity:PlayerObject)=>same(entity.id)||same(entity.name)||(entity.kind==="person"&&same(entity.name.split(" ")[0]));
@@ -27,8 +30,7 @@ export function verifyJourneyFact(fact:JourneyFact, native:PlayerJourney, compar
   }
 }
 export function validJourneyEvidence(value:unknown):value is JourneyEvidence[]{
-  const topics=new Set(["place","exit","carried","visible","sealed","open","locked","contents","scene","same-place","same-time","same-scene"]);
-  return Array.isArray(value)&&value.length>0&&value.every(fact=>fact&&topics.has(fact.topic)&&typeof fact.subject==="string"&&fact.subject.trim().length>0&&["confirmed","refuted","unknown"].includes(fact.verdict));
+  return Array.isArray(value)&&value.length>0&&value.every(fact=>fact&&typeof fact.topic==="string"&&fact.topic.trim().length>0&&typeof fact.subject==="string"&&fact.subject.trim().length>0&&["confirmed","refuted","unknown"].includes(fact.verdict));
 }
 /** No golden claim list or receiver bookkeeping is part of semantic admission. */
 export function createJourneyMeaningReview<T extends object>(goal:string,observations:T,requestedReturn:unknown){

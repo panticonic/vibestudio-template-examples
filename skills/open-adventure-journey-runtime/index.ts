@@ -1,4 +1,4 @@
-import {verifyJourneyFact,validJourneyEvidence,createJourneyMeaningReview,type JourneyFact,type JourneyObservations} from "./findings.js";
+import {verifyJourneyFact,validJourneyEvidence,createJourneyMeaningReview,type NativeFixtureFact,type JourneyObservations} from "./findings.js";
 import {assessObservedApplicationOutcome} from "@workspace/application-outcomes/observed-application-outcome";
 import type {InvocationObservations} from "@workspace/application-outcomes/observed-invocation";
 import type {SemanticOutcomeContract} from "@workspace/application-outcomes/semantic-outcome-contract";
@@ -27,7 +27,7 @@ export type AdventureGoalCase = {
   expected: {
     save: number;
     compared?: number[];
-    evidence: JourneyFact[];
+    evidence: NativeFixtureFact[];
     turn: "preserved" | "withdrawn" | "staged" | "replaced";
     proposal?: TurnProposal;
     text?: string;
