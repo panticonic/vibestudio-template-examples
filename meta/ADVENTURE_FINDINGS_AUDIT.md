@@ -78,3 +78,15 @@ diagnostics. Scoped script lint, syntax and all three diffs passed. No model
 calls, cold npm, native/Webview qualification or full transitive typecheck was
 performed or claimed. The earlier registry-test Map/array mistake was corrected;
 the final run above exercises the actual Map API.
+
+Archived reassessment shares findings.ts with the live receiver. Its fact
+checker consumes the canonical PlayerJourney projection (including actual
+boolean/unknown flags, scene freshness and comparison signatures); neither an
+inverse synthetic native ServiceView nor a second fact implementation is
+needed. The review constructor is also shared. Historical contexts explicitly
+label captured actor readbacks and source-verified native guarantees rather
+than inventing an uncaptured initial native snapshot.
+Actual expanded check vibe-adventure-projected-facts-final-20261125a passed35
+Node +28Vitest checks, including ALL16original frozen journey worlds through
+the real engine projection and existing native transport seam (627.8MiB peak,
+expected1/hard2GiB,reserve5.5LOW). No model or native UI claim.

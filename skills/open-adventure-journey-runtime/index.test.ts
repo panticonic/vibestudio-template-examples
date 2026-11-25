@@ -4,14 +4,14 @@ import {prepareOpenAdventureGoal,type AdventureGoalCase} from "./index.js";
 vi.mock("@workspace/runtime",()=>({workers:{}}));
 vi.mock("@workspace-workers/adventure-world/contract",()=>({adventureWorldRpcMethods:[]}));
 vi.mock("./owned-player.js",()=>({openOwnedAdventurePlayer:()=>{throw Error("Component tests must not start a UI");}}));
-function fixture(world:AdventureGoalCase){
+export function fixture(world:AdventureGoalCase){
  const states:ServiceView[]=[];
  const prepared=prepareOpenAdventureGoal({caseId:world.id,contextId:"actual-test-context"},world,()=>{
-  let state:ServiceView;
+  let state:ServiceView;const seen=new Set<string>();
   const read=async()=>structuredClone({...state,view:createWorldAPI(state.world,state.world.playerId).observe()});
   return {start:async(campaign:Campaign)=>{const native=initialWorld(campaign),view=createWorldAPI(native,native.playerId).observe();
    state={world:native,view,pending:null,background:{scene:null},visual:{signature:JSON.stringify(view),fresh:false},seated:false,neededSeats:[]};states.push(state);return read();},read,
-   play:async({id,text})=>{if(state.pending?.id===id)return read();state.pending={id,text,phase:"player",replies:[],participants:[],attempt:0};state.world.journal.push({id:"input-"+id,actor:state.world.playerId,tick:state.world.tick,text,kind:"player",audience:[state.world.playerId]});return read();},
+   play:async({id,text})=>{if(seen.has(id))return read();seen.add(id);state.pending={id,text,phase:"player",replies:[],participants:[],attempt:0};state.world.journal.push({id:"input-"+id,actor:state.world.playerId,tick:state.world.tick,text,kind:"player",audience:[state.world.playerId]});return read();},
    cancel:async()=>{state.pending=null;state.background.scene={id:"scene",placeId:state.view.location.id,signature:state.visual.signature,status:"queued"};return read();}};
  });return {prepared,states};
 }

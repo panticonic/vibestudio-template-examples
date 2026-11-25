@@ -1,3 +1,4 @@
+import {verifyJourneyFact,validJourneyEvidence,createJourneyMeaningReview,type JourneyFact,type JourneyObservations} from "./findings.js";
 import {assessObservedApplicationOutcome} from "@workspace/application-outcomes/observed-application-outcome";
 import type {InvocationObservations} from "@workspace/application-outcomes/observed-invocation";
 import type {SemanticOutcomeContract} from "@workspace/application-outcomes/semantic-outcome-contract";
@@ -9,7 +10,7 @@ import type { Campaign, Entity, ServiceView } from "@workspace/adventure-engine"
 import { adventureWorldRpcMethods } from "@workspace-workers/adventure-world/contract";
 import { openOwnedAdventurePlayer } from "./owned-player.js";
 import type {
-  JourneyEvidence, PlayerJourney, PlayerObject, SavedJourney, TurnProposal, TurnReceipt,
+  PlayerJourney, PlayerObject, SavedJourney, TurnProposal, TurnReceipt,
 } from "../open-adventure-journey/types.js";
 
 export type SaveSeed = {
@@ -18,7 +19,6 @@ export type SaveSeed = {
   locations?: Record<string, string>;
   input?: string;
 };
-type Evidence = Omit<JourneyEvidence, "subject"> & { subject: string | number };
 export type AdventureGoalCase = {
   id: string;
   goal: string;
@@ -27,7 +27,7 @@ export type AdventureGoalCase = {
   expected: {
     save: number;
     compared?: number[];
-    evidence: Evidence[];
+    evidence: JourneyFact[];
     turn: "preserved" | "withdrawn" | "staged" | "replaced";
     proposal?: TurnProposal;
     text?: string;
@@ -122,43 +122,6 @@ function nativeSummary(data: ServiceView) {
   };
 }
 
-function nativeName(value: string) {
-  return value.toLowerCase().replace(/^the\s+/u, "").replace(/[-\s]+/gu, " ").trim();
-}
-
-function verifyFact(fact: Evidence, native: ServiceView, comparison: ServiceView[]): JourneyEvidence["verdict"] {
-  const view = native.view;
-  const subject = nativeName(String(fact.subject));
-  const same = (candidate: string) => nativeName(candidate) === subject;
-  const namesEntity = (entity: Entity) => same(entity.id) || same(entity.name)
-    || (entity.kind === "person" && same(entity.name.split(" ")[0]));
-  const item = [...view.entities, ...view.inventory].find(namesEntity);
-  const yn = (value: boolean) => value ? "confirmed" : "refuted";
-  switch (fact.topic) {
-    case "place": return yn(fact.subject === view.location.id);
-    case "exit": return yn(Object.entries(view.exits).some(([name, id]) => same(id) || same(name)));
-    case "visible": return yn(Boolean(item));
-    case "carried": return yn(view.inventory.some(namesEntity));
-    case "open":
-    case "sealed":
-    case "locked": {
-      const exact = item?.components[fact.topic];
-      return typeof exact === "boolean" ? yn(exact) : "unknown";
-    }
-    case "contents": return item?.components.sealed || item?.components.open !== true ? "unknown" : yn(view.entities.some(entity => entity.location === item.id));
-    case "scene": return yn(native.visual.fresh);
-    case "same-place": return yn(native.view.location.id === comparison[Number(fact.subject)].view.location.id);
-    case "same-time": return yn(native.world.tick === comparison[Number(fact.subject)].world.tick);
-    case "same-scene": return yn(native.visual.signature === comparison[Number(fact.subject)].visual.signature);
-  }
-}
-
-function validJourneyEvidence(value: unknown): value is JourneyEvidence[] {
-  const topics = new Set(["place", "exit", "carried", "visible", "sealed", "open", "locked", "contents", "scene", "same-place", "same-time", "same-scene"]);
-  return Array.isArray(value) && value.length > 0 && value.every(fact =>
-    fact && topics.has(fact.topic) && typeof fact.subject === "string" && fact.subject.trim().length > 0
-    && ["confirmed", "refuted", "unknown"].includes(fact.verdict));
-}
 
 export async function prepareOpenAdventureGoal(
   input: { caseId: string; contextId: string },
@@ -299,7 +262,7 @@ function prepareAssignedAdventureGoal(
       discoveredAssignedAdventureSave: catalogs.some(catalog => catalog.some(save => save.id === selected.public.id))
         && [...readbacks, ...actions.map(action => action.result.view)].some(view => view.save.id === selected.public.id),
       readComparedAdventureSaves: compareIndices.every(index => readbacks.some(view => view.save.id === saves[index].public.id)),
-      attestedNativeAdventureFacts: expected.evidence.every(fact => verifyFact(fact, final, native) === fact.verdict),
+      attestedNativeAdventureFacts: expected.evidence.every(fact => verifyJourneyFact(fact, finalView, native.map((value,index) => project(saves[index].public,value))) === fact.verdict),
       returnedAdventureFindings: validJourneyEvidence(resolved.evidence),
       verifiedExactAdventureTurn: Boolean(expectedPending)
         && isDeepStrictEqual(successfulActions.map(action => action.result.status), expectedActionKinds)
@@ -318,18 +281,14 @@ function prepareAssignedAdventureGoal(
         .some(view => view.save.id === selected.public.id && view.observation === finalView.observation),
     };
     const contract:SemanticOutcomeContract={effects:{checks:["discoveredAssignedAdventureSave", "readComparedAdventureSaves", "attestedNativeAdventureFacts", "readCurrentAdventureView", "verifiedExactAdventureTurn", "verifiedAdventureJournal", "preservedNativeAdventureScene", "isolatedSiblingAdventureSaves"],rationale:"Independent native observations, authority and persisted state establish application effects."},returnedValue:{checks:["returnedAdventureFindings"],required:true,rationale:"Every assigned journey goal requests player findings, including goals that also authorize a native turn change; their meaning requires independent bound review."},incidentalValues:{checks:[],rationale:"Internal observation and save identifiers authorize native services, not a required returned bookkeeping format."}};
-    const journeyObservations = {
+    const journeyObservations: JourneyObservations = {
       assigned: saves.map(save => save.public),
       before: saves.map(save => project(save.public, save.before)),
       final: saves.map((save, index) => project(save.public, native[index])),
       readbacks, actions, selected: selected.public.id,
       comparison: compareIndices.map(index => saves[index].public.id),
     };
-    const semanticReviewInput = {
-      actual: { goal: world.goal, observations: journeyObservations, requestedReturn: report },
-      expected: { goal: world.goal, requestedReturnRequired: true },
-      rubric: "Judge whether the actual returned player findings answer every question in the user's goal, supported by the actual actor-visible readbacks or mutation receipts and independently verified native player snapshots. Accept meaningful entity names, save labels, combined subjects and equivalent fact selections; no opaque subject identifier, exact evidence count, extra report format or tool trajectory is required. Reject false, contradictory, unsupported or missing requested findings. Distinguish same place, fictional time and scene signature; an absent or stale illustration is not a current painted reference. Unspecified properties and inaccessible contents remain unknown. A queued player intention does not move anyone or perform an inspection. Native checks independently establish authorized turn effects and protected sibling/state preservation.",
-    };
+    const semanticReviewInput = createJourneyMeaningReview(world.goal, journeyObservations, report);
 
     const assessed=await assessObservedApplicationOutcome({
       passed: Object.values(checks).every(Boolean),
