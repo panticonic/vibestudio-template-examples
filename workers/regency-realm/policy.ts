@@ -1,8 +1,9 @@
 import {
   createEvalExecutor,
+  disposeEvalScope,
   type EvalCall,
 } from "@vibestudio/service-schemas/eval";
-import { deserializeRpcFailure, formatRpcFailure } from "@vibestudio/rpc";
+import { deserializeRpcFailure } from "@vibestudio/rpc";
 import {
   validateWorld,
   settleRealmMonth,
@@ -58,9 +59,11 @@ export async function runPolicies(
   enact: string | undefined,
   months: number,
   interaction?: WorldInteraction,
+  options: { legacyWholeRunOnly?: boolean } = {},
 ) {
   const key = "regency-policy-" + crypto.randomUUID();
-  const execute = createEvalExecutor(call);
+  const execute = createEvalExecutor(call, { captureFailureEvents: true });
+  let failure: { error: unknown } | undefined;
   try {
     const result = await execute({
       runId: key,
@@ -75,16 +78,21 @@ export async function runPolicies(
         effects: "read-only",
         approvals: "pregranted-only",
       },
-      timeoutMs: 3000,
+      ...(options.legacyWholeRunOnly
+        ? { timeoutMs: 3000 }
+        : { timeoutMs: 30000, executionTimeoutMs: 3000 }),
     });
     if (!result.success)
-      throw new Error(
-        result.error
-          ? formatRpcFailure(deserializeRpcFailure(result.error))
-          : "Policy execution failed.",
-      );
+      throw result.error
+        ? deserializeRpcFailure(result.error)
+        : new Error("Policy execution failed.");
     const length = result.returnValue;
-    if (typeof length !== "number" || length > 200000)
+    if (
+      !Number.isSafeInteger(length) ||
+      typeof length !== "number" ||
+      length < 0 ||
+      length > 200000
+    )
       throw new Error("Policy result is too large.");
     let text = "";
     for (let offset = 0; offset < length; offset += 4000) {
@@ -96,6 +104,9 @@ export async function runPolicies(
           syntax: "javascript",
           code: `return scope.policyResult.slice(${offset},${offset + 4000});`,
         },
+        ...(options.legacyWholeRunOnly
+          ? {}
+          : { timeoutMs: 30000, executionTimeoutMs: 3000 }),
         authority: {
           requests: [],
           effects: "read-only",
@@ -103,7 +114,9 @@ export async function runPolicies(
         },
       });
       if (!page.success || typeof page.returnValue !== "string")
-        throw new Error("Policy result could not be read.");
+        throw page.error
+          ? deserializeRpcFailure(page.error)
+          : new Error("Policy result could not be read.");
       text += page.returnValue;
     }
     const output = JSON.parse(text);
@@ -120,7 +133,10 @@ export async function runPolicies(
       programs: programs.map((p, i) => ({ ...p, state: output.states[i] })),
       events: output.events as string[],
     };
+  } catch (error) {
+    failure = { error };
+    throw error;
   } finally {
-    await call("eval.dispose", [{ scopeKey: key }]);
+    await disposeEvalScope(call, key, failure);
   }
 }

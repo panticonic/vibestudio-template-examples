@@ -1,8 +1,9 @@
 import {
   createEvalExecutor,
+  disposeEvalScope,
   type EvalCall,
 } from "@vibestudio/service-schemas/eval";
-import { deserializeRpcFailure, formatRpcFailure } from "@vibestudio/rpc";
+import { deserializeRpcFailure } from "@vibestudio/rpc";
 import {
   createWorldAPI,
   validateWorld,
@@ -79,8 +80,9 @@ export async function evaluate(
   code: string,
   engineSource: string,
   privileged = false,
+  options: { legacyWholeRunOnly?: boolean } = {},
 ) {
-  const execute = createEvalExecutor(call),
+  const execute = createEvalExecutor(call, { captureFailureEvents: true }),
     key = "adventure-" + crypto.randomUUID();
   const run = (code: string) =>
     execute({
@@ -92,26 +94,34 @@ export async function evaluate(
         effects: "read-only",
         approvals: "pregranted-only",
       },
-      timeoutMs: 3000,
+      ...(options.legacyWholeRunOnly
+        ? { timeoutMs: 3000 }
+        : { timeoutMs: 30000, executionTimeoutMs: 3000 }),
     });
+  let failure: { error: unknown } | undefined;
   try {
     const result = await run(
       simulationSource(world, actorId, code, engineSource, privileged),
     );
     if (!result.success)
-      throw new Error(
-        result.error
-          ? formatRpcFailure(deserializeRpcFailure(result.error))
-          : "Eval failed",
-      );
+      throw result.error
+        ? deserializeRpcFailure(result.error)
+        : new Error("Eval failed");
     const length = result.returnValue;
-    if (typeof length !== "number" || length > 1000000)
+    if (
+      !Number.isSafeInteger(length) ||
+      typeof length !== "number" ||
+      length < 0 ||
+      length > 1000000
+    )
       throw new Error("Invalid simulation result");
     let output = "";
     for (let n = 0; n < length; n += 4000) {
       const page = await run(`return scope.output.slice(${n},${n + 4000});`);
       if (!page.success || typeof page.returnValue !== "string")
-        throw new Error("Simulation result unavailable");
+        throw page.error
+          ? deserializeRpcFailure(page.error)
+          : new Error("Simulation result unavailable");
       output += page.returnValue;
     }
     const parsed = JSON.parse(output);
@@ -124,7 +134,10 @@ export async function evaluate(
     }
     validateWorld(parsed.world);
     return parsed as { world: World; result: unknown };
+  } catch (error) {
+    failure = { error };
+    throw error;
   } finally {
-    await call("eval.dispose", [{ scopeKey: key }]);
+    await disposeEvalScope(call, key, failure);
   }
 }
