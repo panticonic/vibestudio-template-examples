@@ -1,0 +1,7 @@
+# Adventure declared service binding
+
+The complete eight-template authored-NL inventory found three instructions that prescribed a `services.<declaredName>` container inside a Natlang function. Actual admitted model scope binds each declared service by its own name. The two reconciliation instructions are corrected in Base55530731; this change corrects Adventure changeTurn to `adventurePlayerTurn.stage/withdraw`.
+
+The full saved-observation arguments, proposal, native receipt and withdraw-before-stage protocol are unchanged. No goal/ID/split, public signature, native authority, model route or review rule changed. Host cell raw `services` and TypeScript namespace imports remain separate valid APIs.
+
+Actual source-sensitive public ProgramLoader control passed both withdrawal and staging through the existing Adventure library member, forwarding the exact save/observation/proposal and returning the real controlled native receipt. The callee is extracted from the authored instruction, so the old wrong prefix fails in actual scope. Unit vibe-adventure-service-binding-20261126b passed one control/two native invocations in 9.296s at approximately 2.3GiB, four unrelated controls skipped. No model/provider calls or live player qualification are claimed. Evidence: /home/werg/vibe-adventure-direct-service-binding-ops; full inventory: /home/werg/vibe-reconciliation-planning-ops/service-binding-namespace-inventory.json.

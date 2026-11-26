@@ -5,4 +5,4 @@ args:
   proposal: TurnProposal | null
 returns: TurnReceipt
 ---
-For a null proposal, call services.adventurePlayerTurn.withdraw with current.save.id and current.observation. Otherwise call services.adventurePlayerTurn.stage with current.save.id, current.observation, and the exact proposal. Return the service result unchanged.
+For a null proposal, call adventurePlayerTurn.withdraw with current.save.id and current.observation. Otherwise call adventurePlayerTurn.stage with current.save.id, current.observation, and the exact proposal. Return the service result unchanged.
